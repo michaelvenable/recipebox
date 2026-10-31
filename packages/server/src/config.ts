@@ -2,9 +2,11 @@
  * Server configuration, read from the environment.
  *
  * `APP_ENV` names the environment. Only when it is `development` or `test` may settings be left out or blank; they then default
- * to the Cosmos DB emulator from docker-compose.yml. In every other case, including when `APP_ENV` is not set, every setting is
- * required and `loadConfig` throws at startup naming the missing ones, so a deployed app never silently uses the emulator.
- * `npm run dev` and the Vitest configs set `APP_ENV` for local use.
+ * to the Cosmos DB emulator from docker-compose.yml and the Vite dev server's origin. In every other case, including when
+ * `APP_ENV` is not set, every setting is required and `loadConfig` throws at startup naming the missing ones, so a deployed app
+ * never silently uses the emulator. `npm run dev` and the Vitest configs set `APP_ENV` for local use.
+ *
+ * `EDITORS` is the one optional setting everywhere: an empty list is valid and means nobody can edit (X-7).
  */
 export interface CosmosConfig {
   endpoint: string;
@@ -13,8 +15,32 @@ export interface CosmosConfig {
   container: string;
 }
 
+/** The identity providers Container Apps' built-in authentication is set up with (docs/architecture.md, "Sign-in"). */
+export const PROVIDERS = ["aad", "google"] as const;
+export type Provider = (typeof PROVIDERS)[number];
+
+/** A signed-in identity: the provider plus that provider's permanent account ID, never an email address (X-7). */
+export interface Identity {
+  provider: Provider;
+  accountId: string;
+}
+
 export interface Config {
   cosmos: CosmosConfig;
+  /** True when `APP_ENV` is `development` or `test`. */
+  local: boolean;
+  /** True when running on Azure Container Apps, which sets `CONTAINER_APP_NAME` in every container. */
+  onContainerApps: boolean;
+  /**
+   * True only on Container Apps with `TRUST_AUTH_HEADERS` set to exactly `true`. The `X-MS-CLIENT-PRINCIPAL-*` headers can't be
+   * forged only while the built-in authentication layer is switched on; the infrastructure script sets the setting in the same
+   * step that turns it on (docs/architecture.md, "Sign-in"). Otherwise the headers are ignored and everyone is a visitor.
+   */
+  trustAuthHeaders: boolean;
+  /** The editor list (X-7). */
+  editors: readonly Identity[];
+  /** The client's origin, the only origin CORS allows (docs/architecture.md, "Sign-in"). */
+  clientOrigin: string;
 }
 
 /** The emulator's address in docker-compose.yml; it serves plain HTTP. */
@@ -27,35 +53,108 @@ export const COSMOS_EMULATOR_ENDPOINT = "http://localhost:8081";
 export const COSMOS_EMULATOR_KEY =
   "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
 
-/** The `APP_ENV` values in which missing settings fall back to the local emulator defaults. */
+/** The Vite dev server's origin, the default `CLIENT_ORIGIN` in development and test. */
+export const DEV_CLIENT_ORIGIN = "http://localhost:5173";
+
+/** The `APP_ENV` values in which missing settings fall back to the local defaults. */
 const LOCAL_ENVIRONMENTS: readonly string[] = ["development", "test"];
 
 type Env = Readonly<Record<string, string | undefined>>;
 
+export function isProvider(value: string): value is Provider {
+  return (PROVIDERS as readonly string[]).includes(value);
+}
+
+/**
+ * Parses `provider:accountId`, e.g. `google:1098`. Returns undefined for an unknown provider or a missing or blank account ID.
+ * Provider names are matched exactly, as Container Apps sends them.
+ */
+export function parseIdentity(text: string): Identity | undefined {
+  const colon = text.indexOf(":");
+  if (colon < 0) return undefined;
+  const provider = text.slice(0, colon).trim();
+  const accountId = text.slice(colon + 1).trim();
+  if (!isProvider(provider) || accountId === "" || /\s/.test(accountId)) return undefined;
+  return { provider, accountId };
+}
+
+/** Parses the `EDITORS` setting (X-7): comma-separated `provider:accountId` entries; spaces and empty entries are ignored. */
+export function parseEditors(text: string | undefined): Identity[] {
+  const entries = (text ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
+  const editors: Identity[] = [];
+  const malformed: string[] = [];
+  for (const entry of entries) {
+    const identity = parseIdentity(entry);
+    if (identity === undefined) malformed.push(entry);
+    else editors.push(identity);
+  }
+  if (malformed.length > 0) {
+    throw new Error(
+      `Malformed EDITORS entries: ${malformed.map((e) => JSON.stringify(e)).join(", ")}. ` +
+        `Each entry must be provider:accountId, where provider is ${PROVIDERS.join(" or ")}, e.g. "google:1098,aad:9f3c".`,
+    );
+  }
+  return editors;
+}
+
+function parseOrigin(value: string): string {
+  let url: URL | undefined;
+  try {
+    url = new URL(value);
+  } catch {
+    url = undefined;
+  }
+  if (url === undefined || url.origin !== value) {
+    throw new Error(
+      `CLIENT_ORIGIN must be an origin such as https://recipes.example.net (scheme, host and optional port, no path or ` +
+        `trailing slash); got ${JSON.stringify(value)}.`,
+    );
+  }
+  return value;
+}
+
 export function loadConfig(env: Env = process.env): Config {
-  const useLocalDefaults = LOCAL_ENVIRONMENTS.includes(env.APP_ENV?.trim() ?? "");
+  const appEnv = env.APP_ENV?.trim() ?? "";
+  const local = LOCAL_ENVIRONMENTS.includes(appEnv);
+  const onContainerApps = (env.CONTAINER_APP_NAME?.trim() ?? "") !== "";
+  // The local defaults and the development sign-in stub must never run in a deployed app (docs/architecture.md, "Sign-in").
+  if (local && onContainerApps) {
+    throw new Error(
+      `APP_ENV=${appEnv} is not allowed on Container Apps (CONTAINER_APP_NAME is set). Development and test mode are for ` +
+        "local use only; remove APP_ENV or set it to the deployed environment's name.",
+    );
+  }
   const missing: string[] = [];
 
   function setting(name: string, localDefault: string): string {
     const value = env[name]?.trim();
     if (value !== undefined && value !== "") return value;
-    if (!useLocalDefaults) missing.push(name);
+    if (!local) missing.push(name);
     return localDefault;
   }
 
-  const config: Config = {
-    cosmos: {
-      endpoint: setting("COSMOS_ENDPOINT", COSMOS_EMULATOR_ENDPOINT),
-      key: setting("COSMOS_KEY", COSMOS_EMULATOR_KEY),
-      database: setting("COSMOS_DATABASE", "recipebox"),
-      container: setting("COSMOS_CONTAINER", "recipes"),
-    },
+  const cosmos: CosmosConfig = {
+    endpoint: setting("COSMOS_ENDPOINT", COSMOS_EMULATOR_ENDPOINT),
+    key: setting("COSMOS_KEY", COSMOS_EMULATOR_KEY),
+    database: setting("COSMOS_DATABASE", "recipebox"),
+    container: setting("COSMOS_CONTAINER", "recipes"),
   };
+  const clientOrigin = setting("CLIENT_ORIGIN", DEV_CLIENT_ORIGIN);
   if (missing.length > 0) {
     throw new Error(
       `Missing required settings: ${missing.join(", ")}. ` +
-        "Set them, or set APP_ENV=development or APP_ENV=test to use the local emulator.",
+        "Set them, or set APP_ENV=development or APP_ENV=test to use the local defaults.",
     );
   }
-  return config;
+  return {
+    cosmos,
+    local,
+    onContainerApps,
+    trustAuthHeaders: onContainerApps && env.TRUST_AUTH_HEADERS === "true",
+    editors: parseEditors(env.EDITORS),
+    clientOrigin: parseOrigin(clientOrigin),
+  };
 }
