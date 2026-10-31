@@ -11,6 +11,7 @@ React PWA on Azure Static Web Apps, Fastify API on Azure Container Apps, Cosmos 
 | `docs/specs/*.md`      | Requirements by area: REC (recipes), PLAN (to-make list), COOK (history) |
 | `docs/domain-model.md` | Design of the domain package: classes, rules, snapshot shape             |
 | `docs/architecture.md` | Hosting, sign-in, request flow, public vs. private data, testing         |
+| `docs/api.md`          | HTTP endpoints, status codes and request/response shapes                 |
 
 The specs are the source of truth. If code and spec disagree, the code is wrong or the spec needs the owner's decision.
 
