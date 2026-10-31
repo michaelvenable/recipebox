@@ -11,6 +11,8 @@ Status: drafted by Claude from the specs and architecture, awaiting the owner's 
   is nothing to send); anything else is refused with 415. `GET` never changes anything. (CSRF, docs/architecture.md)
 - Times are ISO 8601 strings in UTC as written by the server, e.g. `2026-10-30T22:15:03.120Z` (X-12). Requests never carry a time.
 - Recipe ids are lowercase UUIDs. A malformed id is treated as not found.
+- Every shape is strict: a request or response with a field the shape doesn't list is rejected (400 for requests), so a misspelled
+  field fails visibly and a private field can't slip into a public response.
 - Callers are visitors, signed-in non-editors (treated as visitors), or editors (X-6, X-7).
 
 Errors:
@@ -24,7 +26,7 @@ Errors:
 | 409    | Change refused by state: recipe in the trash (REC-17), restore too late (REC-16) | `ErrorResponse`              |
 | 415    | A change sent without a JSON body                                                | `ErrorResponse`              |
 
-`ErrorResponse` is `{ errors: DomainError[] }`, the domain's errors with their `code`, `field` and `message`.
+`ErrorResponse` is `{ errors: ErrorItem[] }`; each `ErrorItem` is a domain error's `code`, `field` and `message`.
 
 ## Public endpoints (anyone)
 
