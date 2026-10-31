@@ -18,7 +18,8 @@ been cooked in a while.
   it (withdrawn).
 - Every requirement must be checkable: it should be possible to write a test, or describe a concrete scenario, that shows it is
   met or broken.
-- Specs describe behavior, not implementation. Storage layout, framework choices and code structure live in `docs/architecture.md`.
+- Specs describe behavior, not implementation. Storage layout, framework choices and code structure live in
+  `docs/architecture.md`.
 - "Out of scope" sections are binding: reviewers must not flag missing features listed there.
 - Items marked (proposed) are decisions the drafter made and the owner has not yet confirmed.
 
@@ -57,6 +58,10 @@ been cooked in a while.
   checked. Stored times are shown in the device's time zone. Relative labels such as "3 months ago" (COOK-6) and "10 days left"
   (REC-14) are calculated on the device, as is whether a recipe was cooked today (COOK-8). Short screen timers such as the Undo
   message (REC-6) also run on the device.
+- **X-13. Text.** These rules apply wherever the specs count characters, sort text or match a search term:
+  - Characters are counted as a person sees them. Every emoji counts as one character, including combined ones such as flags.
+  - Sorting and matching ignore case and accents, using English rules. "Éclair" sorts among the E's, and searching "creme" finds
+    "Crème brûlée".
 
 ## Out of scope (for now)
 

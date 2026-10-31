@@ -7,14 +7,14 @@ tag.
 
 ## Recipe contents
 
-| Field       | Required | Rules                                                   |
-| ----------- | -------- | ------------------------------------------------------- |
-| Name        | Yes      | 1–200 characters after trimming whitespace              |
-| Ingredients | Yes      | Ordered list of free-text entries, at least 1           |
-| Steps       | Yes      | Ordered list of free-text entries, at least 1           |
-| Photo       | No       | One image (see REC-7)                                   |
-| Total time  | No       | Whole minutes, 1–1440, covering preparation and cooking |
-| Tags        | No       | Zero or more short labels (see REC-10 to REC-13)        |
+| Field       | Required | Rules                                                                      |
+| ----------- | -------- | -------------------------------------------------------------------------- |
+| Name        | Yes      | 1–200 characters after trimming whitespace                                 |
+| Ingredients | Yes      | Ordered list of free-text entries, at least 1, each up to 1,000 characters |
+| Steps       | Yes      | Ordered list of free-text entries, at least 1, each up to 1,000 characters |
+| Photo       | No       | One image (see REC-7)                                                      |
+| Total time  | No       | Whole minutes, 1–1440, covering preparation and cooking                    |
+| Tags        | No       | Zero or more short labels (see REC-10 to REC-13)                           |
 
 ## Requirements
 
@@ -37,10 +37,10 @@ tag.
   - Anything else is rejected with a message; the recipe is unchanged.
   - Replacing or removing a photo deletes the previous image from storage.
   - Photos display correctly oriented (respect camera rotation metadata).
-- **REC-8. List.** A user can see all recipes, sorted by name case-insensitively, each showing its name and a photo thumbnail (or
-  a placeholder when there is no photo).
+- **REC-8. List.** A user can see all recipes, sorted by name, ignoring case and accents (X-13), each showing its name and a photo
+  thumbnail (or a placeholder when there is no photo).
 - **REC-9. Search by name.** A user can type a search term to filter the list.
-  - Matching is case-insensitive and finds the term anywhere in the name.
+  - Matching ignores case and accents (X-13) and finds the term anywhere in the name.
   - Leading/trailing whitespace in the term is ignored.
   - An empty term shows all recipes.
   - Results keep the REC-8 sort order.
@@ -49,18 +49,18 @@ tag.
   recipe and directly from the recipe view. Tags are free-form labels such as "dinner", "vegetarian" or "quick"; a new tag is
   created simply by typing it.
 - **REC-11. Tag rules.**
-  - A tag is trimmed, then must be 1–30 characters.
+  - A tag is trimmed and lowercased, then must be 1–30 characters (X-13).
   - Tags are stored and shown in lowercase, so "Dinner" and "dinner" are the same tag.
   - A recipe never has the same tag twice; attaching a tag it already has changes nothing and shows no error, even when the recipe
     already has 20 tags.
   - A recipe has at most 20 tags.
-  - A recipe's tags are shown in alphabetical order.
+  - A recipe's tags are shown in alphabetical order (X-13).
 - **REC-12. Tag suggestions.** While typing a tag, the editor is offered tags already used on other recipes that contain the typed
   text, ignoring case, so the collection doesn't drift into near-duplicates like "dessert" and "desserts". Tags the recipe already
   has are not offered.
 - **REC-13. Filter by tags.** On the recipe list, a user can pick one or more tags to filter by.
-  - The user picks from every tag currently in use, shown in alphabetical order (case-insensitive) with the number of recipes that
-    have each one.
+  - The user picks from every tag currently in use, shown in alphabetical order (X-13) with the number of recipes that have each
+    one.
   - With several tags picked, only recipes that have all of them are shown.
   - The tag filter and name search (REC-9) can be used together; a recipe must match both.
   - Results keep the REC-8 sort order. Clearing all picked tags shows the unfiltered list.
@@ -80,23 +80,27 @@ tag.
 
 ## Examples
 
-| Situation                                                                    | Result                                   |
-| ---------------------------------------------------------------------------- | ---------------------------------------- |
-| Name `"  Pad Thai "`                                                         | Saved as `"Pad Thai"`                    |
-| Ingredients `["2 eggs", "  ", ""]`                                           | Saved as `["2 eggs"]`                    |
-| Ingredients `["   "]`                                                        | Rejected: at least 1 ingredient required |
-| Total time `0` or `2.5`                                                      | Rejected                                 |
-| Search `"chick"` with recipes "Chicken Tikka", "Chickpea Curry", "Beef Stew" | Chicken Tikka, Chickpea Curry            |
-| Search `"TIKKA "`                                                            | Chicken Tikka                            |
-| Delete "Pad Thai" (on the to-make list), then restore it                     | Restored, but not on the "to make" list  |
-| Recipe deleted 2026-10-01; today is 2026-10-21                               | Trash shows 10 days left                 |
-| Upload a 20 MB JPEG                                                          | Rejected: too large; existing photo kept |
-| Attach tag `" Quick "` to a recipe tagged "quick"                            | No change; one tag "quick"               |
-| Recipes: A [dinner, quick], B [dinner], C [quick]; filter dinner + quick     | A                                        |
-| Same recipes; filter "dinner" and search "b"                                 | B                                        |
-| Remove "quick" from A and C                                                  | "quick" no longer offered as a filter    |
-| Attach "quick" to a recipe that has 20 tags including "quick"                | No change, no error                      |
-| Restore a recipe deleted 30 days and 2 hours ago, not yet removed            | Refused: can no longer be restored       |
+| Situation                                                                    | Result                                      |
+| ---------------------------------------------------------------------------- | ------------------------------------------- |
+| Name `"  Pad Thai "`                                                         | Saved as `"Pad Thai"`                       |
+| Ingredients `["2 eggs", "  ", ""]`                                           | Saved as `["2 eggs"]`                       |
+| Ingredients `["   "]`                                                        | Rejected: at least 1 ingredient required    |
+| Total time `0` or `2.5`                                                      | Rejected                                    |
+| Search `"chick"` with recipes "Chicken Tikka", "Chickpea Curry", "Beef Stew" | Chicken Tikka, Chickpea Curry               |
+| Search `"TIKKA "`                                                            | Chicken Tikka                               |
+| Search `"creme"` with a recipe "Crème Brûlée"                                | Crème Brûlée                                |
+| Recipes "Zucchini Bread", "Éclair", "apple pie"                              | Listed as apple pie, Éclair, Zucchini Bread |
+| Tags "zucchini", "épicé", "apple" on one recipe                              | Shown as apple, épicé, zucchini             |
+| An ingredient of 1,001 characters                                            | Rejected                                    |
+| Delete "Pad Thai" (on the to-make list), then restore it                     | Restored, but not on the "to make" list     |
+| Recipe deleted 2026-10-01; today is 2026-10-21                               | Trash shows 10 days left                    |
+| Upload a 20 MB JPEG                                                          | Rejected: too large; existing photo kept    |
+| Attach tag `" Quick "` to a recipe tagged "quick"                            | No change; one tag "quick"                  |
+| Recipes: A [dinner, quick], B [dinner], C [quick]; filter dinner + quick     | A                                           |
+| Same recipes; filter "dinner" and search "b"                                 | B                                           |
+| Remove "quick" from A and C                                                  | "quick" no longer offered as a filter       |
+| Attach "quick" to a recipe that has 20 tags including "quick"                | No change, no error                         |
+| Restore a recipe deleted 30 days and 2 hours ago, not yet removed            | Refused: can no longer be restored          |
 
 ## Out of scope
 
