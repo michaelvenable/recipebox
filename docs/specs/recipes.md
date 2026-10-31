@@ -77,7 +77,7 @@ tag.
   are measured by the server's clock, never by a time the app sends.
 - **REC-17. Trashed recipes can't be changed.** Any change to a recipe in the trash, other than restoring it, is refused and
   nothing changes. The editor is told the recipe is in the trash. (This can happen when another device still shows the recipe
-  after it was deleted.)
+  after it was deleted.) The exception is deleting it again: that changes nothing and shows no error.
 - **REC-18. Screen stays on.** While a recipe is open, the device's screen doesn't turn off on its own, on devices and browsers
   that allow it. It may turn off again once the recipe is closed.
 - **REC-19. Tick off while cooking.** Anyone viewing a recipe can tick off ingredients and steps as they go, and untick them.

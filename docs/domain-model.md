@@ -130,7 +130,7 @@ Behavior rules:
 | `setPhoto`, `removePhoto`     | Return the previous `PhotoRef` so its blob can be deleted.                 | REC-7          |
 | `revise`                      | Replaces content, including tags. Never touches photo, plan or history.    | REC-5          |
 | `attachTag`                   | Already attached: no-op, even at 20. Else fails if invalid or 20 attached. | REC-11         |
-| `removeTag`                   | If the tag isn't attached, does nothing.                                   | REC-10         |
+| `removeTag`                   | If the tag isn't attached, or isn't a valid tag, does nothing.             | REC-10         |
 | `delete`                      | Clears to-make status. Already deleted: no-op.                             | REC-6, PLAN-6  |
 | All changes except `restore`  | Fail with `recipe.inTrash` on a deleted recipe; nothing changes.           | REC-17         |
 | `restore`                     | Fails with `trash.expired` if `at` is at or after `removalDueAt`.          | REC-16         |
