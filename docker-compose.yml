@@ -1,0 +1,17 @@
+# Local services for development and integration tests (docs/architecture.md, "Testing"). Tests never touch Azure.
+name: recipebox
+
+services:
+  cosmos:
+    # The Linux "vNext" emulator serves plain HTTP at http://localhost:8081 with the well-known emulator key.
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview
+    command: ["--protocol", "http"]
+    ports:
+      - "8081:8081"
+
+  azurite:
+    # Blob Storage emulator, for photos (later tasks).
+    image: mcr.microsoft.com/azure-storage/azurite
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--blobPort", "10000"]
+    ports:
+      - "10000:10000"

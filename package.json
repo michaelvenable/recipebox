@@ -13,7 +13,10 @@
     "test:watch": "vitest",
     "typecheck": "tsc -b",
     "dev:server": "npm run dev -w @recipebox/server",
-    "dev:client": "npm run dev -w @recipebox/client"
+    "dev:client": "npm run dev -w @recipebox/client",
+    "test:int": "vitest run --config vitest.int.config.ts",
+    "services:up": "docker compose up -d",
+    "services:down": "docker compose down"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

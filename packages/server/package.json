@@ -4,14 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/main.ts"
+    "dev": "cross-env APP_ENV=development tsx watch src/main.ts"
   },
   "dependencies": {
+    "@azure/cosmos": "^4.10.1",
     "@recipebox/domain": "^0.0.0",
     "@recipebox/shared": "^0.0.0",
     "fastify": "^5.12.7"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "tsx": "^4.23.15"
   }
 }
