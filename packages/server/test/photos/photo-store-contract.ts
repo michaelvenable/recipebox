@@ -73,6 +73,40 @@ export function photoStoreContract(name: string, createStore: () => Promise<Phot
       await expect(store.delete(name)).resolves.toBeUndefined();
     });
 
+    // The store's last-modified times come from its own clock (Blob Storage's, at whole seconds); this only checks that they
+    // are close to now.
+    const CLOCK_TOLERANCE_MS = 60_000;
+
+    it("lists stored images by full name with their last-modified time", async () => {
+      const photo = photoName();
+      const thumbnail = photo.replace(/\.jpg$/, ".thumbnail.jpg");
+      const before = Date.now();
+      await store.put(photo, Buffer.from("photo"), "image/jpeg");
+      await store.put(thumbnail, Buffer.from("thumbnail"), "image/jpeg");
+      const after = Date.now();
+
+      const listed = (await store.list()).filter((image) => image.name === photo || image.name === thumbnail);
+
+      expect(listed.map((image) => image.name).sort()).toEqual([photo, thumbnail].sort());
+      for (const image of listed) {
+        expect(image.lastModified.epochMillis).toBeGreaterThanOrEqual(before - CLOCK_TOLERANCE_MS);
+        expect(image.lastModified.epochMillis).toBeLessThanOrEqual(after + CLOCK_TOLERANCE_MS);
+      }
+    });
+
+    it("doesn't list deleted images", async () => {
+      const kept = photoName();
+      const deleted = photoName();
+      await store.put(kept, Buffer.from("kept"), "image/jpeg");
+      await store.put(deleted, Buffer.from("deleted"), "image/jpeg");
+
+      await store.delete(deleted);
+
+      const names = (await store.list()).map((image) => image.name);
+      expect(names).toContain(kept);
+      expect(names).not.toContain(deleted);
+    });
+
     it("stores larger images intact", async () => {
       const name = photoName();
       const bytes = Buffer.alloc(3 * 1024 * 1024);

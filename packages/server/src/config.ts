@@ -4,7 +4,8 @@
  * `APP_ENV` names the environment. Only when it is `development` or `test` may settings be left out or blank; they then default
  * to the Cosmos DB emulator and Azurite from docker-compose.yml and the Vite dev server's origin. In every other case,
  * including when `APP_ENV` is not set, every setting is required and `loadConfig` throws at startup naming the missing ones, so
- * a deployed app never silently uses the emulators. `npm run dev` and the Vitest configs set `APP_ENV` for local use.
+ * a deployed app never silently uses the emulators. `npm run dev`, `npm run cleanup:dev` and the Vitest configs set `APP_ENV`
+ * for local use.
  *
  * `EDITORS` is the one optional setting everywhere: an empty list is valid and means nobody can edit (X-7).
  */
@@ -36,12 +37,16 @@ export interface Config {
   storage: StorageConfig;
   /** True when `APP_ENV` is `development` or `test`. */
   local: boolean;
-  /** True when running on Azure Container Apps, which sets `CONTAINER_APP_NAME` in every container. */
+  /**
+   * True when running on Azure Container Apps: in an app, which sets `CONTAINER_APP_NAME` in every container, or in a job, such
+   * as the trash cleanup, which sets `CONTAINER_APP_JOB_NAME`.
+   */
   onContainerApps: boolean;
   /**
-   * True only on Container Apps with `TRUST_AUTH_HEADERS` set to exactly `true`. The `X-MS-CLIENT-PRINCIPAL-*` headers can't be
-   * forged only while the built-in authentication layer is switched on; the infrastructure script sets the setting in the same
-   * step that turns it on (docs/architecture.md, "Sign-in"). Otherwise the headers are ignored and everyone is a visitor.
+   * True only in a Container App (`CONTAINER_APP_NAME`; a job serves no requests) with `TRUST_AUTH_HEADERS` set to exactly
+   * `true`. The `X-MS-CLIENT-PRINCIPAL-*` headers can't be forged only while the built-in authentication layer is switched on;
+   * the infrastructure script sets the setting in the same step that turns it on (docs/architecture.md, "Sign-in"). Otherwise
+   * the headers are ignored and everyone is a visitor.
    */
   trustAuthHeaders: boolean;
   /** The editor list (X-7). */
@@ -74,6 +79,9 @@ export const DEV_CLIENT_ORIGIN = "http://localhost:5173";
 
 /** The `APP_ENV` values in which missing settings fall back to the local defaults. */
 const LOCAL_ENVIRONMENTS: readonly string[] = ["development", "test"];
+
+/** Set by Azure Container Apps in every app container and every job container, respectively. */
+const CONTAINER_APPS_VARIABLES = ["CONTAINER_APP_NAME", "CONTAINER_APP_JOB_NAME"] as const;
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -135,12 +143,15 @@ function parseOrigin(value: string): string {
 export function loadConfig(env: Env = process.env): Config {
   const appEnv = env.APP_ENV?.trim() ?? "";
   const local = LOCAL_ENVIRONMENTS.includes(appEnv);
-  const onContainerApps = (env.CONTAINER_APP_NAME?.trim() ?? "") !== "";
-  // The local defaults and the development sign-in stub must never run in a deployed app (docs/architecture.md, "Sign-in").
+  const containerAppsVariables = CONTAINER_APPS_VARIABLES.filter((name) => (env[name]?.trim() ?? "") !== "");
+  const onContainerApps = containerAppsVariables.length > 0;
+  // The local defaults, the emulators and the development sign-in stub must never run in a deployed app or job
+  // (docs/architecture.md, "Sign-in" and "Trash cleanup").
   if (local && onContainerApps) {
     throw new Error(
-      `APP_ENV=${appEnv} is not allowed on Container Apps (CONTAINER_APP_NAME is set). Development and test mode are for ` +
-        "local use only; remove APP_ENV or set it to the deployed environment's name.",
+      `APP_ENV=${appEnv} is not allowed on Container Apps (${containerAppsVariables.join(" and ")} ` +
+        `${containerAppsVariables.length > 1 ? "are" : "is"} set). Development and test mode are for local use only; ` +
+        "remove APP_ENV or set it to the deployed environment's name.",
     );
   }
   const missing: string[] = [];
@@ -174,7 +185,7 @@ export function loadConfig(env: Env = process.env): Config {
     storage,
     local,
     onContainerApps,
-    trustAuthHeaders: onContainerApps && env.TRUST_AUTH_HEADERS === "true",
+    trustAuthHeaders: (env.CONTAINER_APP_NAME?.trim() ?? "") !== "" && env.TRUST_AUTH_HEADERS === "true",
     editors: parseEditors(env.EDITORS),
     clientOrigin: parseOrigin(clientOrigin),
   };

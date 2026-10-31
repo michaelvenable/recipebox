@@ -80,6 +80,17 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...allSettings, CONTAINER_APP_NAME: "recipebox-api" }).onContainerApps).toBe(true);
   });
 
+  it("detects a Container Apps Job from CONTAINER_APP_JOB_NAME", () => {
+    expect(loadConfig({ ...allSettings, CONTAINER_APP_JOB_NAME: " " }).onContainerApps).toBe(false);
+    expect(loadConfig({ ...allSettings, CONTAINER_APP_JOB_NAME: "recipebox-cleanup" }).onContainerApps).toBe(true);
+  });
+
+  it("never trusts identity headers in a Container Apps Job, which serves no requests", () => {
+    expect(
+      loadConfig({ ...allSettings, CONTAINER_APP_JOB_NAME: "recipebox-cleanup", TRUST_AUTH_HEADERS: "true" }).trustAuthHeaders,
+    ).toBe(false);
+  });
+
   it("trusts identity headers only on Container Apps with TRUST_AUTH_HEADERS exactly \"true\"", () => {
     const onContainerApps = { ...allSettings, CONTAINER_APP_NAME: "recipebox-api" };
     expect(loadConfig({ ...onContainerApps, TRUST_AUTH_HEADERS: "true" }).trustAuthHeaders).toBe(true);
@@ -100,8 +111,19 @@ describe("loadConfig", () => {
     );
   });
 
+  it.each(["development", "test", " test "])("refuses to start with APP_ENV=%j in a Container Apps Job", (appEnv) => {
+    expect(() => loadConfig({ ...allSettings, APP_ENV: appEnv, CONTAINER_APP_JOB_NAME: "recipebox-cleanup" })).toThrow(
+      "is not allowed on Container Apps (CONTAINER_APP_JOB_NAME is set)",
+    );
+    // Without any other settings, as `npm run cleanup:dev` would run it: still refused, not run on the emulator defaults.
+    expect(() => loadConfig({ APP_ENV: appEnv, CONTAINER_APP_JOB_NAME: "recipebox-cleanup" })).toThrow(
+      "is not allowed on Container Apps",
+    );
+  });
+
   it.each([undefined, "production", "staging"])("starts on Container Apps with APP_ENV=%j", (appEnv) => {
     expect(loadConfig({ ...allSettings, APP_ENV: appEnv, CONTAINER_APP_NAME: "recipebox-api" }).local).toBe(false);
+    expect(loadConfig({ ...allSettings, APP_ENV: appEnv, CONTAINER_APP_JOB_NAME: "recipebox-cleanup" }).local).toBe(false);
   });
 });
 

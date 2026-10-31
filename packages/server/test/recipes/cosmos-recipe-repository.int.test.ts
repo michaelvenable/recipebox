@@ -7,6 +7,7 @@ import {
   CosmosRecipeRepository,
   createCosmosClient,
   ensureRecipeContainer,
+  openRecipeContainer,
   withoutSystemProperties,
   type RecipeDocument,
 } from "../../src/recipes/cosmos-recipe-repository.js";
@@ -57,6 +58,33 @@ describe("CosmosRecipeRepository document shape", () => {
     const again = await ensureRecipeContainer(client, { database: config.database, container: container.id });
     const { resource } = await again.read();
     expect(resource?.partitionKey?.paths).toEqual(["/id"]);
+  });
+});
+
+describe("CosmosRecipeRepository outside local runs (architecture.md, Trash cleanup)", () => {
+  it("opens an existing container", async () => {
+    const opened = await openRecipeContainer(client, { database: config.database, container: container.id });
+    expect(opened.id).toBe(container.id);
+  });
+
+  it("refuses a missing container, and doesn't create it", async () => {
+    const missing = `recipes-missing-${randomUUID()}`;
+
+    await expect(openRecipeContainer(client, { database: config.database, container: missing })).rejects.toThrow(
+      "does not exist",
+    );
+
+    const { resources } = await client.database(config.database).containers.readAll().fetchAll();
+    expect(resources.map((c) => c.id)).not.toContain(missing);
+  });
+
+  it("refuses a missing database, and doesn't create it", async () => {
+    const missing = `recipebox-missing-${randomUUID()}`;
+
+    await expect(openRecipeContainer(client, { database: missing, container: "recipes" })).rejects.toThrow("does not exist");
+
+    const { resources } = await client.databases.readAll().fetchAll();
+    expect(resources.map((d) => d.id)).not.toContain(missing);
   });
 });
 

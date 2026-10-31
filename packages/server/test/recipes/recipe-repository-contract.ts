@@ -124,6 +124,82 @@ export function recipeRepositoryContract(name: string, createRepository: () => P
       expect(byId(await repository.list())).toEqual(byId([kept]));
     });
 
+    // The trash cleanup removes a recipe only if nobody saved it since the job read it (REC-16; architecture.md, Trash cleanup).
+    describe("versioned read and conditional remove (REC-16)", () => {
+      it("returns the stored recipe with a version", async () => {
+        const recipe = fullRecipe();
+        await repository.save(recipe);
+
+        const versioned = await repository.getWithVersion(recipe.id);
+
+        expect(versioned?.recipe.toSnapshot()).toEqual(recipe.toSnapshot());
+        expect(versioned?.version).toEqual(expect.any(String));
+      });
+
+      it("returns undefined for an unknown id", async () => {
+        await repository.save(newRecipe("Pancakes"));
+
+        expect(await repository.getWithVersion(newId())).toBeUndefined();
+      });
+
+      it("gives a new version on every save, even of an unchanged recipe", async () => {
+        const recipe = newRecipe("Pancakes");
+        await repository.save(recipe);
+        const first = (await repository.getWithVersion(recipe.id))?.version;
+
+        await repository.save(recipe);
+
+        expect((await repository.getWithVersion(recipe.id))?.version).not.toEqual(first);
+      });
+
+      it("removes the recipe when it is unchanged since it was read", async () => {
+        const removed = newRecipe("Pancakes");
+        const kept = newRecipe("Waffles");
+        await repository.save(removed);
+        await repository.save(kept);
+        const { version } = (await repository.getWithVersion(removed.id))!;
+
+        expect(await repository.removeIfUnchanged(removed.id, version)).toBe(true);
+
+        expect(await repository.get(removed.id)).toBeUndefined();
+        expect(byId(await repository.list())).toEqual(byId([kept]));
+      });
+
+      it("keeps the recipe when it was saved after it was read, as by a restore (REC-15)", async () => {
+        const recipe = newRecipe("Pancakes");
+        recipe.delete(at("2026-09-01T09:00:00Z"));
+        await repository.save(recipe);
+        const { version } = (await repository.getWithVersion(recipe.id))!;
+        valueOf(recipe.restore(at("2026-10-01T08:59:59Z")));
+        await repository.save(recipe);
+
+        expect(await repository.removeIfUnchanged(recipe.id, version)).toBe(false);
+
+        expect((await repository.get(recipe.id))?.toSnapshot()).toEqual(recipe.toSnapshot());
+      });
+
+      it("keeps a recipe removed and saved again after it was read", async () => {
+        const recipe = newRecipe("Pancakes");
+        await repository.save(recipe);
+        const { version } = (await repository.getWithVersion(recipe.id))!;
+        await repository.remove(recipe.id);
+        await repository.save(recipe);
+
+        expect(await repository.removeIfUnchanged(recipe.id, version)).toBe(false);
+
+        expect((await repository.get(recipe.id))?.toSnapshot()).toEqual(recipe.toSnapshot());
+      });
+
+      it("returns false for a recipe already removed", async () => {
+        const recipe = newRecipe("Pancakes");
+        await repository.save(recipe);
+        const { version } = (await repository.getWithVersion(recipe.id))!;
+        await repository.remove(recipe.id);
+
+        expect(await repository.removeIfUnchanged(recipe.id, version)).toBe(false);
+      });
+    });
+
     it("keeps the stored recipe unchanged when a loaded recipe is changed but not saved", async () => {
       const recipe = newRecipe("Pancakes");
       await repository.save(recipe);

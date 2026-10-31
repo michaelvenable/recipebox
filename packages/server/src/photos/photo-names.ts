@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { PhotoRef, RecipeId } from "@recipebox/domain";
+import { type PhotoRef, RecipeId } from "@recipebox/domain";
 
 /**
  * A fresh, unique name for a new upload's display image: `photos/{recipeId}/{uuid}.jpg`. Every upload gets a new name, so the
@@ -28,4 +28,16 @@ export function thumbnailNameOf(photoName: string): string {
 /** Both stored images of a photo: the display image and its thumbnail. */
 export function imageNamesOf(photo: PhotoRef): [photo: string, thumbnail: string] {
   return [photo.blobName, thumbnailNameOf(photo.blobName)];
+}
+
+/**
+ * Whether `name` has the form every recipe image name has, `photos/{recipeId}/{file}` (`newPhotoName` and its thumbnail): a
+ * recipe ID exactly as `RecipeId` writes it, and one more non-empty segment. The trash cleanup's orphan sweep never deletes
+ * anything else in the store (docs/architecture.md, "Trash cleanup").
+ */
+export function isRecipeImageName(name: string): boolean {
+  const match = /^photos\/([^/]+)\/[^/]+$/.exec(name);
+  if (match === null) return false;
+  const id = RecipeId.create(match[1]!);
+  return id.ok && id.value.value === match[1];
 }

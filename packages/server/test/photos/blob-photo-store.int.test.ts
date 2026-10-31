@@ -5,6 +5,7 @@ import {
   BlobPhotoStore,
   createPhotoContainerClient,
   ensurePhotoContainer,
+  openPhotoContainer,
 } from "../../src/photos/blob-photo-store.js";
 import { emulatorStorageConfig } from "../emulator.js";
 import { photoStoreContract } from "./photo-store-contract.js";
@@ -37,6 +38,18 @@ describe("BlobPhotoStore container", () => {
     await ensurePhotoContainer(createPhotoContainerClient(config));
 
     expect((await store.get("photos/kept.jpg"))?.bytes.toString()).toBe("kept");
+  });
+
+  it("opens an existing container outside local runs (architecture.md, Trash cleanup)", async () => {
+    await expect(openPhotoContainer(createPhotoContainerClient(config))).resolves.toBeDefined();
+  });
+
+  it("refuses a missing container outside local runs, and doesn't create it", async () => {
+    const missing = createPhotoContainerClient({ ...config, photoContainer: `photos-missing-${randomUUID()}` });
+
+    await expect(openPhotoContainer(missing)).rejects.toThrow("does not exist");
+
+    expect(await missing.exists()).toBe(false);
   });
 
   it("sets the content type on the blob itself", async () => {

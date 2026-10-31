@@ -1,6 +1,7 @@
 import { BlobServiceClient, type ContainerClient, RestError } from "@azure/storage-blob";
+import { Instant } from "@recipebox/domain";
 import type { StorageConfig } from "../config.js";
-import type { PhotoStore, StoredImage } from "./photo-store.js";
+import type { PhotoStore, StoredImage, StoredImageInfo } from "./photo-store.js";
 
 /**
  * Stores photos as block blobs in one private container (docs/architecture.md, "Photos"). Each blob's content type is set on
@@ -31,6 +32,17 @@ export class BlobPhotoStore implements PhotoStore {
   async delete(name: string): Promise<void> {
     await this.container.getBlobClient(name).deleteIfExists();
   }
+
+  async list(): Promise<StoredImageInfo[]> {
+    const images: StoredImageInfo[] = [];
+    // A flat listing gives each blob's full name, slashes included; the SDK follows continuation pages.
+    for await (const blob of this.container.listBlobsFlat()) {
+      const lastModified = Instant.fromEpochMillis(blob.properties.lastModified.getTime());
+      if (!lastModified.ok) throw new Error(`Blob Storage returned an invalid last-modified time for ${blob.name}`);
+      images.push({ name: blob.name, lastModified: lastModified.value });
+    }
+    return images;
+  }
 }
 
 export function createPhotoContainerClient(config: StorageConfig): ContainerClient {
@@ -43,5 +55,19 @@ export function createPhotoContainerClient(config: StorageConfig): ContainerClie
  */
 export async function ensurePhotoContainer(container: ContainerClient): Promise<ContainerClient> {
   await container.createIfNotExists();
+  return container;
+}
+
+/**
+ * The existing photo container, for every run outside local development and tests: a missing container is an error, never
+ * created, so a misconfigured deployment can't start against a new, empty one (docs/architecture.md, "Trash cleanup").
+ */
+export async function openPhotoContainer(container: ContainerClient): Promise<ContainerClient> {
+  if (!(await container.exists())) {
+    throw new Error(
+      `Blob Storage container ${JSON.stringify(container.containerName)} does not exist. Outside local development it is ` +
+        "created by the infrastructure scripts, never by the app.",
+    );
+  }
   return container;
 }
