@@ -1,0 +1,3 @@
+# X-10: ask search engines not to index RecipeBox.
+User-agent: *
+Disallow: /
