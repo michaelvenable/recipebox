@@ -1,6 +1,9 @@
 import type { FastifyInstance } from "fastify";
+import { Instant } from "@recipebox/domain";
 import { type AppDependencies, buildApp } from "../src/app.js";
+import { randomRecipeId } from "../src/clock.js";
 import { type Config, loadConfig } from "../src/config.js";
+import { InMemoryRecipeRepository } from "../src/recipes/in-memory-recipe-repository.js";
 
 /** Settings a deployed app needs, so tests can build a non-local config. */
 export const DEPLOYED_SETTINGS = {
@@ -19,9 +22,26 @@ export function configFrom(env: Record<string, string | undefined> = {}): Config
   return loadConfig({ APP_ENV: "test", EDITORS: `${EDITOR},aad:9f3c`, ...env });
 }
 
+/** A fixed time for tests that don't care about the clock. */
+export const TEST_TIME = "2026-10-01T09:00:00.000Z";
+
+export function instant(iso: string): Instant {
+  const parsed = Instant.fromIso(iso);
+  if (!parsed.ok) throw new Error(`Not an ISO time: ${iso}`);
+  return parsed.value;
+}
+
+/** The app with an empty in-memory repository and a fixed clock, unless `deps` says otherwise. */
 export async function appWith(
   env: Record<string, string | undefined> = {},
   logger: AppDependencies["logger"] = false,
+  deps: Partial<Pick<AppDependencies, "recipes" | "clock" | "newRecipeId">> = {},
 ): Promise<FastifyInstance> {
-  return buildApp({ config: configFrom(env), logger });
+  return buildApp({
+    config: configFrom(env),
+    logger,
+    recipes: deps.recipes ?? new InMemoryRecipeRepository(),
+    clock: deps.clock ?? (() => instant(TEST_TIME)),
+    newRecipeId: deps.newRecipeId ?? randomRecipeId,
+  });
 }

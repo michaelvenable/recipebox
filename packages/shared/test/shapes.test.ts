@@ -3,6 +3,7 @@ import type { z } from "zod";
 import {
   EditorRecipe,
   EditorRecipeSummary,
+  EmptyRequest,
   ErrorResponse,
   HealthResponse,
   Me,
@@ -79,6 +80,19 @@ describe("api.md Shapes: RecipeContentInput", () => {
   it("rejects unknown keys, so a misspelled or stored field isn't silently dropped", () => {
     expect(RecipeContentInput.safeParse({ ...valid, cookedAt: [T1] }).success).toBe(false);
     expect(RecipeContentInput.safeParse({ ...valid, totalTime: 20 }).success).toBe(false);
+  });
+});
+
+describe("api.md Conventions: EmptyRequest, the body of a change with no input", () => {
+  it("parses {}", () => {
+    expect(EmptyRequest.parse({})).toEqual({});
+  });
+  it("rejects any field, such as a time (X-12)", () => {
+    expect(EmptyRequest.safeParse({ deletedAt: T1 }).success).toBe(false);
+  });
+  it("rejects a body that isn't an object", () => {
+    expect(EmptyRequest.safeParse(null).success).toBe(false);
+    expect(EmptyRequest.safeParse([]).success).toBe(false);
   });
 });
 

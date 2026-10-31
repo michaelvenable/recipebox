@@ -21,6 +21,13 @@ export const RecipeContentInput = z.strictObject({
 });
 export type RecipeContentInput = z.infer<typeof RecipeContentInput>;
 
+/**
+ * Body of a change that has no input, e.g. DELETE /recipes/{id} or POST /trash/{id}/restore: an empty `{}` (docs/api.md,
+ * "Conventions"). Strict, so a time sent along (X-12) or any other field is refused rather than ignored.
+ */
+export const EmptyRequest = z.strictObject({});
+export type EmptyRequest = z.infer<typeof EmptyRequest>;
+
 /** A recipe in the list, as a visitor sees it (X-1). */
 export const RecipeSummary = z.strictObject({
   id: z.string(),
