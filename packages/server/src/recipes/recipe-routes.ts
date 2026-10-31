@@ -1,5 +1,6 @@
-// The recipe endpoints (docs/api.md) other than photos: list, tags, view, create, edit, delete, trash and restore; attaching and
-// removing tags and tag suggestions; the "to make" list; cooking history and the "haven't made in a while" view.
+// The recipe endpoints (docs/api.md) other than photos (photos/photo-routes.ts): list, tags, view, create, edit, delete, trash
+// and restore; attaching and removing tags and tag suggestions; the "to make" list; cooking history and the "haven't made in
+// a while" view.
 //
 // Every change follows docs/architecture.md, "How a change is applied": requireEditor (X-6), read the stored recipe, call one
 // domain method with the request's input and the server's time (X-12), answer domain errors without saving, then save the
@@ -84,7 +85,7 @@ const STATE_ERRORS: Readonly<Record<string, number>> = {
   "trash.expired": 409,
 };
 
-function statusFor(errors: readonly DomainError[]): number {
+export function statusFor(errors: readonly DomainError[]): number {
   for (const e of errors) {
     const status = STATE_ERRORS[e.code];
     if (status !== undefined) return status;
@@ -96,7 +97,7 @@ function errorItems(errors: readonly DomainError[]): ErrorItem[] {
   return errors.map((e) => (e.field === undefined ? { code: e.code, message: e.message } : { ...e }));
 }
 
-function sendErrors(reply: FastifyReply, status: number, errors: readonly DomainError[]): FastifyReply {
+export function sendErrors(reply: FastifyReply, status: number, errors: readonly DomainError[]): FastifyReply {
   const body: ErrorResponse = { errors: errorItems(errors) };
   return reply.code(status).send(body);
 }
@@ -105,12 +106,12 @@ function sendErrors(reply: FastifyReply, status: number, errors: readonly Domain
  * The same answer for a recipe that doesn't exist, a malformed id and (when reading) a recipe in the trash, so a visitor can't
  * tell them apart (REC-4, REC-6, X-1). An editor changing a trashed recipe gets 409 recipe.inTrash instead (REC-17).
  */
-function sendNotFound(reply: FastifyReply): FastifyReply {
+export function sendNotFound(reply: FastifyReply): FastifyReply {
   return sendErrors(reply, 404, [{ code: "recipe.notFound", message: "This recipe doesn't exist." }]);
 }
 
 /** Recipe ids are UUIDs; a malformed one is treated as not found (docs/api.md, "Conventions"). */
-function recipeIdOf(raw: string): RecipeId | undefined {
+export function recipeIdOf(raw: string): RecipeId | undefined {
   const id = RecipeId.create(raw);
   return id.ok ? id.value : undefined;
 }
@@ -129,7 +130,7 @@ function storedTimeOf(raw: string): Instant | undefined {
  * REC-17 for a change whose input is checked before the domain is called: an editor changing a recipe in the trash is told so,
  * whatever the input, as the domain would answer (code recipe.inTrash, 409).
  */
-function sendInTrash(reply: FastifyReply): FastifyReply {
+export function sendInTrash(reply: FastifyReply): FastifyReply {
   return sendErrors(reply, 409, [
     { code: "recipe.inTrash", message: "This recipe is in the trash. Restore it before changing it." },
   ]);
@@ -140,7 +141,7 @@ function sendCookingNotFound(reply: FastifyReply): FastifyReply {
 }
 
 /** 400 unless the body is `{}` (EmptyRequest); a time sent along is refused like any other field (X-12). */
-function refuseUnlessEmpty(body: unknown, reply: FastifyReply): FastifyReply | undefined {
+export function refuseUnlessEmpty(body: unknown, reply: FastifyReply): FastifyReply | undefined {
   const parsed = parseBody(EmptyRequest, body);
   return parsed.ok ? undefined : reply.code(400).send({ errors: parsed.errors } satisfies ErrorResponse);
 }

@@ -3,6 +3,7 @@ import { Instant } from "@recipebox/domain";
 import { type AppDependencies, buildApp } from "../src/app.js";
 import { randomRecipeId } from "../src/clock.js";
 import { type Config, loadConfig } from "../src/config.js";
+import { InMemoryPhotoStore } from "../src/photos/in-memory-photo-store.js";
 import { InMemoryRecipeRepository } from "../src/recipes/in-memory-recipe-repository.js";
 
 /** Settings a deployed app needs, so tests can build a non-local config. */
@@ -11,6 +12,9 @@ export const DEPLOYED_SETTINGS = {
   COSMOS_KEY: "secret",
   COSMOS_DATABASE: "db",
   COSMOS_CONTAINER: "recipes-prod",
+  STORAGE_CONNECTION_STRING:
+    "DefaultEndpointsProtocol=https;AccountName=recipebox;AccountKey=secret;EndpointSuffix=core.windows.net",
+  STORAGE_PHOTO_CONTAINER: "photos-prod",
   CLIENT_ORIGIN: "https://recipes.example.net",
 };
 
@@ -31,17 +35,19 @@ export function instant(iso: string): Instant {
   return parsed.value;
 }
 
-/** The app with an empty in-memory repository and a fixed clock, unless `deps` says otherwise. */
+/** The app with an empty in-memory repository and photo store and a fixed clock, unless `deps` says otherwise. */
 export async function appWith(
   env: Record<string, string | undefined> = {},
   logger: AppDependencies["logger"] = false,
-  deps: Partial<Pick<AppDependencies, "recipes" | "clock" | "newRecipeId">> = {},
+  deps: Partial<Pick<AppDependencies, "recipes" | "photos" | "clock" | "newRecipeId" | "photoProcessing">> = {},
 ): Promise<FastifyInstance> {
   return buildApp({
     config: configFrom(env),
     logger,
     recipes: deps.recipes ?? new InMemoryRecipeRepository(),
+    photos: deps.photos ?? new InMemoryPhotoStore(),
     clock: deps.clock ?? (() => instant(TEST_TIME)),
     newRecipeId: deps.newRecipeId ?? randomRecipeId,
+    ...(deps.photoProcessing === undefined ? {} : { photoProcessing: deps.photoProcessing }),
   });
 }

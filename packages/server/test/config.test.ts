@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   COSMOS_EMULATOR_ENDPOINT,
   COSMOS_EMULATOR_KEY,
+  AZURITE_CONNECTION_STRING,
   DEV_CLIENT_ORIGIN,
   loadConfig,
   parseEditors,
@@ -12,6 +13,9 @@ const allSettings = {
   COSMOS_KEY: "secret",
   COSMOS_DATABASE: "db",
   COSMOS_CONTAINER: "recipes-prod",
+  STORAGE_CONNECTION_STRING:
+    "DefaultEndpointsProtocol=https;AccountName=recipebox;AccountKey=secret;EndpointSuffix=core.windows.net",
+  STORAGE_PHOTO_CONTAINER: "photos-prod",
   CLIENT_ORIGIN: "https://recipes.example.net",
 };
 
@@ -25,6 +29,7 @@ describe("loadConfig", () => {
       database: "recipebox",
       container: "recipes",
     });
+    expect(config.storage).toEqual({ connectionString: AZURITE_CONNECTION_STRING, photoContainer: "photos" });
     expect(config.clientOrigin).toBe(DEV_CLIENT_ORIGIN);
     expect(config.local).toBe(true);
   });
@@ -38,6 +43,10 @@ describe("loadConfig", () => {
     });
     const deployed = loadConfig(allSettings);
     expect(deployed.cosmos.endpoint).toBe(allSettings.COSMOS_ENDPOINT);
+    expect(deployed.storage).toEqual({
+      connectionString: allSettings.STORAGE_CONNECTION_STRING,
+      photoContainer: "photos-prod",
+    });
     expect(deployed.clientOrigin).toBe("https://recipes.example.net");
     expect(deployed.local).toBe(false);
   });
@@ -46,14 +55,15 @@ describe("loadConfig", () => {
     "throws naming every missing setting when APP_ENV is %j",
     (appEnv) => {
       expect(() => loadConfig({ APP_ENV: appEnv })).toThrow(
-        "Missing required settings: COSMOS_ENDPOINT, COSMOS_KEY, COSMOS_DATABASE, COSMOS_CONTAINER, CLIENT_ORIGIN.",
+        "Missing required settings: COSMOS_ENDPOINT, COSMOS_KEY, COSMOS_DATABASE, COSMOS_CONTAINER, STORAGE_CONNECTION_STRING, " +
+          "STORAGE_PHOTO_CONTAINER, CLIENT_ORIGIN.",
       );
     },
   );
 
   it("treats blank settings as missing outside development and test", () => {
-    expect(() => loadConfig({ ...allSettings, COSMOS_KEY: " ", COSMOS_CONTAINER: "" })).toThrow(
-      "Missing required settings: COSMOS_KEY, COSMOS_CONTAINER.",
+    expect(() => loadConfig({ ...allSettings, COSMOS_KEY: " ", COSMOS_CONTAINER: "", STORAGE_CONNECTION_STRING: " " })).toThrow(
+      "Missing required settings: COSMOS_KEY, COSMOS_CONTAINER, STORAGE_CONNECTION_STRING.",
     );
   });
 

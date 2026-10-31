@@ -1,0 +1,47 @@
+import { BlobServiceClient, type ContainerClient, RestError } from "@azure/storage-blob";
+import type { StorageConfig } from "../config.js";
+import type { PhotoStore, StoredImage } from "./photo-store.js";
+
+/**
+ * Stores photos as block blobs in one private container (docs/architecture.md, "Photos"). Each blob's content type is set on
+ * the blob, so it can be served with it.
+ */
+export class BlobPhotoStore implements PhotoStore {
+  constructor(private readonly container: ContainerClient) {}
+
+  async put(name: string, bytes: Buffer, contentType: string): Promise<void> {
+    await this.container.getBlockBlobClient(name).uploadData(bytes, { blobHTTPHeaders: { blobContentType: contentType } });
+  }
+
+  async get(name: string): Promise<StoredImage | undefined> {
+    try {
+      const response = await this.container.getBlobClient(name).download();
+      const body = response.readableStreamBody;
+      if (body === undefined) throw new Error(`Blob Storage returned no body for ${name}`);
+      const chunks: Buffer[] = [];
+      // No encoding is set on the stream, so it yields Buffers.
+      for await (const chunk of body) chunks.push(chunk as Buffer);
+      return { bytes: Buffer.concat(chunks), contentType: response.contentType ?? "application/octet-stream" };
+    } catch (error) {
+      if (error instanceof RestError && error.statusCode === 404) return undefined;
+      throw error;
+    }
+  }
+
+  async delete(name: string): Promise<void> {
+    await this.container.getBlobClient(name).deleteIfExists();
+  }
+}
+
+export function createPhotoContainerClient(config: StorageConfig): ContainerClient {
+  return BlobServiceClient.fromConnectionString(config.connectionString).getContainerClient(config.photoContainer);
+}
+
+/**
+ * Creates the photo container if it doesn't exist, for local development and tests. It is private: no anonymous access is
+ * granted, so images are read only through the API (X-1). Production resources come from the infrastructure scripts.
+ */
+export async function ensurePhotoContainer(container: ContainerClient): Promise<ContainerClient> {
+  await container.createIfNotExists();
+  return container;
+}

@@ -6,6 +6,9 @@ import type { Config } from "./config.js";
 import { registerCaller } from "./http/caller.js";
 import { registerJsonOnlyChanges } from "./http/content-type.js";
 import { registerErrorHandling } from "./http/errors.js";
+import type { PhotoProcessingOptions } from "./photos/photo-processing.js";
+import { registerPhotoRoutes } from "./photos/photo-routes.js";
+import type { PhotoStore } from "./photos/photo-store.js";
 import type { RecipeRepository } from "./recipes/recipe-repository.js";
 import { registerRecipeRoutes } from "./recipes/recipe-routes.js";
 
@@ -14,10 +17,14 @@ export interface AppDependencies {
   config: Config;
   /** Where recipes are stored: Cosmos DB in main.ts, the in-memory repository in route tests. */
   recipes: RecipeRepository;
+  /** Where photo images are stored: Blob Storage in main.ts, the in-memory store in route tests (REC-7). */
+  photos: PhotoStore;
   /** The server's clock, the source of every stored time (X-12). */
   clock: Clock;
   /** Creates the id for a new recipe (REC-1). */
   newRecipeId: RecipeIdGenerator;
+  /** How photo uploads are decoded (REC-7). Left out except in tests that simulate a decoder that hangs or crashes. */
+  photoProcessing?: Omit<PhotoProcessingOptions, "log">;
   /**
    * Fastify's logger. main.ts turns it on (JSON lines to stdout, collected by Container Apps); tests leave it off unless they
    * check what is logged. Fastify's default request serializer logs method, URL and host but no headers, so cookies and
@@ -30,8 +37,10 @@ export interface AppDependencies {
 export async function buildApp({
   config,
   recipes,
+  photos,
   clock,
   newRecipeId,
+  photoProcessing = {},
   logger = false,
 }: AppDependencies): Promise<FastifyInstance> {
   const app = Fastify({ logger });
@@ -59,8 +68,9 @@ export async function buildApp({
     return { signedIn: true, provider: caller.provider, accountId: caller.accountId, isEditor: caller.isEditor };
   });
 
-  // In its own scope, so the recipe routes' hooks apply only to them.
+  // Each in its own scope, so their hooks (and the photo routes' multipart parser) apply only to them.
   await app.register(async (scope) => registerRecipeRoutes(scope, { recipes, clock, newRecipeId }));
+  await app.register(async (scope) => registerPhotoRoutes(scope, { recipes, photos, photoProcessing }));
 
   return app;
 }

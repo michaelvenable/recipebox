@@ -2,9 +2,9 @@
  * Server configuration, read from the environment.
  *
  * `APP_ENV` names the environment. Only when it is `development` or `test` may settings be left out or blank; they then default
- * to the Cosmos DB emulator from docker-compose.yml and the Vite dev server's origin. In every other case, including when
- * `APP_ENV` is not set, every setting is required and `loadConfig` throws at startup naming the missing ones, so a deployed app
- * never silently uses the emulator. `npm run dev` and the Vitest configs set `APP_ENV` for local use.
+ * to the Cosmos DB emulator and Azurite from docker-compose.yml and the Vite dev server's origin. In every other case,
+ * including when `APP_ENV` is not set, every setting is required and `loadConfig` throws at startup naming the missing ones, so
+ * a deployed app never silently uses the emulators. `npm run dev` and the Vitest configs set `APP_ENV` for local use.
  *
  * `EDITORS` is the one optional setting everywhere: an empty list is valid and means nobody can edit (X-7).
  */
@@ -13,6 +13,12 @@ export interface CosmosConfig {
   key: string;
   database: string;
   container: string;
+}
+
+/** Blob Storage for photos (docs/architecture.md, "Photos"): a private container, read only through the API (X-1). */
+export interface StorageConfig {
+  connectionString: string;
+  photoContainer: string;
 }
 
 /** The identity providers Container Apps' built-in authentication is set up with (docs/architecture.md, "Sign-in"). */
@@ -27,6 +33,7 @@ export interface Identity {
 
 export interface Config {
   cosmos: CosmosConfig;
+  storage: StorageConfig;
   /** True when `APP_ENV` is `development` or `test`. */
   local: boolean;
   /** True when running on Azure Container Apps, which sets `CONTAINER_APP_NAME` in every container. */
@@ -52,6 +59,15 @@ export const COSMOS_EMULATOR_ENDPOINT = "http://localhost:8081";
  */
 export const COSMOS_EMULATOR_KEY =
   "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
+
+/**
+ * Azurite's fixed, publicly documented development account (devstoreaccount1) at the address in docker-compose.yml. Like the
+ * Cosmos DB emulator key, it is the same for every install and grants access to nothing else, so it is not a secret.
+ */
+export const AZURITE_CONNECTION_STRING =
+  "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;" +
+  "AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;" +
+  "BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;";
 
 /** The Vite dev server's origin, the default `CLIENT_ORIGIN` in development and test. */
 export const DEV_CLIENT_ORIGIN = "http://localhost:5173";
@@ -142,6 +158,10 @@ export function loadConfig(env: Env = process.env): Config {
     database: setting("COSMOS_DATABASE", "recipebox"),
     container: setting("COSMOS_CONTAINER", "recipes"),
   };
+  const storage: StorageConfig = {
+    connectionString: setting("STORAGE_CONNECTION_STRING", AZURITE_CONNECTION_STRING),
+    photoContainer: setting("STORAGE_PHOTO_CONTAINER", "photos"),
+  };
   const clientOrigin = setting("CLIENT_ORIGIN", DEV_CLIENT_ORIGIN);
   if (missing.length > 0) {
     throw new Error(
@@ -151,6 +171,7 @@ export function loadConfig(env: Env = process.env): Config {
   }
   return {
     cosmos,
+    storage,
     local,
     onContainerApps,
     trustAuthHeaders: onContainerApps && env.TRUST_AUTH_HEADERS === "true",

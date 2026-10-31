@@ -10,8 +10,9 @@ services:
       - "8081:8081"
 
   azurite:
-    # Blob Storage emulator, for photos (later tasks).
+    # Blob Storage emulator, for photos. @azure/storage-blob often speaks a newer storage API version than the Azurite
+    # image knows; --skipApiVersionCheck lets it answer anyway (the calls the app makes are long-standing ones).
     image: mcr.microsoft.com/azure-storage/azurite
-    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--blobPort", "10000"]
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--blobPort", "10000", "--skipApiVersionCheck"]
     ports:
       - "10000:10000"
