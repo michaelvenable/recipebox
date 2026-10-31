@@ -48,6 +48,18 @@ Git
 - The main branch is `master`. Don't commit or push unless the owner asks.
 - Commit messages say what changed and cite the requirement IDs involved.
 
+## Development workflow
+
+Work is done in small tasks, each a list of requirement IDs. Each task goes through three agents defined in `.claude/agents/`:
+
+1. `author` implements the requirements with tests, until `npm test` and `npm run typecheck` pass.
+2. `reviewer` reviews the change against the specs on `master` and reports findings. It has no access to the author's reasoning.
+3. `verifier` checks each finding independently, in an isolated worktree, and tries to prove it with a failing test.
+4. `author` fixes only the confirmed findings. Then the reviewer looks again. At most two review rounds per task.
+5. The owner reviews the result, including any refuted or uncertain findings, and decides whether to commit.
+
+Spec questions raised by any agent go to the owner; agents never resolve them by editing docs.
+
 ## Writing docs
 
 - Wrap prose at about 130 characters per line.
