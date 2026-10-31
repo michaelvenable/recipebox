@@ -16,4 +16,5 @@ export {
   PublicRecipe,
   RecipeContentInput,
   RecipeSummary,
+  TagRequest,
 } from "./recipes.js";

@@ -6,6 +6,7 @@ import {
   RecipeId,
   suggestTags,
   tagsInUse,
+  toMakeList,
   trashContents,
   type RecipeContentInput,
 } from "../src/index.js";
@@ -214,6 +215,65 @@ describe("REC-12 tag suggestions", () => {
   });
 });
 
+describe("REC-12 tag suggestions for a recipe not yet created", () => {
+  it("offers every tag in use that contains the typed text, alphabetically", () => {
+    const all = [recipe("Cake", ["desserts", "baking"]), recipe("Pie", ["dessert"]), recipe("Soup", ["dinner"])];
+    expect(values(suggestTags(all, undefined, "des"))).toEqual(["dessert", "desserts"]);
+  });
+
+  it("leaves nothing out before anything is typed, except tags only on deleted recipes (REC-6)", () => {
+    const all = [recipe("Cake", ["baking", "dessert"]), recipe("Pie", ["quick"]), deleted(recipe("Tikka", ["spicy"]))];
+    expect(values(suggestTags(all, undefined, ""))).toEqual(["baking", "dessert", "quick"]);
+    expect(values(suggestTags(all, undefined, "  "))).toEqual(["baking", "dessert", "quick"]);
+  });
+
+  it("offers each tag once and ignores case and accents in the typed text (X-13)", () => {
+    const all = [recipe("Curry", ["épicé"]), recipe("Chili", ["épicé"])];
+    expect(values(suggestTags(all, undefined, "PICE"))).toEqual(["épicé"]);
+  });
+});
+
+describe("PLAN-3 the to-make list", () => {
+  function added(r: Recipe, iso: string): Recipe {
+    valueOf(r.addToMakeList(at(iso)));
+    return r;
+  }
+
+  it("lists recipes on the list, oldest added first", () => {
+    const newest = added(recipe("Apple Pie"), "2026-10-20T12:00:00Z");
+    const oldest = added(recipe("Zucchini Bread"), "2026-09-01T12:00:00Z");
+    const middle = added(recipe("Mango Lassi"), "2026-10-01T12:00:00Z");
+    const notOnList = recipe("Beef Stew");
+    expect(names(toMakeList([newest, notOnList, oldest, middle]))).toEqual(["Zucchini Bread", "Mango Lassi", "Apple Pie"]);
+  });
+
+  it("lists recipes added at the same moment by name, ignoring case and accents (X-13)", () => {
+    const same = "2026-10-01T12:00:00Z";
+    const list = [added(recipe("Zebra Cake"), same), added(recipe("éclair"), same), added(recipe("Apple Pie"), same)];
+    expect(names(toMakeList(list))).toEqual(["Apple Pie", "éclair", "Zebra Cake"]);
+  });
+
+  it("keeps the original added time when a recipe is added twice (PLAN-2)", () => {
+    const padThai = added(recipe("Pad Thai"), "2026-09-01T12:00:00Z");
+    const curry = added(recipe("Curry"), "2026-10-01T12:00:00Z");
+    added(padThai, "2026-10-20T12:00:00Z");
+    expect(names(toMakeList([curry, padThai]))).toEqual(["Pad Thai", "Curry"]);
+  });
+
+  it("leaves out deleted recipes (REC-6, PLAN-6) and cooked ones (PLAN-5)", () => {
+    const kept = added(recipe("Kept"), "2026-10-01T12:00:00Z");
+    const gone = deleted(added(recipe("Gone"), "2026-09-01T12:00:00Z"));
+    const cooked = added(recipe("Cooked"), "2026-09-02T12:00:00Z");
+    valueOf(cooked.markCooked(at("2026-10-02T12:00:00Z")));
+    expect(names(toMakeList([gone, cooked, kept]))).toEqual(["Kept"]);
+  });
+
+  it("is empty when no recipe is on the list", () => {
+    expect(toMakeList([recipe("Beef Stew")])).toEqual([]);
+    expect(toMakeList([])).toEqual([]);
+  });
+});
+
 describe("REC-6 deleted recipes disappear from everywhere else", () => {
   function collection() {
     const kept = recipe("Beef Stew", ["dinner"]);
@@ -279,6 +339,8 @@ describe("collection functions don't change their input", () => {
     findRecipes(list, { name: "a", tags: ["quick"] });
     tagsInUse(list);
     suggestTags(list, list[0]!, "d");
+    suggestTags(list, undefined, "d");
+    toMakeList(list);
     trashContents(list);
     expect(list).toEqual(before);
     expect(list.every((r, i) => r === before[i])).toBe(true);

@@ -43,14 +43,16 @@ export function tagsInUse(recipes: readonly Recipe[]): { tag: Tag; count: number
 
 /**
  * Tags in use on other recipes that contain the typed text, ignoring case and accents (REC-12, X-13), alphabetically.
- * Tags `forRecipe` already has are left out. Deleted recipes are skipped (REC-6).
+ * Tags `forRecipe` already has are left out. With `forRecipe` undefined (a recipe not yet created), every recipe counts as
+ * another recipe and only the typed text matters. Deleted recipes are skipped (REC-6).
  */
-export function suggestTags(recipes: readonly Recipe[], forRecipe: Recipe, typed: string): Tag[] {
+export function suggestTags(recipes: readonly Recipe[], forRecipe: Recipe | undefined, typed: string): Tag[] {
   const term = typed.normalize("NFC").trim();
-  const others = recipes.filter((r) => !r.id.equals(forRecipe.id));
+  const others = forRecipe === undefined ? recipes : recipes.filter((r) => !r.id.equals(forRecipe.id));
+  const own = forRecipe?.tags ?? [];
   return tagsInUse(others)
     .map((entry) => entry.tag)
-    .filter((tag) => containsText(tag.value, term) && !forRecipe.tags.some((t) => t.equals(tag)));
+    .filter((tag) => containsText(tag.value, term) && !own.some((t) => t.equals(tag)));
 }
 
 /** Deleted recipes only, most recently deleted first (REC-14). */
@@ -58,6 +60,17 @@ export function trashContents(recipes: readonly Recipe[]): Recipe[] {
   return recipes
     .flatMap((r) => (r.deletedAt === undefined ? [] : [{ recipe: r, deletedAt: r.deletedAt }]))
     .sort((a, b) => Instant.compare(b.deletedAt, a.deletedAt))
+    .map((entry) => entry.recipe);
+}
+
+/**
+ * The "to make" list (PLAN-3): recipes on the list, oldest added first; recipes added at the same moment by name (REC-8,
+ * X-13). Deleted recipes are skipped (REC-6, PLAN-6).
+ */
+export function toMakeList(recipes: readonly Recipe[]): Recipe[] {
+  return sortByName(recipes.filter((r) => !r.isDeleted))
+    .flatMap((r) => (r.addedToMakeListAt === undefined ? [] : [{ recipe: r, addedAt: r.addedToMakeListAt }]))
+    .sort((a, b) => Instant.compare(a.addedAt, b.addedAt))
     .map((entry) => entry.recipe);
 }
 

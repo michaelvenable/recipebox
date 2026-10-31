@@ -6,7 +6,10 @@ import type {
   EditorRecipeSummary,
   PublicRecipe,
   RecipeSummary,
+  RediscoverEntry,
+  Tag,
   TagCount,
+  ToMakeEntry,
   TrashEntry,
 } from "@recipebox/shared";
 import type { Caller } from "../http/caller.js";
@@ -75,4 +78,21 @@ export function toTrashEntry(recipe: Recipe): TrashEntry {
     throw new Error(`Recipe ${recipe.id.value} is not in the trash`);
   }
   return { ...toRecipeSummary(recipe), deletedAt: deletedAt.toIso(), removalDueAt: removalDueAt.toIso() };
+}
+
+/** A tag offered while typing (REC-12). */
+export function toTag(tag: { value: string }): Tag {
+  return tag.value;
+}
+
+/** A recipe on the to-make list (PLAN-3). Only for recipes on the list; editor-only (X-1). */
+export function toToMakeEntry(recipe: Recipe): ToMakeEntry {
+  const addedAt = recipe.addedToMakeListAt;
+  if (addedAt === undefined) throw new Error(`Recipe ${recipe.id.value} is not on the to-make list`);
+  return { ...toRecipeSummary(recipe), addedAt: addedAt.toIso() };
+}
+
+/** A recipe in the "haven't made in a while" view (COOK-6); no lastCookedAt if never cooked. Editor-only (X-1). */
+export function toRediscoverEntry(recipe: Recipe): RediscoverEntry {
+  return { ...toRecipeSummary(recipe), lastCookedAt: recipe.lastCookedAt?.toIso() };
 }

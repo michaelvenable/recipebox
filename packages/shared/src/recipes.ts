@@ -28,6 +28,15 @@ export type RecipeContentInput = z.infer<typeof RecipeContentInput>;
 export const EmptyRequest = z.strictObject({});
 export type EmptyRequest = z.infer<typeof EmptyRequest>;
 
+/**
+ * Body of POST and DELETE /recipes/{id}/tags (REC-10, REC-11): the tag as typed; reading it (trim, lowercase) is the domain's
+ * job. The tag travels in the body because browsers rewrite tags such as "." or ".." in an address (docs/api.md).
+ */
+export const TagRequest = z.strictObject({
+  tag: z.string(),
+});
+export type TagRequest = z.infer<typeof TagRequest>;
+
 /** A recipe in the list, as a visitor sees it (X-1). */
 export const RecipeSummary = z.strictObject({
   id: z.string(),

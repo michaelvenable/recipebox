@@ -13,6 +13,7 @@ import {
   RediscoverEntry,
   Tag,
   TagCount,
+  TagRequest,
   ToMakeEntry,
   TrashEntry,
 } from "../src/index.js";
@@ -93,6 +94,25 @@ describe("api.md Conventions: EmptyRequest, the body of a change with no input",
   it("rejects a body that isn't an object", () => {
     expect(EmptyRequest.safeParse(null).success).toBe(false);
     expect(EmptyRequest.safeParse([]).success).toBe(false);
+  });
+});
+
+describe("api.md Shapes: TagRequest, the body of attaching or removing a tag", () => {
+  it("parses { tag }, keeping the text as typed", () => {
+    expect(TagRequest.parse({ tag: " Dinner " })).toEqual({ tag: " Dinner " });
+    expect(TagRequest.parse({ tag: ".." })).toEqual({ tag: ".." });
+  });
+  it("requires tag to be a string", () => {
+    expect(TagRequest.safeParse({}).success).toBe(false);
+    expect(TagRequest.safeParse({ tag: ["dinner"] }).success).toBe(false);
+    expect(TagRequest.safeParse({ tag: 3 }).success).toBe(false);
+  });
+  it("rejects unknown keys", () => {
+    expect(TagRequest.safeParse({ tag: "dinner", tags: ["dinner"] }).success).toBe(false);
+  });
+  it("rejects a body that isn't an object", () => {
+    expect(TagRequest.safeParse("dinner").success).toBe(false);
+    expect(TagRequest.safeParse(null).success).toBe(false);
   });
 });
 
