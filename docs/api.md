@@ -41,8 +41,8 @@ Visitors get the public shapes. Editors calling the same endpoints get the edito
 - `GET /tags` — tags in use with counts (REC-13). Returns `TagCount[]`.
 - `GET /recipes/{id}` — one recipe (REC-4). Returns `PublicRecipe` or `EditorRecipe` (adds to-make status and cooking history).
   404 if it is in the trash.
-- `GET /recipes/{id}/photo` and `GET /recipes/{id}/thumbnail` — the images (REC-7). 404 if there is no photo or the recipe is in
-  the trash.
+- `GET /recipes/{id}/photo` and `GET /recipes/{id}/thumbnail` — the images (REC-7). 404 if there is no photo. If the recipe is in
+  the trash: 404 for visitors and non-editors, but editors get the images, so the trash can show thumbnails (REC-14, X-1).
 - `GET /me` — the Account page (X-11). Returns `Me`: whether signed in, provider, account ID, and whether an editor.
 
 ## Editor endpoints
@@ -51,7 +51,10 @@ Recipes:
 - `POST /recipes` — create (REC-1). Body `RecipeContentInput`. Returns 201 with `EditorRecipe`.
 - `PUT /recipes/{id}/content` — edit (REC-5). Body `RecipeContentInput`. Returns `EditorRecipe`.
 - `PUT /recipes/{id}/photo` — add or replace the photo (REC-7). Body: the image (`multipart/form-data`, the one exception to the
-  JSON rule, still refused from other origins by CORS). Returns `EditorRecipe`.
+  JSON rule, still refused from other origins by CORS). Returns `EditorRecipe`. Exactly one file part, under any field name. JPEG,
+  PNG, WebP or HEIC up to 15 MB, detected from the file's bytes. Errors (400): `photo.required`, `photo.tooLarge`,
+  `photo.unsupportedType`, `photo.unreadable`. 503 `photo.busy` when too many uploads are waiting to be processed; try again.
+  Location and other metadata are removed before storing.
 - `DELETE /recipes/{id}/photo` — remove the photo (REC-7). Returns `EditorRecipe`.
 - `DELETE /recipes/{id}` — move to the trash (REC-6). Returns 204.
 

@@ -155,8 +155,16 @@ act as a visitor, an editor or a non-editor. The server refuses to start in deve
 
 ## Photos
 
-- Upload: the client sends the image to the API (REC-7). The server checks type and size, applies the camera's rotation, converts
-  HEIC to JPEG (most browsers can't display HEIC), creates a thumbnail, and stores both in Blob Storage.
+- Upload: the client sends the image to the API (REC-7). HEIC is decoded with libheif-js (libheif and its HEVC decoder compiled to
+  WebAssembly, LGPL-3.0), because sharp's prebuilt build can't read HEVC. All metadata, including GPS location, is removed, since
+  recipe photos are public. *(proposed)* The server checks type and size, applies the camera's rotation, converts HEIC to JPEG
+  (most browsers can't display HEIC), creates a thumbnail, and stores both in Blob Storage.
+- Decoding is isolated (proposed): each upload is decoded in its own worker thread with a 30-second limit, and the worker is ended
+  afterwards. A file that crashes, hangs or exhausts the decoder only ends that worker; the upload is refused with
+  `photo.unreadable` and the API keeps serving. Images over 50 megapixels are refused before decoding (48-megapixel phone photos
+  fit). The source is decoded once for both sizes. Only one decode runs at a time; up to 8 more uploads wait in a queue, and the
+  30-second limit starts when a decode begins. When the queue is full, the upload gets 503 `photo.busy` and can be retried. The
+  API container gets 2 GiB of memory for this headroom.
 - Display: the client loads photos from the API, never directly from storage. The API checks the recipe isn't in the trash (or the
   caller is an editor) and streams the image with cache headers.
 - Replace and remove delete the previous images (REC-7). Permanent removal deletes them with the recipe (REC-16).
@@ -177,8 +185,9 @@ relative labels ("3 months ago", "10 days left") and whether a recipe was cooked
 ## Trash cleanup
 
 A Container Apps Job runs once a day. It finds recipes whose `removalDueAt` has passed, deletes their photos from Blob Storage,
-then deletes the documents. Running daily satisfies REC-16's "within one day". Restores after the deadline are already refused by
-the domain, so a recipe waiting for cleanup can't come back.
+then deletes the documents. It also deletes photo files more than a day old that no recipe refers to, which can be left behind
+when two photo changes to the same recipe overlap (last save wins, X-5). *(proposed)* Running daily satisfies REC-16's "within one
+day". Restores after the deadline are already refused by the domain, so a recipe waiting for cleanup can't come back.
 
 ## Testing
 
