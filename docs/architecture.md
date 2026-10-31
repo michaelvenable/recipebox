@@ -174,14 +174,17 @@ the domain, so a recipe waiting for cleanup can't come back.
 
 ## Testing
 
-| Level      | Tool                        | What                                                                   |
-| ---------- | --------------------------- | ---------------------------------------------------------------------- |
-| Domain     | Vitest                      | Every rule, with `describe` blocks named by spec ID.                   |
-| API        | Vitest + Fastify `inject()` | Routes against the Cosmos emulator and Azurite; visitor/editor checks. |
-| Client     | Vitest + Testing Library    | Components and formatting (local dates, relative labels).              |
-| End to end | Playwright (later)          | Main flows at phone and tablet sizes.                                  |
+| Level      | Tool                        | What                                                                    |
+| ---------- | --------------------------- | ----------------------------------------------------------------------- |
+| Domain     | Vitest                      | Every rule, with `describe` blocks named by spec ID.                    |
+| API        | Vitest + Fastify `inject()` | Routes on the in-memory repository; visitor/editor checks.              |
+| Storage    | Vitest (`npm run test:int`) | Cosmos and Blob code against the emulators; same contract as in-memory. |
+| Client     | Vitest + Testing Library    | Components and formatting (local dates, relative labels).               |
+| End to end | Playwright (later)          | Main flows at phone and tablet sizes.                                   |
 
-Local services: the Azure Cosmos DB emulator and Azurite (Blob Storage emulator), so no test touches Azure.
+Local services: the Azure Cosmos DB emulator and Azurite (Blob Storage emulator), so no test touches Azure. Route tests use an
+in-memory repository that passes the same contract tests as the Cosmos one, so `npm test` stays fast and needs no Docker; the
+storage code itself is tested against the emulators with `npm run test:int`. *(proposed)*
 
 ## Cost
 
