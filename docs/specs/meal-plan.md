@@ -7,7 +7,8 @@ only signed-in editors can see or change it (X-1, X-6).
 
 ## Requirements
 
-- **PLAN-1. Add.** From a recipe, a user can add it to the "to make" list.
+- **PLAN-1. Add.** From a recipe, an editor can tap "I want to cook this" to add it to the "to make" list. While it is on the
+  list, the button shows that instead, and offers to remove it (PLAN-4).
 - **PLAN-2. No duplicates.** A recipe appears on the list at most once. Adding a recipe that is already on the list leaves the
   list unchanged and does not show an error.
 - **PLAN-3. View.** A user can see the list, ordered by when each recipe was added (oldest first), each showing name, thumbnail

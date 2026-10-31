@@ -7,8 +7,8 @@ ones that haven't been made in a while. Cooking history is private: only signed-
 
 ## Requirements
 
-- **COOK-1. Mark as cooked.** From a recipe, an editor can record "we made this". The time recorded is the server's current time
-  (X-12); it can't be changed. Editors are expected to mark a recipe when they cook it.
+- **COOK-1. Mark as cooked.** From a recipe, an editor can tap "I cooked this today" to record a cooking. The time recorded is the
+  server's current time (X-12); it can't be changed. Editors are expected to mark a recipe when they cook it.
 - **COOK-2.** (withdrawn) "Today" no longer comes from the device; cooking times come from the server (X-12).
 - **COOK-3.** (withdrawn) Future dates can't occur, because the server records the time.
 - **COOK-4.** (withdrawn) Duplicate entries are allowed. Marking a recipe cooked twice records two entries; a mistaken one can be
@@ -21,9 +21,9 @@ ones that haven't been made in a while. Cooking history is private: only signed-
   others, sorted by name.
 - **COOK-7. History drives the view.** Deleting a history entry (COOK-5) immediately updates the recipe's last-cooked date, count
   and its position in the COOK-6 view.
-- **COOK-8. Cooked-today button.** If a recipe was last cooked earlier on the device's current day, its "We made this" button
-  reads "Cooked today ✓" and can't be tapped again until the next day. This prevents most accidental duplicates; the server still
-  accepts them (COOK-4).
+- **COOK-8. Cooked-today button.** If a recipe was last cooked earlier on the device's current day, its "I cooked this today"
+  button reads "Cooked today ✓" and can't be tapped again until the next day. This prevents most accidental duplicates; the server
+  still accepts them (COOK-4).
 
 ## Examples
 

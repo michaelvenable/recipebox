@@ -36,21 +36,26 @@ interface DomainError {
 
 ### Value objects
 
-| Class        | Rules                                                                   | Spec                       |
-| ------------ | ----------------------------------------------------------------------- | -------------------------- |
-| `RecipeId`   | Opaque UUID string, created outside the domain so tests can control it. | —                          |
-| `RecipeName` | Trimmed; 1–200 characters. Sorting and search: see notes.               | REC-1, REC-2, REC-8, REC-9 |
-| `TextEntry`  | One ingredient or step. Trimmed; 1–1,000 characters.                    | REC-1, REC-2               |
-| `Minutes`    | Whole number, 1–1440.                                                   | REC-1                      |
-| `PhotoRef`   | Blob name + content type. The domain never sees image bytes.            | REC-7                      |
-| `Tag`        | Trimmed and lowercased; 1–30 characters. Equal tags have equal text.    | REC-11                     |
-| `Instant`    | A point in time (UTC). Passed in; the domain never reads the clock.     | X-12                       |
+| Class        | Rules                                                                          | Spec                       |
+| ------------ | ------------------------------------------------------------------------------ | -------------------------- |
+| `RecipeId`   | UUID, stored in lowercase; created outside the domain so tests can control it. | —                          |
+| `RecipeName` | Trimmed; 1–200 characters. Sorting and search: see notes.                      | REC-1, REC-2, REC-8, REC-9 |
+| `TextEntry`  | One ingredient or step. Trimmed; 1–1,000 characters.                           | REC-1, REC-2               |
+| `Minutes`    | Whole number, 1–1440.                                                          | REC-1                      |
+| `PhotoRef`   | Blob name + content type. The domain never sees image bytes.                   | REC-7                      |
+| `Tag`        | Trimmed and lowercased; 1–30 characters. Equal tags have equal text.           | REC-11                     |
+| `Instant`    | A point in time (UTC). Passed in; the domain never reads the clock.            | X-12                       |
 
 Notes:
 - `RecipeName.compare(a, b)` sorts ignoring case and accents. `RecipeName.matches(term)` finds the trimmed term anywhere in the
   name, ignoring case and accents; an empty term matches everything.
 - Character counts, sorting and matching all follow X-13: characters are counted as a person sees them (every emoji is one), and
-  comparisons ignore case and accents using English rules. One shared helper implements this so every value object agrees.
+  comparisons ignore case and accents using English rules. One shared helper implements this so every value object agrees:
+  - All stored text (names, ingredients, steps, tags) is normalized to Unicode NFC, so text that looks the same is the same.
+    Two "café" tags typed on different keyboards are one tag.
+  - Search folds both the name and the term the same way sorting does: NFKD, accent marks removed, a small table for letters
+    that don't decompose (ø→o, ł→l, đ→d, æ→ae, œ→oe, ß→ss), then lowercase. "smorrebrod" finds "Smørrebrød".
+  - Tags that differ only in accents ("epice", "épicé") stay separate tags; only case is folded when a tag is stored.
 - The domain has no calendar-date type. Everything it stores is an `Instant`; turning one into a local date or "3 months ago" is
   done on the device (X-12).
 

@@ -6,11 +6,11 @@ been cooked in a while.
 
 ## Spec files
 
-| File                                     | Prefix | Covers                                                       |
-| ---------------------------------------- | ------ | ------------------------------------------------------------ |
-| [recipes.md](recipes.md)                 | REC    | Create, view, edit, photo, search, tags, trash               |
-| [meal-plan.md](meal-plan.md)             | PLAN   | The "to make" list                                           |
-| [cooking-history.md](cooking-history.md) | COOK   | "We made this", last-cooked dates, "haven't made in a while" |
+| File                                     | Prefix | Covers                                                              |
+| ---------------------------------------- | ------ | ------------------------------------------------------------------- |
+| [recipes.md](recipes.md)                 | REC    | Create, view, edit, photo, search, tags, trash                      |
+| [meal-plan.md](meal-plan.md)             | PLAN   | The "to make" list                                                  |
+| [cooking-history.md](cooking-history.md) | COOK   | "I cooked this today", last-cooked dates, "haven't made in a while" |
 
 ## How to read and write these specs
 
@@ -62,6 +62,8 @@ been cooked in a while.
   - Characters are counted as a person sees them. Every emoji counts as one character, including combined ones such as flags.
   - Sorting and matching ignore case and accents, using English rules. "Éclair" sorts among the E's, and searching "creme" finds
     "Crème brûlée".
+- **X-14. Dark theme.** The app uses a light or dark theme to match the device's setting, and switches when the setting changes.
+  There is no theme switch in the app.
 
 ## Out of scope (for now)
 

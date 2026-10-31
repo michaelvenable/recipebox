@@ -24,7 +24,8 @@ tag.
   and step entries that are empty after trimming are discarded before the "at least 1" rule is checked.
 - **REC-3. Order is preserved.** Ingredients and steps are always displayed in the order the user entered them.
 - **REC-4. View.** A user can open a recipe and see all of its contents. Steps are numbered starting at 1. Opening a recipe that
-  does not exist shows a "not found" message, not an error page.
+  does not exist shows a "not found" message, not an error page. Visitors see the same page without editing controls or private
+  information (X-1, X-8).
 - **REC-5. Edit.** A user can change any field of an existing recipe, including reordering, adding and removing ingredients and
   steps. The same rules as REC-1 and REC-2 apply.
 - **REC-6. Delete to trash.** An editor can delete a recipe without being asked to confirm. The recipe moves to the trash (REC-14)
@@ -77,6 +78,10 @@ tag.
 - **REC-17. Trashed recipes can't be changed.** Any change to a recipe in the trash, other than restoring it, is refused and
   nothing changes. The editor is told the recipe is in the trash. (This can happen when another device still shows the recipe
   after it was deleted.)
+- **REC-18. Screen stays on.** While a recipe is open, the device's screen doesn't turn off on its own, on devices and browsers
+  that allow it. It may turn off again once the recipe is closed.
+- **REC-19. Tick off while cooking.** Anyone viewing a recipe can tick off ingredients and steps as they go, and untick them.
+  Ticks are never saved, on the device or the server; they are cleared when the person leaves the recipe.
 
 ## Examples
 
