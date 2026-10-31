@@ -51,10 +51,10 @@ Notes:
   name, ignoring case and accents; an empty term matches everything.
 - Character counts, sorting and matching all follow X-13: characters are counted as a person sees them (every emoji is one), and
   comparisons ignore case and accents using English rules. One shared helper implements this so every value object agrees:
-  - All stored text (names, ingredients, steps, tags) is normalized to Unicode NFC, so text that looks the same is the same.
-    Two "café" tags typed on different keyboards are one tag.
-  - Search folds both the name and the term the same way sorting does: NFKD, accent marks removed, a small table for letters
-    that don't decompose (ø→o, ł→l, đ→d, æ→ae, œ→oe, ß→ss), then lowercase. "smorrebrod" finds "Smørrebrød".
+  - All stored text (names, ingredients, steps, tags) is normalized to Unicode NFC, so text that looks the same is the same. Two
+    "café" tags typed on different keyboards are one tag.
+  - Search folds both the name and the term the same way sorting does: NFKD, accent marks removed, a small table for letters that
+    don't decompose (ø→o, ł→l, đ→d, æ→ae, œ→oe, ß→ss), then lowercase. "smorrebrod" finds "Smørrebrød".
   - Tags that differ only in accents ("epice", "épicé") stay separate tags; only case is folded when a tag is stored.
 - The domain has no calendar-date type. Everything it stores is an `Instant`; turning one into a local date or "3 months ago" is
   done on the device (X-12).
@@ -152,18 +152,20 @@ cannot restore an expired recipe by claiming an earlier time.
 ```ts
 function findRecipes(recipes: readonly Recipe[], by: { name?: string; tags?: string[] }): Recipe[];  // REC-9, REC-13
 function tagsInUse(recipes: readonly Recipe[]): { tag: Tag; count: number }[];                   // REC-13
-function suggestTags(recipes: readonly Recipe[], forRecipe: Recipe, typed: string): Tag[];       // REC-12
+function suggestTags(recipes: readonly Recipe[], forRecipe: Recipe | undefined, typed: string): Tag[];  // REC-12
 function trashContents(recipes: readonly Recipe[]): Recipe[];                                     // REC-14
+function toMakeList(recipes: readonly Recipe[]): Recipe[];                                        // PLAN-3
 ```
 
 - `findRecipes`, `tagsInUse`, `suggestTags` and `orderForRediscovery` (below) skip deleted recipes (REC-6).
 - `trashContents` returns only deleted recipes, most recently deleted first (REC-14).
+- `toMakeList` returns non-deleted recipes on the to-make list, oldest added first; ties sorted by name (PLAN-3). *(proposed)*
 - `findRecipes` keeps recipes whose name matches (`RecipeName.matches`) and that have every picked tag, sorted by
   `RecipeName.compare` (REC-8). No name and no tags returns every recipe.
 - `tagsInUse` lists each tag on at least one recipe with its count, alphabetically. Tags on no recipe simply don't appear, so
   there is no tag list to keep in sync.
 - `suggestTags` returns tags in use on other recipes that contain the typed text, ignoring case, alphabetically. Tags `forRecipe`
-  already has are left out (REC-12).
+  already has are left out (REC-12). With `forRecipe` undefined (a recipe not yet created), only the typed text matters.
 
 ### Rediscovery ordering
 

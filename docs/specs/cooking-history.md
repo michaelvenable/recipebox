@@ -30,7 +30,7 @@ ones that haven't been made in a while. Cooking history is private: only signed-
 | Situation                                                    | Result                                          |
 | ------------------------------------------------------------ | ----------------------------------------------- |
 | Mark cooked at 6 pm                                          | Button reads "Cooked today ✓" until midnight    |
-| Two devices mark the same recipe cooked at the same moment   | Two entries; one can be deleted (COOK-5)        |
+| Two devices each mark the recipe cooked, one after the other | Two entries; one can be deleted (COOK-5)        |
 | Entries 2026-09-01 and 2026-10-15; delete 2026-10-15         | Last cooked becomes 2026-09-01; count becomes 1 |
 | Recipes: A (never), B (last 2026-01-10), C (last 2026-08-02) | View order: A, B, C                             |
 

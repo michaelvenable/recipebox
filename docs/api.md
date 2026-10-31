@@ -56,8 +56,9 @@ Recipes:
 - `DELETE /recipes/{id}` — move to the trash (REC-6). Returns 204.
 
 Tags:
-- `PUT /recipes/{id}/tags/{tag}` — attach a tag (REC-10, REC-11); the tag is URL-encoded. Returns `EditorRecipe`.
-- `DELETE /recipes/{id}/tags/{tag}` — remove a tag (REC-10). Returns `EditorRecipe`.
+- `POST /recipes/{id}/tags` — attach a tag (REC-10, REC-11). Body `TagRequest`. Returns `EditorRecipe`.
+- `DELETE /recipes/{id}/tags` — remove a tag (REC-10). Body `TagRequest`. Returns `EditorRecipe`.
+- The tag travels in the body, not the address, because browsers rewrite tags such as "." or ".." in an address.
 - `GET /tag-suggestions?typed=&recipeId=` — suggestions while typing (REC-12). `recipeId` is omitted for a new recipe. Returns
   `Tag[]`.
 
@@ -69,7 +70,8 @@ Tags:
 Cooking history:
 - `POST /recipes/{id}/cookings` — "I cooked this today" (COOK-1, PLAN-5). The server records its own time. Returns `EditorRecipe`.
 - `DELETE /recipes/{id}/cookings/{at}` — delete one entry (COOK-5); `at` is the entry's stored time, URL-encoded. Returns
-  `EditorRecipe`.
+  `EditorRecipe`. An `at` that isn't in the stored form gets 404 `cooking.notFound`; a well-formed time with no matching entry
+  changes nothing.
 - `GET /rediscover` — "Haven't made in a while" (COOK-6). Returns `RediscoverEntry[]`.
 
 Trash:
@@ -85,6 +87,7 @@ Trash:
 - `PublicRecipe`: `id`, `name`, `ingredients[]`, `steps[]`, `totalTimeMinutes?`, `tags[]`, `hasPhoto`.
 - `EditorRecipe`: `PublicRecipe` plus `toMake?` (`addedAt`), `cookedAt[]` (newest first), `lastCookedAt?`, `timesCooked`.
 - `TagCount`: `tag`, `count`. `Tag`: a string.
+- `TagRequest`: `{ tag }`, the tag text as typed.
 - `ToMakeEntry`: `RecipeSummary` plus `addedAt`.
 - `RediscoverEntry`: `RecipeSummary` plus `lastCookedAt?`.
 - `TrashEntry`: `RecipeSummary` plus `deletedAt`, `removalDueAt`.
