@@ -17,14 +17,18 @@ Status: drafted by Claude from the specs and architecture, awaiting the owner's 
 
 Errors:
 
-| Status | When                                                                             | Body                         |
-| ------ | -------------------------------------------------------------------------------- | ---------------------------- |
-| 400    | Request fails validation or a domain rule (e.g. REC-1)                           | `ErrorResponse` (all errors) |
-| 401    | Editor endpoint called without signing in                                        | `ErrorResponse`              |
-| 403    | Editor endpoint called by a signed-in non-editor                                 | `ErrorResponse`              |
-| 404    | Recipe doesn't exist, or is in the trash and this isn't the trash endpoint       | `ErrorResponse`              |
-| 409    | Change refused by state: recipe in the trash (REC-17), restore too late (REC-16) | `ErrorResponse`              |
-| 415    | A change sent without a JSON body                                                | `ErrorResponse`              |
+| Status | When                                                   | Body                         |
+| ------ | ------------------------------------------------------ | ---------------------------- |
+| 400    | Request fails validation or a domain rule (e.g. REC-1) | `ErrorResponse` (all errors) |
+| 401    | Editor endpoint called without signing in              | `ErrorResponse`              |
+| 403    | Editor endpoint called by a signed-in non-editor       | `ErrorResponse`              |
+| 404    | Recipe doesn't exist, or is in the trash (see below)   | `ErrorResponse`              |
+| 409    | Change refused by the recipe's state (see below)       | `ErrorResponse`              |
+| 415    | A change sent without a JSON body                      | `ErrorResponse`              |
+
+Recipes in the trash: reading one gets 404, the same as an unknown id. Visitors and non-editors who try to change one get 401 or
+403 before the recipe is looked up, so they can't tell it apart from an unknown id either. An editor who tries to change one gets
+409 `recipe.inTrash`, so the app can say it is in the trash (REC-17). Restoring after 30 days gets 409 `trash.expired` (REC-16).
 
 `ErrorResponse` is `{ errors: ErrorItem[] }`; each `ErrorItem` is a domain error's `code`, `field` and `message`.
 
@@ -70,7 +74,8 @@ Cooking history:
 
 Trash:
 - `GET /trash` — the trash (REC-14). Returns `TrashEntry[]`, each with `deletedAt` and `removalDueAt`.
-- `POST /trash/{id}/restore` — restore (REC-15, REC-16). Returns `EditorRecipe`; 409 with `trash.expired` after 30 days.
+- `POST /trash/{id}/restore` — restore (REC-15, REC-16). Returns `EditorRecipe`; 409 with `trash.expired` after 30 days. Restoring
+  a recipe that isn't in the trash changes nothing and returns it.
 
 ## Shapes
 
@@ -85,6 +90,7 @@ Trash:
 - `TrashEntry`: `RecipeSummary` plus `deletedAt`, `removalDueAt`.
 - `Me`: `signedIn`, `provider?` (`aad` or `google`), `accountId?`, `isEditor`.
 - `ErrorResponse`: `errors[]` of `{ code, field?, message }`.
+- `EmptyRequest`: `{}`, the body of a change that needs no input (delete, restore, add to the list, mark cooked).
 
 Public shapes never include `toMake`, `cookedAt`, `lastCookedAt`, `timesCooked`, `deletedAt` or `onToMakeList` (X-1). Tests check
 this for every public endpoint.
