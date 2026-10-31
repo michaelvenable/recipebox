@@ -18,8 +18,7 @@ been cooked in a while.
   it (withdrawn).
 - Every requirement must be checkable: it should be possible to write a test, or describe a concrete scenario, that shows it is
   met or broken.
-- Specs describe behavior, not implementation. Storage layout, framework choices and code structure live in `docs/architecture.md`
-  (to be written).
+- Specs describe behavior, not implementation. Storage layout, framework choices and code structure live in `docs/architecture.md`.
 - "Out of scope" sections are binding: reviewers must not flag missing features listed there.
 - Items marked (proposed) are decisions the drafter made and the owner has not yet confirmed.
 
