@@ -66,7 +66,7 @@ Tags:
   `Tag[]`.
 
 "To make" list:
-- `GET /to-make` — the list (PLAN-3). Returns `ToMakeEntry[]`.
+- `GET /plan` — the list (PLAN-3). Returns `ToMakeEntry[]`.
 - `POST /recipes/{id}/add-to-plan` — add (PLAN-1, PLAN-2). Returns `EditorRecipe`.
 - `POST /recipes/{id}/remove-from-plan` — remove (PLAN-4). Returns `EditorRecipe`.
 
