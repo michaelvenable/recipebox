@@ -15,14 +15,13 @@ import {
   storedSnapshots,
 } from "./recipe-route-helpers.js";
 
-const COOKED_AT = "2026-09-01T18:00:00.000Z";
 const UNKNOWN_ID = "bbbbbbbb-0000-4000-8000-000000000000";
 
 /** A recipe on the to-make list with cooking history, plus one in the trash: every kind of private data there is. */
 async function appWithPrivateData(): Promise<Awaited<ReturnType<typeof recipeApp>> & { id: string; trashedId: string }> {
   const setup = await recipeApp("2026-10-10T09:00:00.000Z");
   const recipe = await seed(setup.repository, content("Pad Thai", { tags: ["dinner"] }), {
-    cookedAt: ["2026-08-01T18:00:00.000Z", COOKED_AT],
+    cookedAt: ["2026-08-01T18:00:00.000Z", "2026-09-01T18:00:00.000Z"],
     toMakeAt: "2026-09-20T08:00:00.000Z",
   });
   await seed(setup.repository, content("Curry", { tags: ["spicy"] }));
@@ -38,20 +37,19 @@ function editorReads(id: string): [string, { parse(v: unknown): unknown }][] {
   return [
     ["/tag-suggestions?typed=", Tag.array()],
     [`/tag-suggestions?typed=s&recipeId=${id}`, Tag.array()],
-    ["/to-make", ToMakeEntry.array()],
-    ["/rediscover", RediscoverEntry.array()],
+    ["/plan", ToMakeEntry.array()],
+    ["/recommendations", RediscoverEntry.array()],
   ];
 }
 
 /** Every change endpoint of this task, against the recipe from appWithPrivateData, with a valid body. */
-function changeEndpoints(id: string): [string, "POST" | "PUT" | "DELETE", string, Record<string, unknown>][] {
+function changeEndpoints(id: string): [string, "POST" | "DELETE", string, Record<string, unknown>][] {
   return [
     ["attach a tag", "POST", `/recipes/${id}/tags`, { tag: "quick" }],
     ["remove a tag", "DELETE", `/recipes/${id}/tags`, { tag: "dinner" }],
-    ["add to the list", "PUT", `/recipes/${id}/to-make`, {}],
-    ["remove from the list", "DELETE", `/recipes/${id}/to-make`, {}],
+    ["add to the list", "POST", `/recipes/${id}/add-to-plan`, {}],
+    ["remove from the list", "POST", `/recipes/${id}/remove-from-plan`, {}],
     ["mark cooked", "POST", `/recipes/${id}/cookings`, {}],
-    ["delete a cooking", "DELETE", `/recipes/${id}/cookings/${encodeURIComponent(COOKED_AT)}`, {}],
   ];
 }
 
@@ -60,7 +58,7 @@ describe("X-1 recipes are public; the rest is private", () => {
     ["a visitor", AS_VISITOR, 401, "auth.signInRequired"],
     ["a signed-in non-editor", AS_NON_EDITOR, 403, "auth.notEditor"],
   ] as const) {
-    it(`refuses ${who} the to-make list, the rediscovery view and tag suggestions, revealing nothing`, async () => {
+    it(`refuses ${who} the to-make list, the recommendations and tag suggestions, revealing nothing`, async () => {
       const { app, id } = await appWithPrivateData();
       for (const [url] of editorReads(id)) {
         const res = await get(app, url, as);
@@ -93,7 +91,7 @@ describe("X-1 recipes are public; the rest is private", () => {
       expect(res.body, url).not.toContain("Trashed Curry");
       expect(res.body, url).not.toContain("secret");
     }
-    expect(ToMakeEntry.array().parse((await get(app, "/to-make", AS_EDITOR)).json())).toEqual([
+    expect(ToMakeEntry.array().parse((await get(app, "/plan", AS_EDITOR)).json())).toEqual([
       { id, name: "Pad Thai", tags: ["dinner"], hasPhoto: false, addedAt: "2026-09-20T08:00:00.000Z" },
     ]);
   });
@@ -163,7 +161,6 @@ describe("X-12 every stored time comes from the server's clock", () => {
     ["add to the list", { addedAt: TIME }],
     ["remove from the list", { at: TIME }],
     ["mark cooked", { cookedAt: TIME }],
-    ["delete a cooking", { at: TIME }],
   ])("refuses a request to %s that carries a time, and changes nothing", async (name, payload) => {
     const { app, repository, id } = await appWithPrivateData();
     const before = await storedSnapshots(repository);
@@ -200,15 +197,27 @@ describe("X-12 every stored time comes from the server's clock", () => {
     const recipe = await seed(repository, content("Pad Thai"));
     clock.set("2026-10-03T04:05:06.007Z");
 
-    await change(app, "PUT", `/recipes/${recipe.id.value}/to-make`);
+    await change(app, "POST", `/recipes/${recipe.id.value}/add-to-plan`);
 
     expect((await repository.get(recipe.id))?.toSnapshot().toMake).toEqual({ addedAt: "2026-10-03T04:05:06.007Z" });
   });
+});
 
-  it("deleting a cooking only selects an entry by its time; no time is stored from the request", async () => {
+describe("docs/api.md retired routes", () => {
+  // The plan endpoints were renamed, GET /rediscover became GET /recommendations (COOK-6), and cooking entries can no longer
+  // be deleted (COOK-5; COOK-7 withdrawn). None of the old routes may still answer.
+  it.each([
+    ["GET", "/to-make"],
+    ["PUT", "/recipes/{id}/to-make"],
+    ["DELETE", "/recipes/{id}/to-make"],
+    ["DELETE", `/recipes/{id}/cookings/${encodeURIComponent("2026-09-01T18:00:00.000Z")}`],
+    ["GET", "/rediscover"],
+  ] as const)("answers an editor's %s %s with 404 and changes nothing", async (method, path) => {
     const { app, repository, id } = await appWithPrivateData();
-    await change(app, "DELETE", `/recipes/${id}/cookings/${encodeURIComponent(COOKED_AT)}`);
-    const recipe = (await repository.list()).find((r) => r.id.value === id);
-    expect(recipe?.toSnapshot().cookedAt).toEqual(["2026-08-01T18:00:00.000Z"]);
+    const before = await storedSnapshots(repository);
+    const url = path.replace("{id}", id);
+    const res = method === "GET" ? await get(app, url, AS_EDITOR) : await change(app, method, url, {}, AS_EDITOR);
+    expect(res.statusCode, res.body).toBe(404);
+    expect(await storedSnapshots(repository)).toEqual(before);
   });
 });

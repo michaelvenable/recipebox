@@ -204,26 +204,17 @@ export class Recipe {
     return ok(undefined);
   }
 
-  /** Removes one entry with exactly that time; none: no-op (COOK-5). */
-  removeCookedEntry(at: Instant): Result<void> {
-    const refused = this.refuseIfInTrash();
-    if (refused) return refused;
-    const index = this.cookings.findIndex((c) => c.equals(at));
-    if (index !== -1) this.cookings.splice(index, 1);
-    return ok(undefined);
-  }
-
   /** Newest first (COOK-5). */
   get cookedAt(): readonly Instant[] {
     return Object.freeze([...this.cookings]);
   }
 
-  /** Derived from `cookedAt`, never stored, so it can't drift (COOK-7). */
+  /** Derived from `cookedAt`, never stored, so it can't drift (COOK-5). */
   get lastCookedAt(): Instant | undefined {
     return this.cookings[0];
   }
 
-  /** Derived from `cookedAt`, never stored, so it can't drift (COOK-7). */
+  /** Derived from `cookedAt`, never stored, so it can't drift (COOK-5). */
   get timesCooked(): number {
     return this.cookings.length;
   }

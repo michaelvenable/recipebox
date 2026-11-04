@@ -46,23 +46,6 @@ describe("COOK-6 haven't made in a while", () => {
   });
 });
 
-describe("COOK-7 history drives the view", () => {
-  it("moves a recipe when its latest entry is deleted", () => {
-    const a = recipe("A", "2026-09-01T18:00:00Z", "2026-10-15T18:00:00Z");
-    const b = recipe("B", "2026-10-01T18:00:00Z");
-    expect(names(orderForRediscovery([a, b]))).toEqual(["B", "A"]);
-    valueOf(a.removeCookedEntry(at("2026-10-15T18:00:00Z")));
-    expect(names(orderForRediscovery([a, b]))).toEqual(["A", "B"]);
-  });
-
-  it("moves a recipe to the never-cooked group when its only entry is deleted", () => {
-    const z = recipe("Z", "2026-09-01T18:00:00Z");
-    const a = recipe("A", "2026-01-01T18:00:00Z");
-    valueOf(z.removeCookedEntry(at("2026-09-01T18:00:00Z")));
-    expect(names(orderForRediscovery([a, z]))).toEqual(["Z", "A"]);
-  });
-});
-
 describe("REC-6 deleted recipes are not in the rediscovery view", () => {
   it("skips deleted recipes, cooked or not", () => {
     const kept = recipe("Kept", "2026-01-01T18:00:00Z");

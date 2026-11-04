@@ -326,8 +326,6 @@ describe("REC-17 trashed recipes can't be changed", () => {
     ["addToMakeList", (r) => r.addToMakeList(at("2026-10-22T09:00:00Z"))],
     ["removeFromMakeList", (r) => r.removeFromMakeList()],
     ["markCooked", (r) => r.markCooked(at("2026-10-22T09:00:00Z"))],
-    ["removeCookedEntry (existing)", (r) => r.removeCookedEntry(at("2026-09-01T18:00:00Z"))],
-    ["removeCookedEntry (missing)", (r) => r.removeCookedEntry(at("2026-01-01T00:00:00Z"))],
   ];
 
   it.each(changes)("%s fails with recipe.inTrash and changes nothing", (_, change) => {
@@ -419,14 +417,6 @@ describe("COOK-1 mark as cooked", () => {
     expect(r.timesCooked).toBe(2);
   });
 
-  it("one of two identical entries can be deleted (COOK-5)", () => {
-    const r = recipe();
-    valueOf(r.markCooked(at("2026-10-21T18:00:00Z")));
-    valueOf(r.markCooked(at("2026-10-21T18:00:00Z")));
-    valueOf(r.removeCookedEntry(at("2026-10-21T18:00:00Z")));
-    expect(isoList(r.cookedAt)).toEqual(["2026-10-21T18:00:00.000Z"]);
-  });
-
   it("doesn't change content, photo or tags", () => {
     const r = fullRecipe();
     const before = r.toSnapshot();
@@ -457,33 +447,13 @@ describe("COOK-5 history on the recipe", () => {
     expect(r.timesCooked).toBe(3);
   });
 
-  it("removing a time with no entry does nothing", () => {
-    const r = fullRecipe();
-    const before = r.toSnapshot();
-    expect(r.removeCookedEntry(at("2026-09-01T18:00:00.001Z")).ok).toBe(true);
-    expect(r.toSnapshot()).toEqual(before);
-  });
-
   it("the returned history can't be used to change the recipe", () => {
     const r = fullRecipe();
     expect(() => (r.cookedAt as Instant[]).pop()).toThrow();
     expect(r.timesCooked).toBe(2);
   });
-});
 
-describe("COOK-7 history drives the view", () => {
-  it("entries 2026-09-01 and 2026-10-15; delete 2026-10-15: last cooked becomes 2026-09-01, count 1", () => {
-    const r = recipe();
-    valueOf(r.markCooked(at("2026-09-01T18:00:00Z")));
-    valueOf(r.markCooked(at("2026-10-15T18:00:00Z")));
-    expect(r.lastCookedAt?.toIso()).toBe("2026-10-15T18:00:00.000Z");
-    expect(r.timesCooked).toBe(2);
-    valueOf(r.removeCookedEntry(at("2026-10-15T18:00:00Z")));
-    expect(r.lastCookedAt?.toIso()).toBe("2026-09-01T18:00:00.000Z");
-    expect(r.timesCooked).toBe(1);
-  });
-
-  it("last-cooked time and count are not stored", () => {
+  it("last-cooked time and count are derived from the entries, not stored", () => {
     const snapshot = fullRecipe().toSnapshot() as unknown as Record<string, unknown>;
     expect(Object.keys(snapshot)).not.toContain("lastCookedAt");
     expect(Object.keys(snapshot)).not.toContain("timesCooked");

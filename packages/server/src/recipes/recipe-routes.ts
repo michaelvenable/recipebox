@@ -9,7 +9,6 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import {
   type DomainError,
   findRecipes,
-  Instant,
   orderForRediscovery,
   Recipe,
   RecipeId,
@@ -60,10 +59,6 @@ export interface RecipeRouteDependencies {
 
 interface IdParams {
   id: string;
-}
-
-interface CookingParams extends IdParams {
-  at: string;
 }
 
 interface ListQuery {
@@ -117,16 +112,6 @@ export function recipeIdOf(raw: string): RecipeId | undefined {
 }
 
 /**
- * A cooking entry is named by its stored time, which is always canonical ISO 8601 (`Instant.toIso`, X-12). Text in any other
- * form names no entry and is treated as not found, like a malformed recipe id (docs/api.md, "Conventions"), so a time written
- * some other way, such as "2026-10-15T18:00Z", can't select an entry.
- */
-function storedTimeOf(raw: string): Instant | undefined {
-  const at = Instant.fromIso(raw);
-  return at.ok && at.value.toIso() === raw ? at.value : undefined;
-}
-
-/**
  * REC-17 for a change whose input is checked before the domain is called: an editor changing a recipe in the trash is told so,
  * whatever the input, as the domain would answer (code recipe.inTrash, 409).
  */
@@ -134,10 +119,6 @@ export function sendInTrash(reply: FastifyReply): FastifyReply {
   return sendErrors(reply, 409, [
     { code: "recipe.inTrash", message: "This recipe is in the trash. Restore it before changing it." },
   ]);
-}
-
-function sendCookingNotFound(reply: FastifyReply): FastifyReply {
-  return sendErrors(reply, 404, [{ code: "cooking.notFound", message: "This cooking entry doesn't exist." }]);
 }
 
 /** 400 unless the body is `{}` (EmptyRequest); a time sent along is refused like any other field (X-12). */
@@ -320,13 +301,13 @@ export function registerRecipeRoutes(app: FastifyInstance, { recipes, clock, new
   );
 
   // PLAN-3: which recipes are listed and in what order is the domain's (toMakeList).
-  app.get("/to-make", { preHandler: requireEditor }, async (): Promise<ToMakeEntry[]> =>
+  app.get("/plan", { preHandler: requireEditor }, async (): Promise<ToMakeEntry[]> =>
     toMakeList(await recipes.list()).map(toToMakeEntry),
   );
 
   // PLAN-1, PLAN-2: the added time is the server's (X-12); adding again keeps the original one.
-  app.put<{ Params: IdParams }>(
-    "/recipes/:id/to-make",
+  app.post<{ Params: IdParams }>(
+    "/recipes/:id/add-to-plan",
     { preHandler: requireEditor },
     async (request, reply): Promise<EditorRecipe | FastifyReply> =>
       refuseUnlessEmpty(request.body, reply) ??
@@ -334,8 +315,8 @@ export function registerRecipeRoutes(app: FastifyInstance, { recipes, clock, new
   );
 
   // PLAN-4: content and cooking history are untouched; removing a recipe that isn't on the list changes nothing.
-  app.delete<{ Params: IdParams }>(
-    "/recipes/:id/to-make",
+  app.post<{ Params: IdParams }>(
+    "/recipes/:id/remove-from-plan",
     { preHandler: requireEditor },
     async (request, reply): Promise<EditorRecipe | FastifyReply> =>
       refuseUnlessEmpty(request.body, reply) ??
@@ -352,30 +333,8 @@ export function registerRecipeRoutes(app: FastifyInstance, { recipes, clock, new
       applyChange(reply, request.params.id, (recipe) => recipe.markCooked(clock())),
   );
 
-  // COOK-5, COOK-7: deletes one entry, named by its stored time. A stored-form time that matches no entry changes nothing (the
-  // domain's rule); text that isn't in stored form is not found (storedTimeOf). The time only selects an entry; nothing is
-  // stored from it (X-12). A recipe in the trash is answered 409 recipe.inTrash before `at` is looked at, so the editor is told
-  // it is in the trash whatever `at` says (REC-17).
-  app.delete<{ Params: CookingParams }>(
-    "/recipes/:id/cookings/:at",
-    { preHandler: requireEditor },
-    async (request, reply): Promise<EditorRecipe | FastifyReply> => {
-      const refused = refuseUnlessEmpty(request.body, reply);
-      if (refused) return refused;
-      const recipe = await load(request.params.id);
-      if (recipe === undefined) return sendNotFound(reply);
-      if (recipe.isDeleted) return sendInTrash(reply);
-      const at = storedTimeOf(request.params.at);
-      if (at === undefined) return sendCookingNotFound(reply);
-      const removed = recipe.removeCookedEntry(at);
-      if (!removed.ok) return sendErrors(reply, statusFor(removed.errors), removed.errors);
-      await recipes.save(recipe);
-      return toEditorRecipe(recipe);
-    },
-  );
-
   // COOK-6: editor-only (X-1); the order is the domain's.
-  app.get("/rediscover", { preHandler: requireEditor }, async (): Promise<RediscoverEntry[]> =>
+  app.get("/recommendations", { preHandler: requireEditor }, async (): Promise<RediscoverEntry[]> =>
     orderForRediscovery(await recipes.list()).map(toRediscoverEntry),
   );
 }

@@ -19,7 +19,7 @@ const MALFORMED_ID = "not-a-uuid";
 type App = Awaited<ReturnType<typeof recipeApp>>["app"];
 
 async function toMakeList(app: App): Promise<ToMakeEntry[]> {
-  const res = await get(app, "/to-make", AS_EDITOR);
+  const res = await get(app, "/plan", AS_EDITOR);
   expect(res.statusCode, res.body).toBe(200);
   return ToMakeEntry.array().parse(res.json());
 }
@@ -30,7 +30,7 @@ describe("PLAN-1 add", () => {
     const recipe = await seed(repository, content("Pad Thai", { totalTimeMinutes: 30, tags: ["dinner"] }));
     clock.set("2026-10-02T17:30:00.000Z");
 
-    const res = await change(app, "PUT", `/recipes/${recipe.id.value}/to-make`);
+    const res = await change(app, "POST", `/recipes/${recipe.id.value}/add-to-plan`);
 
     expect(res.statusCode, res.body).toBe(200);
     expect(EditorRecipe.parse(res.json())).toEqual({
@@ -63,7 +63,7 @@ describe("PLAN-1 add", () => {
     ["a malformed id", MALFORMED_ID],
   ])("answers %s with 404", async (_name, id) => {
     const { app, repository } = await recipeApp();
-    expectErrors(await change(app, "PUT", `/recipes/${id}/to-make`), 404, ["recipe.notFound"]);
+    expectErrors(await change(app, "POST", `/recipes/${id}/add-to-plan`), 404, ["recipe.notFound"]);
     expect(await repository.list()).toEqual([]);
   });
 });
@@ -73,9 +73,9 @@ describe("PLAN-2 no duplicates", () => {
     const { app, repository, clock } = await recipeApp("2026-10-01T09:00:00.000Z");
     const recipe = await seed(repository, content("Pad Thai"));
 
-    expect((await change(app, "PUT", `/recipes/${recipe.id.value}/to-make`)).statusCode).toBe(200);
+    expect((await change(app, "POST", `/recipes/${recipe.id.value}/add-to-plan`)).statusCode).toBe(200);
     clock.set("2026-10-05T09:00:00.000Z");
-    const again = await change(app, "PUT", `/recipes/${recipe.id.value}/to-make`);
+    const again = await change(app, "POST", `/recipes/${recipe.id.value}/add-to-plan`);
 
     expect(again.statusCode, again.body).toBe(200);
     expect(EditorRecipe.parse(again.json()).toMake).toEqual({ addedAt: "2026-10-01T09:00:00.000Z" });
@@ -104,9 +104,9 @@ describe("PLAN-3 view", () => {
     const later = await seed(repository, content("A later"));
     const first = await seed(repository, content("B first"));
     clock.set("2026-10-01T10:00:00.000Z");
-    await change(app, "PUT", `/recipes/${first.id.value}/to-make`);
+    await change(app, "POST", `/recipes/${first.id.value}/add-to-plan`);
     clock.set("2026-10-01T11:00:00.000Z");
-    await change(app, "PUT", `/recipes/${later.id.value}/to-make`);
+    await change(app, "POST", `/recipes/${later.id.value}/add-to-plan`);
 
     expect((await toMakeList(app)).map((e) => e.name)).toEqual(["B first", "A later"]);
   });
@@ -127,7 +127,7 @@ describe("PLAN-4 remove", () => {
     });
     const before = (await repository.get(recipe.id))?.toSnapshot();
 
-    const res = await change(app, "DELETE", `/recipes/${recipe.id.value}/to-make`);
+    const res = await change(app, "POST", `/recipes/${recipe.id.value}/remove-from-plan`);
 
     expect(res.statusCode, res.body).toBe(200);
     const removed = EditorRecipe.parse(res.json());
@@ -148,7 +148,7 @@ describe("PLAN-4 remove", () => {
     const { app, repository } = await recipeApp();
     const recipe = await seed(repository, content("Pad Thai"));
     const before = await storedSnapshots(repository);
-    const res = await change(app, "DELETE", `/recipes/${recipe.id.value}/to-make`);
+    const res = await change(app, "POST", `/recipes/${recipe.id.value}/remove-from-plan`);
     expect(res.statusCode, res.body).toBe(200);
     expect(await storedSnapshots(repository)).toEqual(before);
   });
@@ -158,7 +158,7 @@ describe("PLAN-4 remove", () => {
     ["a malformed id", MALFORMED_ID],
   ])("answers %s with 404", async (_name, id) => {
     const { app } = await recipeApp();
-    expectErrors(await change(app, "DELETE", `/recipes/${id}/to-make`), 404, ["recipe.notFound"]);
+    expectErrors(await change(app, "POST", `/recipes/${id}/remove-from-plan`), 404, ["recipe.notFound"]);
   });
 });
 
@@ -190,7 +190,7 @@ describe("PLAN-6 deleted recipes leave the list", () => {
     await change(app, "POST", `/trash/${recipe.id.value}/restore`);
     expect(await toMakeList(app)).toEqual([]);
 
-    expect((await change(app, "PUT", `/recipes/${recipe.id.value}/to-make`)).statusCode).toBe(200);
+    expect((await change(app, "POST", `/recipes/${recipe.id.value}/add-to-plan`)).statusCode).toBe(200);
     expect((await toMakeList(app)).map((e) => e.name)).toEqual(["Pad Thai"]);
   });
 });
@@ -203,20 +203,20 @@ describe("PLAN-7 indicator", () => {
       EditorRecipeSummary.array().parse((await get(app, "/recipes", AS_EDITOR)).json())[0]?.onToMakeList;
 
     expect(await onList()).toBe(false);
-    await change(app, "PUT", `/recipes/${recipe.id.value}/to-make`);
+    await change(app, "POST", `/recipes/${recipe.id.value}/add-to-plan`);
     expect(await onList()).toBe(true);
-    await change(app, "DELETE", `/recipes/${recipe.id.value}/to-make`);
+    await change(app, "POST", `/recipes/${recipe.id.value}/remove-from-plan`);
     expect(await onList()).toBe(false);
   });
 });
 
 describe("REC-17 trashed recipes can't be changed: the to-make list", () => {
-  for (const method of ["PUT", "DELETE"] as const) {
-    it(`answers an editor's ${method} for a recipe in the trash with 409 recipe.inTrash, and changes nothing`, async () => {
+  for (const action of ["add-to-plan", "remove-from-plan"] as const) {
+    it(`answers an editor's ${action} for a recipe in the trash with 409 recipe.inTrash, and changes nothing`, async () => {
       const { app, repository } = await recipeApp();
       const recipe = await seed(repository, content("Pad Thai"), { deletedAt: "2026-09-30T10:00:00.000Z" });
       const before = await storedSnapshots(repository);
-      expectErrors(await change(app, method, `/recipes/${recipe.id.value}/to-make`), 409, ["recipe.inTrash"]);
+      expectErrors(await change(app, "POST", `/recipes/${recipe.id.value}/${action}`), 409, ["recipe.inTrash"]);
       expect(await storedSnapshots(repository)).toEqual(before);
       expect(await toMakeList(app)).toEqual([]);
     });

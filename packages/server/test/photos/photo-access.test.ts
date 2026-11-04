@@ -82,7 +82,8 @@ describe('architecture "Sign-in": multipart/form-data only on PUT /recipes/{id}/
     ["POST", "/recipes/{id}/cookings"],
     ["POST", "/trash/{id}/restore"],
     ["PUT", "/recipes/{id}/content"],
-    ["PUT", "/recipes/{id}/to-make"],
+    ["POST", "/recipes/{id}/add-to-plan"],
+    ["POST", "/recipes/{id}/remove-from-plan"],
   ] as const)("refuses multipart/form-data on %s %s with 415, changing nothing", async (method, path) => {
     const setup = await appWithPhotos();
     const before = await stateOf(setup);

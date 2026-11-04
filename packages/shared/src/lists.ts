@@ -13,13 +13,13 @@ export type TagCount = z.infer<typeof TagCount>;
 export const Tag = z.string();
 export type Tag = z.infer<typeof Tag>;
 
-/** GET /to-make (PLAN-3). */
+/** GET /plan (PLAN-3). */
 export const ToMakeEntry = RecipeSummary.extend({
   addedAt: z.string(),
 });
 export type ToMakeEntry = z.infer<typeof ToMakeEntry>;
 
-/** GET /rediscover (COOK-6). */
+/** GET /recommendations (COOK-6). */
 export const RediscoverEntry = RecipeSummary.extend({
   lastCookedAt: z.string().optional(),
 });
