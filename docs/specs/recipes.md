@@ -61,7 +61,7 @@ tag.
 - **REC-12. Tag suggestions.** While typing a tag, the editor is offered tags already used on other recipes that contain the typed
   text, ignoring case and accents (X-13), so the collection doesn't drift into near-duplicates like "dessert" and "desserts". Tags
   the recipe already has are not offered. Before anything is typed, all tags in use on other recipes are offered, the way an empty
-  search shows every recipe. *(proposed)*
+  search shows every recipe.
 - **REC-13. Filter by tags.** On the recipe list, a user can pick one or more tags to filter by.
   - The user picks from every tag currently in use, shown in alphabetical order (X-13) with the number of recipes that have each
     one.
