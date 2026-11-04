@@ -1,7 +1,6 @@
 import { MessageChannel, type Worker, type WorkerOptions } from "node:worker_threads";
 import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
-import { decodeHeic } from "../../src/photos/heic.js";
 import {
   DECODE_CONCURRENCY,
   DECODE_QUEUE_SIZE,
@@ -19,12 +18,10 @@ import {
 import {
   CAMERA_MAKE,
   colorAt,
-  corruptedHeic,
   exifOf,
   expectColor,
   expectStrippedJpeg,
   gif,
-  heicDeclaring,
   jpeg,
   paddedJpeg,
   phoneHeic,
@@ -53,7 +50,6 @@ describe("REC-7 accepted types, detected from the file's bytes", () => {
     ["JPEG", jpeg, "jpeg"],
     ["PNG", png, "png"],
     ["WebP", webp, "webp"],
-    ["HEIC", async () => phoneHeic(), "heic"],
   ] as const)("detects %s by its signature", async (_name, make, type) => {
     expect(detectImageType(await make())).toBe(type);
   });
@@ -61,6 +57,7 @@ describe("REC-7 accepted types, detected from the file's bytes", () => {
   it.each([
     ["a text file (named photo.jpg by its sender)", async () => TEXT_FILE],
     ["a GIF", gif],
+    ["a HEIC from an iPhone (iOS converts photos picked in the browser to JPEG)", async () => phoneHeic()],
     ["an AVIF (HEIF, but AV1 rather than HEVC)", avif],
     ["a TIFF", () => sharp({ create: { width: 4, height: 4, channels: 3, background: "red" } }).tiff().toBuffer()],
     ["an SVG", async () => Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/>')],
@@ -72,20 +69,9 @@ describe("REC-7 accepted types, detected from the file's bytes", () => {
     expect(await processPhoto(bytes)).toEqual({ ok: false, reason: "unsupportedType" });
   });
 
-  it("detects HEIC whose major brand is the generic mif1, when it lists a HEIC brand", () => {
-    const heic = Buffer.from(phoneHeic());
-    heic.write("mif1", 8, "latin1");
-    expect(detectImageType(heic)).toBe("heic");
-    const avifLike = Buffer.from(heic);
-    for (let at = 16; at < 28; at += 4) avifLike.write("avif", at, "latin1");
-    expect(detectImageType(avifLike)).toBeUndefined();
-  });
-
   it("refuses a file with an accepted signature that can't be decoded", async () => {
     const broken = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(200, 7)]);
     expect(await processPhoto(broken)).toEqual({ ok: false, reason: "unreadable" });
-    const truncatedHeic = phoneHeic().subarray(0, 600);
-    expect(await processPhoto(truncatedHeic)).toEqual({ ok: false, reason: "unreadable" });
   });
 
 });
@@ -112,15 +98,6 @@ describe('REC-7 images over 50 megapixels are refused before decoding (architect
     expect((await sharp(result.photo).metadata()).width).toBe(PHOTO_MAX_SIDE);
     expect((await sharp(result.thumbnail).metadata()).width).toBe(THUMBNAIL_MAX_SIDE);
   }, 30_000);
-
-  it("refuses a HEIC that declares more than 50 megapixels, by its declared size, without decoding it", async () => {
-    // The fixture's pixels are 64 x 64; only the size it declares (its ispe box) is changed. The size check reports tooLarge;
-    // without it, libheif would decode the pixels and report the size mismatch instead.
-    const huge = heicDeclaring(8_000, 7_000);
-    expect(decodeHeic(huge, MAX_INPUT_PIXELS)).toEqual({ ok: false, reason: "tooLarge" });
-    expect(decodeHeic(heicDeclaring(7_000, 7_000), MAX_INPUT_PIXELS)).toEqual({ ok: false, reason: "undecodable" });
-    expect(await processPhoto(huge)).toEqual({ ok: false, reason: "unreadable" });
-  });
 });
 
 describe('REC-7 a damaged or hostile file cannot harm the server (architecture "Photos": decoding is isolated)', () => {
@@ -140,14 +117,6 @@ describe('REC-7 a damaged or hostile file cannot harm the server (architecture "
 
   /** Gives anything a decode left behind (timers, promises) time to fail in this process. */
   const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 200));
-
-  it("refuses a HEIC whose decoded size differs from its declared size, promptly and without an unhandled rejection", async () => {
-    const started = Date.now();
-    expect(await processPhoto(corruptedHeic())).toEqual({ ok: false, reason: "unreadable" });
-    expect(Date.now() - started).toBeLessThan(DECODE_TIMEOUT_MS);
-    await settle();
-    expect(escaped).toEqual([]);
-  });
 
   it("refuses an image whose decoder doesn't answer within the time limit", async () => {
     const started = Date.now();
@@ -170,8 +139,8 @@ describe('REC-7 a damaged or hostile file cannot harm the server (architecture "
   });
 
   it("still converts images after a decoder failed", async () => {
-    await processPhoto(corruptedHeic());
-    await expectUpright((await processed(phoneHeic())).photo);
+    await processPhoto(await jpeg(), { workerUrl: workerFixture("throw") });
+    await expectUpright((await processed(await phoneJpeg())).photo);
   });
 });
 
@@ -185,13 +154,6 @@ describe("REC-7 photos display correctly oriented", () => {
   it("applies a WebP's EXIF orientation", async () => {
     await expectUpright((await processed(await webp())).photo);
   });
-
-  it("applies a HEIC file's rotation once, not again from its EXIF orientation", async () => {
-    expect((await exifOf(phoneHeic()))?.Image?.Orientation).toBe(6);
-    const result = await processed(phoneHeic());
-    await expectUpright(result.photo);
-    await expectUpright(result.thumbnail);
-  });
 });
 
 describe("REC-7, X-1 stored images carry no metadata", () => {
@@ -199,7 +161,6 @@ describe("REC-7, X-1 stored images carry no metadata", () => {
     ["JPEG", phoneJpeg],
     ["PNG", png],
     ["WebP", webp],
-    ["HEIC", async () => phoneHeic()],
   ] as const)("drops EXIF, GPS location and all other metadata from a %s", async (_name, make) => {
     const source = await make();
     const exif = await exifOf(source);

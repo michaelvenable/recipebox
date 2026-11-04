@@ -34,7 +34,9 @@ tag.
   - Right after deleting, a "Recipe deleted" message with an Undo option is shown for at least 10 seconds. Undo restores the
     recipe exactly as restoring from the trash does (REC-15).
 - **REC-7. Photo.** A user can add, replace or remove a recipe's photo.
-  - Accepted: JPEG, PNG, WebP and HEIC (iPhone), up to 15 MB.
+  - Accepted: JPEG, PNG and WebP, up to 15 MB. HEIC is not accepted: an iPhone converts a photo picked from its library to JPEG
+    when the upload asks only for these types. A HEIC file chosen another way (such as from Files, or copied to a computer) is
+    rejected with a message saying to choose a JPEG.
   - Anything else is rejected with a message; the recipe is unchanged.
   - Replacing or removing a photo deletes the previous image from storage.
   - Photos display correctly oriented (respect camera rotation metadata).

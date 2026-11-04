@@ -52,7 +52,7 @@ Recipes:
 - `PUT /recipes/{id}/content` — edit (REC-5). Body `RecipeContentInput`. Returns `EditorRecipe`.
 - `PUT /recipes/{id}/photo` — add or replace the photo (REC-7). Body: the image (`multipart/form-data`, the one exception to the
   JSON rule, still refused from other origins by CORS). Returns `EditorRecipe`. Exactly one file part, under any field name. JPEG,
-  PNG, WebP or HEIC up to 15 MB, detected from the file's bytes. Errors (400): `photo.required`, `photo.tooLarge`,
+  PNG or WebP up to 15 MB, detected from the file's bytes. Errors (400): `photo.required`, `photo.tooLarge`,
   `photo.unsupportedType`, `photo.unreadable`. 503 `photo.busy` when too many uploads are waiting to be processed; try again.
   Location and other metadata are removed before storing.
 - `DELETE /recipes/{id}/photo` — remove the photo (REC-7). Returns `EditorRecipe`.

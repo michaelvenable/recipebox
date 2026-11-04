@@ -1,7 +1,6 @@
 // Decodes an upload and makes the two stored images (REC-7; docs/architecture.md, "Photos"). Runs only inside a photo worker
 // (photo-worker.ts); photo-processing.ts starts the worker and holds the rest of the upload checks.
 import sharp, { type Sharp } from "sharp";
-import { decodeHeic } from "./heic.js";
 
 /**
  * Images with more pixels than this are refused before any pixels are decoded, so a small file that expands to a huge image (a
@@ -15,14 +14,14 @@ export const PHOTO_MAX_SIDE = 2000;
 export const THUMBNAIL_MAX_SIDE = 400;
 
 /**
- * Both stored images are JPEG, whatever was uploaded: every browser can show it, unlike HEIC (docs/architecture.md, "Photos").
+ * Both stored images are JPEG, whatever was uploaded: every browser can show it (docs/architecture.md, "Photos").
  * Transparent areas of PNG and WebP uploads become white.
  */
 export const STORED_CONTENT_TYPE = "image/jpeg";
 const JPEG_QUALITY = 82;
 
 /** REC-7: the accepted types. */
-export type ImageType = "jpeg" | "png" | "webp" | "heic";
+export type ImageType = "jpeg" | "png" | "webp";
 
 /** What a worker is given. */
 export interface ConversionRequest {
@@ -35,7 +34,7 @@ export type ConversionResult = { ok: true; photo: Uint8Array; thumbnail: Uint8Ar
 
 /**
  * Decodes the upload once and makes both stored images from that one decode:
- * - the camera's rotation is applied (EXIF orientation; for HEIC, the file's rotation, applied by the decoder);
+ * - the camera's rotation is applied (EXIF orientation);
  * - all metadata is dropped: EXIF (including GPS location), XMP, IPTC, comments and ICC profiles. Recipes are public (X-1) and
  *   phone photos record where they were taken. Colors are converted to sRGB first, so dropping the profile doesn't shift them.
  */
@@ -69,13 +68,6 @@ export async function convertPhoto({ bytes, type }: ConversionRequest): Promise<
 
 /** A sharp pipeline reading the upload, already in display orientation, or why it can't be read as `type`. */
 async function decode(bytes: Uint8Array, type: ImageType): Promise<{ ok: true; image: Sharp } | { ok: false; detail: string }> {
-  if (type === "heic") {
-    const decoded = decodeHeic(bytes, MAX_INPUT_PIXELS);
-    if (!decoded.ok) return { ok: false, detail: `HEIC ${decoded.reason}` };
-    const { width, height, data } = decoded.image;
-    // Raw pixels carry no metadata at all; the decoder has already applied the rotation.
-    return { ok: true, image: sharp(data, { raw: { width, height, channels: 4 } }) };
-  }
   // failOn "error": phone photos often carry small defects that decoders warn about but read fine. limitInputPixels is checked
   // against the size in the file's header, before decoding.
   const source = sharp(bytes, { failOn: "error", limitInputPixels: MAX_INPUT_PIXELS, autoOrient: true });

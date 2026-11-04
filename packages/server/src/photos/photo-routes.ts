@@ -52,7 +52,7 @@ const NOT_ONE_FILE: ErrorItem = {
 const UNSUPPORTED: ErrorItem = {
   code: "photo.unsupportedType",
   field: "photo",
-  message: "This file isn't a JPEG, PNG, WebP or HEIC image.",
+  message: "This file isn't a JPEG, PNG or WebP image.",
 };
 const UNREADABLE: ErrorItem = {
   code: "photo.unreadable",

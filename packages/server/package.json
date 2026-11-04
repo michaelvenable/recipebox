@@ -16,7 +16,6 @@
     "@recipebox/domain": "^0.0.0",
     "@recipebox/shared": "^0.0.0",
     "fastify": "^5.12.7",
-    "libheif-js": "^1.23.5",
     "pino": "^10.4.0",
     "sharp": "^0.35.5"
   },

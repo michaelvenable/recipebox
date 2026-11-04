@@ -91,44 +91,13 @@ export function gif(): Promise<Buffer> {
 }
 
 /**
- * A real HEIC file (HEVC-coded), 1.8 KB: phoneJpeg() converted with libheif's heif-enc and x265, laid out as an iPhone writes
- * it. Its pixels are stored 60 x 40 with a rotation box (`irot`) that turns it to 40 x 60, red on top, and it keeps the JPEG's
- * EXIF and XMP: orientation 6 (which describes the rotation box and must not be applied a second time), the camera make and GPS
- * location. Made from our own synthetic pixels, so no third-party content or license is involved. To recreate it, write
- * phoneJpeg() to phone.jpg, then:
+ * A real HEIC file (HEVC-coded), 1.8 KB, as an iPhone saves photos: phoneJpeg() converted with libheif's heif-enc and x265. HEIC
+ * is not accepted (REC-7); this is the file that must be refused. Made from our own synthetic pixels, so no third-party content
+ * or license is involved. To recreate it, write phoneJpeg() to phone.jpg, then:
  *   docker run --rm -v "$PWD:/w" alpine sh -c "apk add libheif-tools x265-libs && heif-enc -q 50 /w/phone.jpg -o /w/out.heic"
  */
 export function phoneHeic(): Buffer {
   return readFileSync(new URL("./fixtures/rotated-with-gps.heic", import.meta.url));
-}
-
-/**
- * phoneHeic() with four bytes of its HEVC data changed, found by a reviewer: it decodes to 64 x 40 pixels instead of the 40 x 60
- * it declares. Given to libheif-js's HeifImage.display(), that threw a RangeError inside a setTimeout, where no try/catch saw
- * it: the upload never finished and the unhandled rejection ended the process.
- */
-export function corruptedHeic(): Buffer {
-  const bytes = Buffer.from(phoneHeic());
-  for (const [offset, value] of [
-    [847, 213],
-    [933, 60],
-    [1430, 26],
-    [1646, 227],
-  ] as const) {
-    bytes[offset] = value;
-  }
-  return bytes;
-}
-
-/** phoneHeic() with the image size it declares (its `ispe` box) changed to width x height; its pixels stay 64 x 64. */
-export function heicDeclaring(width: number, height: number): Buffer {
-  const bytes = Buffer.from(phoneHeic());
-  const ispe = bytes.indexOf("ispe", 0, "latin1");
-  if (ispe < 0 || bytes.indexOf("ispe", ispe + 1, "latin1") >= 0) throw new Error("expected one ispe box in the fixture");
-  // The box type, then a version and flags (4 bytes), then the width and height.
-  bytes.writeUInt32BE(width, ispe + 8);
-  bytes.writeUInt32BE(height, ispe + 12);
-  return bytes;
 }
 
 /** A text file, which a browser would happily send as photo.jpg with type image/jpeg. */

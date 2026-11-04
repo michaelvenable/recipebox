@@ -155,10 +155,11 @@ act as a visitor, an editor or a non-editor. The server refuses to start in deve
 
 ## Photos
 
-- Upload: the client sends the image to the API (REC-7). HEIC is decoded with libheif-js (libheif and its HEVC decoder compiled to
-  WebAssembly, LGPL-3.0), because sharp's prebuilt build can't read HEVC. All metadata, including GPS location, is removed, since
-  recipe photos are public. *(proposed)* The server checks type and size, applies the camera's rotation, converts HEIC to JPEG
-  (most browsers can't display HEIC), creates a thumbnail, and stores both in Blob Storage.
+- Upload: the client sends the image to the API (REC-7). The upload field accepts only JPEG, PNG and WebP, so iOS converts HEIC
+  photos to JPEG before sending them; the server doesn't decode HEIC (sharp's prebuilt build can't read HEVC, and the WebAssembly
+  decoder that could is LGPL-3.0 and not worth carrying for this). All metadata, including GPS location, is removed, since
+  recipe photos are public. *(proposed)* The server checks type and size, applies the camera's rotation, converts the image to
+  JPEG, creates a thumbnail, and stores both in Blob Storage.
 - Decoding is isolated (proposed): each upload is decoded in its own worker thread with a 30-second limit, and the worker is ended
   afterwards. A file that crashes, hangs or exhausts the decoder only ends that worker; the upload is refused with
   `photo.unreadable` and the API keeps serving. Images over 50 megapixels are refused before decoding (48-megapixel phone photos

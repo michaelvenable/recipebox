@@ -62,11 +62,6 @@ export class DecodeQueue {
 /** The queue all uploads share, unless a test passes its own. */
 const sharedDecodeQueue = new DecodeQueue();
 
-/** HEIF brands of HEVC-coded images (HEIC). AVIF and other HEIF codecs are not accepted. */
-const HEIC_BRANDS: readonly string[] = ["heic", "heix", "heim", "heis", "hevc", "hevx", "hevm", "hevs"];
-/** Generic HEIF brands; such a file is HEIC only if it also lists a HEIC brand as compatible. */
-const GENERIC_HEIF_BRANDS: readonly string[] = ["mif1", "msf1"];
-
 function ascii(bytes: Uint8Array, start: number, end: number): string {
   return String.fromCharCode(...bytes.subarray(start, end));
 }
@@ -75,29 +70,15 @@ function startsWith(bytes: Uint8Array, signature: readonly number[]): boolean {
   return bytes.length >= signature.length && signature.every((b, i) => bytes[i] === b);
 }
 
-/** The brands in a HEIF file's leading `ftyp` box: the major brand, then the compatible brands. */
-function heifBrands(bytes: Uint8Array): string[] {
-  if (bytes.length < 16 || ascii(bytes, 4, 8) !== "ftyp") return [];
-  const boxSize = ((bytes[0]! << 24) | (bytes[1]! << 16) | (bytes[2]! << 8) | bytes[3]!) >>> 0;
-  if (boxSize < 16 || boxSize > bytes.length) return [];
-  const brands = [ascii(bytes, 8, 12)];
-  for (let at = 16; at + 4 <= boxSize; at += 4) brands.push(ascii(bytes, at, at + 4));
-  return brands;
-}
-
 /**
  * The image type, read from the file's own bytes (its signature). The file name and the type the browser claims are never used:
- * a text file renamed photo.jpg is not a JPEG. Undefined for anything that is not one of the accepted types (REC-7).
+ * a text file renamed photo.jpg is not a JPEG. Undefined for anything that is not one of the accepted types (REC-7), including
+ * HEIC.
  */
 export function detectImageType(bytes: Uint8Array): ImageType | undefined {
   if (startsWith(bytes, [0xff, 0xd8, 0xff])) return "jpeg";
   if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return "png";
   if (bytes.length >= 12 && ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 12) === "WEBP") return "webp";
-  const [major, ...compatible] = heifBrands(bytes);
-  if (major !== undefined && HEIC_BRANDS.includes(major)) return "heic";
-  if (major !== undefined && GENERIC_HEIF_BRANDS.includes(major) && compatible.some((b) => HEIC_BRANDS.includes(b))) {
-    return "heic";
-  }
   return undefined;
 }
 
@@ -111,7 +92,7 @@ export interface ProcessedPhoto {
 
 export type ProcessingResult =
   | { ok: true; value: ProcessedPhoto }
-  /** `unsupportedType`: not JPEG, PNG, WebP or HEIC. `unreadable`: one of those by its signature, but it can't be decoded. */
+  /** `unsupportedType`: not JPEG, PNG or WebP. `unreadable`: one of those by its signature, but it can't be decoded. */
   /** `busy`: too many uploads are already waiting for a decode; nothing was decoded. */
   | { ok: false; reason: "unsupportedType" | "unreadable" | "busy" };
 
@@ -177,7 +158,7 @@ function convertInWorker(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      // Ending the worker also frees libheif's WebAssembly memory, which otherwise never shrinks.
+      // Ending the worker also frees whatever memory the decode used.
       if (worker === undefined) {
         resolve(result);
         return;
@@ -213,7 +194,7 @@ function convertInWorker(
 
 /**
  * Checks and converts an uploaded image (REC-7):
- * - the type is detected from the bytes; anything but JPEG, PNG, WebP or HEIC is refused;
+ * - the type is detected from the bytes; anything but JPEG, PNG or WebP is refused;
  * - images over MAX_INPUT_PIXELS are refused before they are decoded;
  * - the camera's rotation is applied and all metadata is dropped (photo-conversion.ts);
  * - a display image and a thumbnail are produced, both JPEG, from one decode of the source.

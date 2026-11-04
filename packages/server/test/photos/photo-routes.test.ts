@@ -19,7 +19,6 @@ import {
 import { multipartBody, photoApp, type PhotoTestApp, uploadBody, uploadPhoto } from "./photo-route-helpers.js";
 import {
   colorAt,
-  corruptedHeic,
   expectColor,
   expectStrippedJpeg,
   gif,
@@ -83,7 +82,6 @@ describe("REC-7 add a photo", () => {
     ["JPEG", jpeg, "photo.jpg", "image/jpeg"],
     ["PNG", png, "photo.png", "image/png"],
     ["WebP", webp, "photo.webp", "image/webp"],
-    ["HEIC (iPhone)", async () => phoneHeic(), "IMG_0001.HEIC", "image/heic"],
   ] as const)("accepts a %s and stores JPEG images", async (_name, make, filename, contentType) => {
     const setup = await appWithRecipe();
 
@@ -156,6 +154,7 @@ describe("REC-7 anything else is rejected and the recipe is unchanged", () => {
     ["a text file renamed photo.jpg", async () => ({ bytes: TEXT_FILE, filename: "photo.jpg", contentType: "image/jpeg" })],
     ["a GIF", async () => ({ bytes: await gif(), filename: "photo.gif", contentType: "image/gif" })],
     ["a GIF named photo.jpg", async () => ({ bytes: await gif(), filename: "photo.jpg", contentType: "image/jpeg" })],
+    ["a HEIC from an iPhone", async () => ({ bytes: phoneHeic(), filename: "IMG_0001.HEIC", contentType: "image/heic" })],
   ])("rejects %s, keeping the existing photo", async (_name, make) => {
     const setup = await appWithPhoto();
     const before = await stateOf(setup);
@@ -163,7 +162,7 @@ describe("REC-7 anything else is rejected and the recipe is unchanged", () => {
     const res = await uploadPhoto(setup.app, setup.id, await make());
 
     const body = expectErrors(res, 400, ["photo.unsupportedType"]);
-    expect(body.errors[0]?.message).toMatch(/JPEG, PNG, WebP or HEIC/);
+    expect(body.errors[0]?.message).toMatch(/JPEG, PNG or WebP/);
     expect(await stateOf(setup)).toEqual(before);
   });
 
@@ -174,16 +173,18 @@ describe("REC-7 anything else is rejected and the recipe is unchanged", () => {
     expect(setup.photos.names()).toEqual([]);
   });
 
-  it("refuses a HEIC that crashed the decoder with photo.unreadable, keeping the photo, and keeps serving", async () => {
-    const setup = await appWithPhoto();
+
+  it("refuses with photo.unreadable when the decoder crashes, and keeps serving", async () => {
+    const setup = await photoApp(undefined, { workerUrl: new URL("./workers/throw.mjs", import.meta.url) });
+    const recipe = await seed(setup.repository, content("Pad Thai"));
+    const id = recipe.id.value;
     const before = await stateOf(setup);
 
-    const res = await uploadPhoto(setup.app, setup.id, { bytes: corruptedHeic(), filename: "IMG_0002.HEIC" });
+    expectErrors(await uploadPhoto(setup.app, id, await jpeg()), 400, ["photo.unreadable"]);
 
-    expectErrors(res, 400, ["photo.unreadable"]);
     expect(await stateOf(setup)).toEqual(before);
-    expect((await get(setup.app, `/recipes/${setup.id}/photo`)).statusCode).toBe(200);
-    expect((await uploadPhoto(setup.app, setup.id, phoneHeic())).statusCode).toBe(200);
+    expect((await get(setup.app, `/recipes/${id}`)).statusCode).toBe(200);
+    expect((await get(setup.app, "/health")).statusCode).toBe(200);
   });
 
   it("refuses with photo.unreadable when decoding takes longer than the time limit, and keeps serving", async () => {
@@ -261,7 +262,6 @@ describe("REC-7 photos display correctly oriented, without metadata", () => {
 
   it.each([
     ["JPEG", phoneJpeg],
-    ["HEIC", async () => phoneHeic()],
   ] as const)("stores no EXIF, GPS location or other metadata from a phone %s, in either image", async (_name, make) => {
     const setup = await appWithRecipe();
     await uploadPhoto(setup.app, setup.id, await make());
