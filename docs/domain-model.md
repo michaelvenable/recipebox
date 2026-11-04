@@ -106,10 +106,9 @@ class Recipe {
 
   // Cooking history
   markCooked(at: Instant): Result<void>;                        // COOK-1; PLAN-5
-  removeCookedEntry(at: Instant): Result<void>;                 // COOK-5
   get cookedAt(): readonly Instant[];  // newest first          // COOK-5
-  get lastCookedAt(): Instant | undefined;                      // COOK-5, COOK-7
-  get timesCooked(): number;                                    // COOK-5, COOK-7
+  get lastCookedAt(): Instant | undefined;                      // COOK-5
+  get timesCooked(): number;                                    // COOK-5
 
   // Persistence
   toSnapshot(): RecipeSnapshot;
@@ -125,8 +124,7 @@ Behavior rules:
 | `removeFromMakeList`          | If not on the list, does nothing.                                          | PLAN-4         |
 | `markCooked`                  | Always adds an entry, even if one exists for the same time.                | COOK-1, COOK-4 |
 | `markCooked`                  | Removes the recipe from the to-make list.                                  | PLAN-5         |
-| `removeCookedEntry`           | Removes one entry with exactly that time; none: does nothing. *(proposed)* | COOK-5         |
-| `lastCookedAt`, `timesCooked` | Derived from `cookedAt`; never stored, so they cannot drift.               | COOK-7         |
+| `lastCookedAt`, `timesCooked` | Derived from `cookedAt`; never stored, so they cannot drift.               | COOK-5         |
 | `setPhoto`, `removePhoto`     | Return the previous `PhotoRef` so its blob can be deleted.                 | REC-7          |
 | `revise`                      | Replaces content, including tags. Never touches photo, plan or history.    | REC-5          |
 | `attachTag`                   | Already attached: no-op, even at 20. Else fails if invalid or 20 attached. | REC-11         |

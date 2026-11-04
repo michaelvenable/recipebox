@@ -67,15 +67,12 @@ Tags:
 
 "To make" list:
 - `GET /to-make` — the list (PLAN-3). Returns `ToMakeEntry[]`.
-- `PUT /recipes/{id}/to-make` — add (PLAN-1, PLAN-2). Returns `EditorRecipe`.
-- `DELETE /recipes/{id}/to-make` — remove (PLAN-4). Returns `EditorRecipe`.
+- `POST /recipes/{id}/add-to-plan` — add (PLAN-1, PLAN-2). Returns `EditorRecipe`.
+- `POST /recipes/{id}/remove-from-plan` — remove (PLAN-4). Returns `EditorRecipe`.
 
 Cooking history:
 - `POST /recipes/{id}/cookings` — "I cooked this today" (COOK-1, PLAN-5). The server records its own time. Returns `EditorRecipe`.
-- `DELETE /recipes/{id}/cookings/{at}` — delete one entry (COOK-5); `at` is the entry's stored time, URL-encoded. Returns
-  `EditorRecipe`. An `at` that isn't in the stored form gets 404 `cooking.notFound`; a well-formed time with no matching entry
-  changes nothing.
-- `GET /rediscover` — "Haven't made in a while" (COOK-6). Returns `RediscoverEntry[]`.
+- `GET /recommendations` — "Haven't made in a while" (COOK-6). Returns `RediscoverEntry[]`.
 
 Trash:
 - `GET /trash` — the trash (REC-14). Returns `TrashEntry[]`, each with `deletedAt` and `removalDueAt`.
