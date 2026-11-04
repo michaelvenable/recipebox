@@ -186,12 +186,12 @@ relative labels ("3 months ago", "10 days left") and whether a recipe was cooked
 ## Trash cleanup
 
 A Container Apps Job runs once a day. It finds recipes whose `removalDueAt` has passed and removes each document, then its photos
-from Blob Storage *(proposed: this order, so a recipe that still exists never loses its photos)*. It also deletes photo files more
+from Blob Storage, in that order, so a recipe that still exists never loses its photos. It also deletes photo files more
 than a day old that no recipe refers to, which can be left behind when two photo changes to the same recipe overlap (last save
-wins, X-5). *(proposed)* Running daily satisfies REC-16's "within one day". Restores after the deadline are already refused by the
+wins, X-5, withdrawn). Running daily satisfies REC-16's "within one day". Restores after the deadline are already refused by the
 domain, so a recipe waiting for cleanup can't come back.
 
-Safety rules for the job, because it deletes data permanently *(proposed)*:
+Safety rules for the job, because it deletes data permanently:
 - It runs with production settings and refuses to start without them; it never creates databases or containers outside local
   development. Development or test mode is refused on Container Apps, including Container Apps Jobs (`CONTAINER_APP_JOB_NAME`).
 - A recipe is removed only if it is unchanged since the job read it (a delete conditional on the document's version), so a restore
