@@ -3,8 +3,6 @@
 The HTTP API served at `https://api.recipes.mikevenable.net`. Behavior is defined in `docs/specs/`; this document only maps it to
 endpoints. Request and response shapes are Zod schemas in `packages/shared`, named below in `code`.
 
-Status: drafted by Claude from the specs and architecture, awaiting the owner's review. *(proposed)*
-
 ## Conventions
 
 - JSON in and out. Every change is `POST`, `PUT` or `DELETE` with `Content-Type: application/json` (an empty `{}` body when there
