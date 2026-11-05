@@ -157,7 +157,7 @@ function toMakeList(recipes: readonly Recipe[]): Recipe[];                      
 
 - `findRecipes`, `tagsInUse`, `suggestTags` and `orderForRediscovery` (below) skip deleted recipes (REC-6).
 - `trashContents` returns only deleted recipes, most recently deleted first (REC-14).
-- `toMakeList` returns non-deleted recipes on the to-make list, oldest added first; ties sorted by name (PLAN-3). *(proposed)*
+- `toMakeList` returns non-deleted recipes on the to-make list, oldest added first; ties sorted by name (PLAN-3).
 - `findRecipes` keeps recipes whose name matches (`RecipeName.matches`) and that have every picked tag, sorted by
   `RecipeName.compare` (REC-8). No name and no tags returns every recipe.
 - `tagsInUse` lists each tag on at least one recipe with its count, alphabetically. Tags on no recipe simply don't appear, so
@@ -173,7 +173,7 @@ function orderForRediscovery(recipes: readonly Recipe[]): Recipe[];   // COOK-6
 
 1. Never-cooked recipes first, sorted by `RecipeName.compare`.
 2. Then by `lastCookedAt`, oldest first.
-3. Ties (same last-cooked time) sorted by `RecipeName.compare`. *(proposed — the spec doesn't define ties)*
+3. Ties (same last-cooked time) sorted by `RecipeName.compare`.
 
 "3 months ago" text is presentation, calculated on the device (X-12), not in the domain.
 

@@ -214,7 +214,7 @@ Safety rules for the job, because it deletes data permanently:
 
 Local services: the Azure Cosmos DB emulator and Azurite (Blob Storage emulator), so no test touches Azure. Route tests use an
 in-memory repository that passes the same contract tests as the Cosmos one, so `npm test` stays fast and needs no Docker; the
-storage code itself is tested against the emulators with `npm run test:int`. *(proposed)*
+storage code itself is tested against the emulators with `npm run test:int`.
 
 ## Cost
 
