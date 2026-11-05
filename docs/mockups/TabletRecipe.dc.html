@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tablet — recipe view</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2E6A4F}a:hover{color:#1F4D38}
+</style>
+</helmet>
+<div style="width: 1024px; height: 768px; box-sizing: border-box; background: #F6F6F3; color: #1D2420; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <nav aria-label="Main" style="display: flex; align-items: center; gap: 6px; padding: 12px 24px; background: #FFFFFF; border-bottom: 1px solid #DCDFDA">
+    <span style="margin-right: 18px; font-size: 22px; font-weight: 700">RecipeBox</span>
+    <a href="TabletList.dc.html" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 22px; background: #2E6A4F; color: #FFFFFF; font-size: 16px; font-weight: 700; text-decoration: none">Recipes</a>
+    <a href="ToMake.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 22px; color: #1D2420; font-size: 16px; text-decoration: none">Want to make</a>
+    <a href="Rediscover.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 22px; color: #1D2420; font-size: 16px; text-decoration: none">Rediscover</a>
+    <a href="Trash.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 22px; color: #1D2420; font-size: 16px; text-decoration: none">Trash</a>
+    <a href="Account.dc.html" style="margin-left: auto; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid #C9CEC8; color: #1D2420; font-size: 16px; text-decoration: none">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1D2420" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg>
+      Account
+    </a>
+  </nav>
+  <div style="flex: 1; min-height: 0; display: flex">
+  <aside style="flex: none; width: 400px; display: flex; flex-direction: column; gap: 12px; padding: 18px 24px; background: #FFFFFF; border-right: 1px solid #DCDFDA; overflow: hidden">
+    <div role="img" aria-label="Pad Thai photo" style="height: 110px; border-radius: 14px; background: #E8CFB0"></div>
+    <h1 style="margin: 0; font-size: 30px; line-height: 1.15; font-weight: 700">Pad Thai</h1>
+    <p style="margin: 0; font-size: 16px; color: #59615C">30 min total · dinner, noodles, quick</p>
+    <div style="display: flex; gap: 10px">
+      <button type="button" style="flex: 1; min-height: 52px; border: 0; border-radius: 14px; background: #2E6A4F; color: #FFFFFF; font: inherit; font-size: 18px; font-weight: 700">I cooked this today</button>
+      <button type="button" style="flex: none; min-height: 52px; padding: 0 16px; border: 1px solid #C9CEC8; border-radius: 14px; background: #FFFFFF; font: inherit; font-size: 15px">I want to cook this</button>
+    </div>
+    <p style="margin: 0; font-size: 14px; color: #59615C">Last cooked Aug 2 · cooked 6 times</p>
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700">Ingredients</h2>
+      <button type="button" onClick="{{clearTicks}}" style="min-height: 44px; padding: 0 8px; border: 0; background: transparent; color: #2E6A4F; font: inherit; font-size: 15px; text-decoration: underline">Clear ticks</button>
+    </div>
+    <ul style="margin: -8px 0 0; padding: 0; list-style: none">
+      <sc-for list="{{ingredients}}" as="i" hint-placeholder-count="6">
+        <li style="border-bottom: 1px solid #E4E6E1">
+          <label style="display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer">
+            <input type="checkbox" checked="{{i.checked}}" onChange="{{i.toggle}}" style="flex: none; width: 22px; height: 22px; margin: 0; accent-color: #2E6A4F">
+            <span style="font-size: 17px; color: {{i.fg}}; text-decoration: {{i.deco}}">{{i.text}}</span>
+          </label>
+        </li>
+      </sc-for>
+    </ul>
+  </aside>
+  <main style="flex: 1; min-width: 0; padding: 24px 36px; overflow: hidden">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 16px">
+      <h2 style="margin: 0; font-size: 24px; font-weight: 700">Steps</h2>
+      <p role="status" style="margin: 0; display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; background: #E3EEE7; color: #1F4D38; font-size: 15px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F4D38" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+        Screen stays on while cooking
+      </p>
+    </div>
+    <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 16px">
+      <sc-for list="{{steps}}" as="s" hint-placeholder-count="6">
+        <li style="display: flex; gap: 12px; align-items: flex-start">
+          <button type="button" aria-pressed="{{s.pressed}}" aria-label="{{s.label}}" onClick="{{s.toggle}}" style="flex: none; width: 48px; height: 48px; margin-top: -5px; padding: 0; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer">
+            <span style="width: 38px; height: 38px; border-radius: 19px; background: {{s.bg}}; color: #FFFFFF; font-size: 18px; font-weight: 700; display: flex; align-items: center; justify-content: center">
+              <sc-if value="{{s.done}}" hint-placeholder-val="{{ false }}">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>
+              </sc-if>
+              <sc-if value="{{s.todo}}" hint-placeholder-val="{{ true }}">{{s.n}}</sc-if>
+            </span>
+          </button>
+          <span style="font-size: 22px; line-height: 1.45; color: {{s.fg}}">{{s.text}}</span>
+        </li>
+      </sc-for>
+    </ol>
+  </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1024,"height":768}}'>
+class Component extends DCLogic {
+  ticks(key, fallback) {
+    return (this.state && this.state[key]) || fallback;
+  }
+  flip(key, arr, i) {
+    const next = arr.slice();
+    next[i] = !next[i];
+    this.setState({ [key]: next });
+  }
+  renderVals() {
+    const ingredients = ['200 g flat rice noodles', '3 tbsp tamarind paste', '3 tbsp fish sauce', '2 tbsp brown sugar', '200 g prawns', '2 eggs'];
+    const steps = [
+      'Soak the rice noodles in warm water for 25 minutes, then drain.',
+      'Stir the tamarind, fish sauce and sugar together until the sugar dissolves.',
+      'Fry the garlic and shallot in a hot wok for 30 seconds.',
+      'Add the prawns and cook until pink. Push to one side and scramble the eggs.',
+      'Add the noodles and sauce; toss for 2 minutes until the noodles soften.',
+      'Fold in the bean sprouts and spring onions. Serve with peanuts and lime.'
+    ];
+    const ingDone = this.ticks('ingDone', ingredients.map((_, i) => i < 3));
+    const stepDone = this.ticks('stepDone', steps.map((_, i) => i < 2));
+    return {
+      clearTicks: () => this.setState({ ingDone: ingredients.map(() => false), stepDone: steps.map(() => false) }),
+      ingredients: ingredients.map((text, i) => ({
+        text, checked: !!ingDone[i],
+        fg: ingDone[i] ? '#59615C' : '#1D2420', deco: ingDone[i] ? 'line-through' : 'none',
+        toggle: () => this.flip('ingDone', ingDone, i)
+      })),
+      steps: steps.map((text, i) => ({
+        n: i + 1, text, done: !!stepDone[i], todo: !stepDone[i],
+        pressed: stepDone[i] ? 'true' : 'false',
+        label: 'Step ' + (i + 1) + ' done',
+        bg: stepDone[i] ? '#2E6A4F' : '#1D2420', fg: stepDone[i] ? '#59615C' : '#1D2420',
+        toggle: () => this.flip('stepDone', stepDone, i)
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>
