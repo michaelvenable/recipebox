@@ -34,13 +34,16 @@ export function mockApiAs(me: Me): FetchMock {
 }
 
 /**
- * An API that answers GET /me with `me` and other requests with `handler`, which gets the parsed URL. Anything `handler`
- * leaves unanswered (returns undefined) fails loudly with a 500.
+ * An API that answers GET /me with `me` and other requests with `handler`, which gets the parsed URL and the request options.
+ * Anything `handler` leaves unanswered (returns undefined) fails loudly with a 500.
  */
-export function mockApi(me: Me, handler: (url: URL) => Response | Promise<Response> | undefined): FetchMock {
-  return mockFetch(async (url) => {
+export function mockApi(
+  me: Me,
+  handler: (url: URL, init: RequestInit) => Response | Promise<Response> | undefined,
+): FetchMock {
+  return mockFetch(async (url, init) => {
     if (url === `${API}/me`) return jsonResponse(200, me);
-    return (await handler(new URL(url))) ?? jsonResponse(500, { errors: [] });
+    return (await handler(new URL(url), init)) ?? jsonResponse(500, { errors: [] });
   });
 }
 
@@ -60,5 +63,5 @@ export function renderAt(path: string, state?: unknown) {
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
-  return { router };
+  return { router, queryClient };
 }

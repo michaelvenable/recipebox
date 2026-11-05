@@ -1,6 +1,6 @@
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { API, APP, EDITOR, NON_EDITOR, VISITOR, mockApiAs, renderAt, requestedUrls } from "./helpers.js";
+import { API, APP, EDITOR, NON_EDITOR, VISITOR, jsonResponse, mockApi, mockApiAs, renderAt, requestedUrls } from "./helpers.js";
 
 const ID = "8d3f2a4e-1b2c-4d5e-8f90-1234567890ab";
 
@@ -43,9 +43,15 @@ describe("X-1, X-6 editor-only pages", () => {
 describe("X-1 public pages", () => {
   it.each([
     ["/", "RecipeBox"],
-    [`/recipes/${ID}`, "Recipe"],
+    [`/recipes/${ID}`, "Toast"],
   ])("shows visitors %s", async (path, heading) => {
-    mockApiAs(VISITOR);
+    mockApi(VISITOR, (url) => {
+      if (url.pathname === "/recipes" || url.pathname === "/tags") return jsonResponse(200, []);
+      if (url.pathname === `/recipes/${ID}`) {
+        return jsonResponse(200, { id: ID, name: "Toast", ingredients: ["Bread"], steps: ["Toast it."], tags: [], hasPhoto: false });
+      }
+      return undefined;
+    });
     renderAt(path);
     expect(await screen.findByRole("heading", { level: 1, name: heading })).toBeInTheDocument();
   });

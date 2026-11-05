@@ -1,6 +1,7 @@
-// The recipe list, tags and thumbnails (docs/api.md, "Public endpoints").
-import { EditorRecipeSummary, RecipeSummary, TagCount } from "@recipebox/shared";
-import { type Schema, apiBaseUrl, apiGet } from "./client.js";
+// Recipes, tags and their images (docs/api.md, "Public endpoints"), and the changes made from the recipe view (docs/api.md,
+// "Editor endpoints").
+import { EditorRecipe, EditorRecipeSummary, PublicRecipe, RecipeSummary, Tag, TagCount, type TagRequest } from "@recipebox/shared";
+import { type Schema, apiBaseUrl, apiChange, apiGet } from "./client.js";
 
 /** The name search (REC-9) and picked tags (REC-13). The server does the matching (X-13); the client only passes them on. */
 export interface RecipeFilter {
@@ -49,4 +50,70 @@ export function thumbnailUrl(id: string): string {
 /** Whether a listed recipe is on the to-make list (PLAN-7). False for the public shape, which never has the field (X-1). */
 export function isOnToMakeList(recipe: ListedRecipe): boolean {
   return "onToMakeList" in recipe && recipe.onToMakeList;
+}
+
+/**
+ * One recipe. Visitors get `PublicRecipe`, editors `EditorRecipe` with to-make status and cooking history (X-1); the server
+ * decides which, so code that shows private parts must check for them with `isEditorRecipe`.
+ */
+export type ViewedRecipe = PublicRecipe | EditorRecipe;
+
+/** Either shape, whole, as for the list: a public recipe with any private field is refused as a contract bug. */
+const OneRecipe: Schema<ViewedRecipe> = {
+  parse(input) {
+    const editor = EditorRecipe.safeParse(input);
+    return editor.success ? editor.data : PublicRecipe.parse(input);
+  },
+};
+
+export function isEditorRecipe(recipe: ViewedRecipe): recipe is EditorRecipe {
+  return "cookedAt" in recipe;
+}
+
+function recipePath(id: string): string {
+  return `/recipes/${encodeURIComponent(id)}`;
+}
+
+/** GET /recipes/{id} (REC-4). A 404 ApiError means not found: an unknown id or a recipe in the trash. */
+export function fetchRecipe(id: string, signal?: AbortSignal): Promise<ViewedRecipe> {
+  return apiGet(recipePath(id), OneRecipe, signal);
+}
+
+/** The address of a recipe's photo, for an `<img>` (REC-7). Only meaningful when the recipe has a photo. */
+export function photoUrl(id: string): string {
+  return `${apiBaseUrl()}${recipePath(id)}/photo`;
+}
+
+// Changes from the recipe view. Each answers with the changed recipe. The ones without input send `{}`, never a time: the
+// server records its own (X-12).
+
+/** POST /recipes/{id}/cookings: "I cooked this today" (COOK-1). The server also takes it off the to-make list (PLAN-5). */
+export function markCooked(id: string): Promise<EditorRecipe> {
+  return apiChange("POST", `${recipePath(id)}/cookings`, EditorRecipe);
+}
+
+/** POST /recipes/{id}/add-to-plan (PLAN-1, PLAN-2). */
+export function addToPlan(id: string): Promise<EditorRecipe> {
+  return apiChange("POST", `${recipePath(id)}/add-to-plan`, EditorRecipe);
+}
+
+/** POST /recipes/{id}/remove-from-plan (PLAN-4). */
+export function removeFromPlan(id: string): Promise<EditorRecipe> {
+  return apiChange("POST", `${recipePath(id)}/remove-from-plan`, EditorRecipe);
+}
+
+/** POST /recipes/{id}/tags: the tag as typed; the server reads and checks it (REC-10, REC-11). */
+export function attachTag(id: string, tag: string): Promise<EditorRecipe> {
+  return apiChange("POST", `${recipePath(id)}/tags`, EditorRecipe, { tag } satisfies TagRequest);
+}
+
+/** DELETE /recipes/{id}/tags (REC-10). */
+export function removeTag(id: string, tag: string): Promise<EditorRecipe> {
+  return apiChange("DELETE", `${recipePath(id)}/tags`, EditorRecipe, { tag } satisfies TagRequest);
+}
+
+/** GET /tag-suggestions: tags on other recipes containing `typed`, as the server matches them (REC-12, X-13). */
+export function fetchTagSuggestions(recipeId: string, typed: string, signal?: AbortSignal): Promise<Tag[]> {
+  const query = `?typed=${encodeURIComponent(typed)}&recipeId=${encodeURIComponent(recipeId)}`;
+  return apiGet(`/tag-suggestions${query}`, Tag.array(), signal);
 }

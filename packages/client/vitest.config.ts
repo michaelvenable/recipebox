@@ -13,6 +13,9 @@ export default mergeConfig(
       include: ["{src,test}/**/*.test.{ts,tsx}"],
       exclude: [...configDefaults.exclude, "**/*.int.test.{ts,tsx}"],
       setupFiles: ["./test/setup.ts"],
+      // A device time zone other than UTC, with daylight saving, so local-day tests (COOK-5, COOK-8, X-12) prove something
+      // whatever the machine's zone. Node applies a TZ assigned at run time, on Windows too; test/dates.test.ts checks it took.
+      env: { TZ: "America/New_York" },
     },
   }),
 );
