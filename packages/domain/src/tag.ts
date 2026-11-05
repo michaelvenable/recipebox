@@ -4,7 +4,7 @@ import { characterCount, compareText } from "./text.js";
 
 export const MAX_TAG_LENGTH = 30;
 
-/** A tag: trimmed and lowercased, 1–30 characters; equal tags have equal text (REC-11). */
+/** A tag: trimmed and lowercased, 1–30 characters, no comma; equal tags have equal text (REC-11). */
 export class Tag {
   private constructor(private readonly text: string) {
     Object.freeze(this);
@@ -16,6 +16,10 @@ export class Tag {
     const text = raw.normalize("NFC").trim().toLowerCase();
     if (text.length === 0) {
       return fail(domainError("tag.required", "A tag can't be empty.", "tag"));
+    }
+    // REC-11: the recipe list's tag filter is comma-separated (docs/api.md), so a tag with a comma couldn't be filtered by.
+    if (text.includes(",")) {
+      return fail(domainError("tag.comma", "A tag can't contain a comma. Add each tag separately.", "tag"));
     }
     if (characterCount(text) > MAX_TAG_LENGTH) {
       return fail(domainError("tag.tooLong", `A tag must be at most ${MAX_TAG_LENGTH} characters.`, "tag"));

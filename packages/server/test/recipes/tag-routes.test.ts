@@ -216,6 +216,7 @@ describe("REC-11 tag rules", () => {
 
   it.each([
     ["31 characters", "x".repeat(31), "tag.tooLong"],
+    ["with a comma", "dinner, quick", "tag.comma"],
     ["blank", "   ", "tag.required"],
     ["empty", "", "tag.required"],
   ])("refuses a tag that is %s with 400, and changes nothing", async (_name, tag, code) => {

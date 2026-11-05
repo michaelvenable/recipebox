@@ -53,6 +53,7 @@ tag.
   created simply by typing it.
 - **REC-11. Tag rules.**
   - A tag is trimmed and lowercased, then must be 1–30 characters (X-13).
+  - A tag can't contain a comma, so "dinner, quick" typed as one tag is refused with a message rather than becoming one odd tag.
   - Tags are stored and shown in lowercase, so "Dinner" and "dinner" are the same tag.
   - A recipe never has the same tag twice; attaching a tag it already has changes nothing and shows no error, even when the recipe
     already has 20 tags.

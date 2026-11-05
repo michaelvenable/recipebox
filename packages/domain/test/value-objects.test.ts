@@ -256,6 +256,10 @@ describe("REC-11 tag rules", () => {
     expect(errorKeys(Tag.create("a".repeat(31)))).toEqual([{ code: "tag.tooLong", field: "tag" }]);
   });
 
+  it.each(["dinner, quick", "salt,pepper", ","])("rejects a tag with a comma, %j", (raw) => {
+    expect(errorKeys(Tag.create(raw))).toEqual([{ code: "tag.comma", field: "tag" }]);
+  });
+
   it.each(["", "   "])("rejects empty tag %j", (raw) => {
     expect(errorKeys(Tag.create(raw))).toEqual([{ code: "tag.required", field: "tag" }]);
   });
