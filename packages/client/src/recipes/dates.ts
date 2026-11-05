@@ -46,6 +46,35 @@ function localDaysBetween(from: Date, to: Date): number {
   return Math.round((end.getTime() - start.getTime()) / DAY_MS);
 }
 
+/**
+ * Whole calendar months from `from` to `to`, in local time. A month is complete on the same day of the month, or on the last
+ * day of a shorter month: Jan 31 to Feb 28 is one month, and so is Aug 2 to Sep 2.
+ */
+function localMonthsBetween(from: Date, to: Date): number {
+  const months = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+  const lastDayOfMonth = new Date(to.getFullYear(), to.getMonth() + 1, 0).getDate();
+  return to.getDate() < Math.min(from.getDate(), lastDayOfMonth) ? months - 1 : months;
+}
+
+/**
+ * How long ago a recipe was last cooked, for "Haven't made in a while" (COOK-6), counted on the device in its time zone (X-12):
+ * "New" if it was never cooked; "today" and "yesterday" by local calendar day; "N days ago" until a whole calendar month has
+ * passed; then whole months ("1 month ago", "11 months ago"); then whole years. Each unit is rounded down, so "3 months ago"
+ * means at least three months. A cooking time ahead of the device's clock reads "today".
+ */
+export function cookedAgo(lastCookedAt: string | undefined, now: Date): string {
+  if (lastCookedAt === undefined) return "New";
+  const cooked = new Date(lastCookedAt);
+  const days = localDaysBetween(cooked, now);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  const months = localMonthsBetween(cooked, now);
+  if (months < 1) return `${days} days ago`;
+  if (months < 12) return months === 1 ? "1 month ago" : `${months} months ago`;
+  const years = Math.floor(months / 12);
+  return years === 1 ? "1 year ago" : `${years} years ago`;
+}
+
 /** The trash period, for the label only (docs/mockups/Trash.dc.html); the deadline itself is the server's `removalDueAt`. */
 const TRASH_DAYS = 30;
 

@@ -6,9 +6,11 @@ import {
   PublicRecipe,
   type RecipeContentInput,
   RecipeSummary,
+  RediscoverEntry,
   Tag,
   TagCount,
   type TagRequest,
+  ToMakeEntry,
   TrashEntry,
 } from "@recipebox/shared";
 import { type Schema, apiBaseUrl, apiChange, apiChangeNoContent, apiGet, apiUpload } from "./client.js";
@@ -115,6 +117,16 @@ export function addToPlan(id: string): Promise<EditorRecipe> {
 /** POST /recipes/{id}/remove-from-plan (PLAN-4). */
 export function removeFromPlan(id: string): Promise<EditorRecipe> {
   return apiChange("POST", `${recipePath(id)}/remove-from-plan`, EditorRecipe);
+}
+
+/** GET /plan: the to-make list, oldest first (PLAN-3). Editors only (X-1). */
+export function fetchPlan(signal?: AbortSignal): Promise<ToMakeEntry[]> {
+  return apiGet("/plan", ToMakeEntry.array(), signal);
+}
+
+/** GET /recommendations: never cooked first by name, then least recently cooked first (COOK-6). Editors only (X-1). */
+export function fetchRecommendations(signal?: AbortSignal): Promise<RediscoverEntry[]> {
+  return apiGet("/recommendations", RediscoverEntry.array(), signal);
 }
 
 /** POST /recipes/{id}/tags: the tag as typed; the server reads and checks it (REC-10, REC-11). */

@@ -1089,6 +1089,153 @@ code {
   color: var(--link-hover);
 }
 
+/* Want to make (PLAN-3, docs/mockups/ToMake.dc.html) and Haven't made in a while (COOK-6, docs/mockups/Rediscover.dc.html). */
+
+.plan-page,
+.rediscover-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.list-page-header h1 {
+  margin: 0;
+}
+
+.list-page-header p {
+  margin: 6px 0 0;
+  font-size: 15px;
+}
+
+.entry-cards {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.entry-cards[hidden] {
+  display: none;
+}
+
+.entry-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  background: var(--surface);
+  border-radius: 14px;
+}
+
+.entry-card-link {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.entry-card-link:hover {
+  color: var(--text);
+}
+
+.entry-card-link:hover .recipe-card-name {
+  text-decoration: underline;
+}
+
+.rediscover-entry .thumb {
+  width: 56px;
+  height: 56px;
+}
+
+/* A round icon button with a border, such as removing an entry from the to-make list (PLAN-4). */
+.round-button {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch);
+  height: var(--touch);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.round-button:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.round-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.cooked-ago {
+  flex: none;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ago-new {
+  color: var(--plan-fg);
+}
+
+.ago-old {
+  color: var(--text);
+}
+
+.ago-recent {
+  color: var(--muted);
+}
+
+/* An empty list that explains how to fill it (docs/mockups/ToMakeEmpty.dc.html). */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 48px 20px;
+  text-align: center;
+}
+
+.empty-state h2 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.empty-state p {
+  margin: 0;
+  max-width: 32ch;
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.empty-state .button {
+  padding: 0 22px;
+  border-radius: 24px;
+}
+
+.empty-state-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 36px;
+  background: var(--plan-bg);
+  color: var(--plan-fg);
+}
+
 /* Hidden from view but still focusable and announced, such as the file input inside its "Add photo" label. */
 .visually-hidden {
   position: absolute;

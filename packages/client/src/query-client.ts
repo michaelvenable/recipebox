@@ -31,6 +31,11 @@ export function createQueryClient(): QueryClient {
         // Retries only what might succeed on a second try: network failures and server errors, never a 4xx refusal.
         retry: (failureCount, error) => !(error instanceof ApiError && error.status < 500) && failureCount < 2,
       },
+      mutations: {
+        // Sent even when the browser says it is offline, so a change fails at once with "Couldn't reach the server" instead
+        // of waiting unseen to be resumed later, perhaps after the editor has moved on (the app needs a connection anyway).
+        networkMode: "always",
+      },
     },
   });
   return queryClient;

@@ -1,6 +1,6 @@
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, onlineManager } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { Me } from "@recipebox/shared";
 import { ApiError } from "../src/api/client.js";
 import { ME_QUERY_KEY, useViewer } from "../src/auth/sign-in.js";
@@ -39,6 +39,28 @@ describe("Query retries", () => {
 
   it("retries a network failure up to twice", async () => {
     expect(await attemptsUntilFailure(new TypeError("Failed to fetch"))).toBe(3);
+  });
+});
+
+describe("Changes while the browser says it is offline", () => {
+  afterEach(() => {
+    onlineManager.setOnline(true);
+  });
+
+  it("are sent at once and fail with the network error, rather than waiting silently to be resumed", async () => {
+    onlineManager.setOnline(false);
+    const client = createQueryClient();
+    let attempts = 0;
+    const error = new TypeError("Failed to fetch");
+    const mutation = client.getMutationCache().build(client, {
+      mutationFn: () => {
+        attempts += 1;
+        return Promise.reject(error);
+      },
+    });
+    await expect(mutation.execute(undefined)).rejects.toBe(error);
+    expect(attempts).toBe(1);
+    expect(mutation.state.isPaused).toBe(false);
   });
 });
 

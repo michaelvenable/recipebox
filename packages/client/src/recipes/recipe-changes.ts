@@ -1,9 +1,9 @@
 // The changes an editor makes from the recipe view, and what each one makes stale.
-import { type QueryClient, useIsMutating, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { EditorRecipe } from "@recipebox/shared";
+import { type Mutation, type QueryClient, useIsMutating, useMutation, useMutationState, useQueryClient } from "@tanstack/react-query";
+import type { EditorRecipe, RecipeSummary, RediscoverEntry, ToMakeEntry } from "@recipebox/shared";
 import { ApiError } from "../api/client.js";
 import { planKeys, recipeKeys, rediscoverKeys, tagKeys } from "../api/query-keys.js";
-import { addToPlan, attachTag, markCooked, removeFromPlan, removeTag } from "../api/recipes.js";
+import { type ListedRecipe, addToPlan, attachTag, markCooked, removeFromPlan, removeTag } from "../api/recipes.js";
 
 export type RecipeChange =
   | { kind: "markCooked" }
@@ -60,10 +60,120 @@ export function useRecipeChange(id: string) {
  */
 export function showSavedRecipe(queryClient: QueryClient, recipe: EditorRecipe, { tagsChanged }: { tagsChanged: boolean }): void {
   queryClient.setQueryData(recipeKeys.detail(recipe.id), recipe);
+  // What the saved recipe already tells, so a list shown again before it reloads doesn't show the old state first: the
+  // to-make mark (PLAN-7), the to-make list (PLAN-1, PLAN-4, PLAN-5) and "haven't made in a while" (COOK-6).
+  queryClient.setQueriesData<ListedRecipe[]>({ queryKey: recipeKeys.lists() }, (recipes) =>
+    recipes?.map((listed) =>
+      listed.id === recipe.id && "onToMakeList" in listed ? { ...listed, onToMakeList: recipe.toMake !== undefined } : listed,
+    ),
+  );
+  queryClient.setQueryData<ToMakeEntry[]>(planKeys.all, (entries) => entries && withPlanEntry(entries, recipe));
+  queryClient.setQueryData<RediscoverEntry[]>(rediscoverKeys.all, (entries) => entries && withRediscoverEntry(entries, recipe));
   void queryClient.invalidateQueries({ queryKey: recipeKeys.lists() });
   void queryClient.invalidateQueries({ queryKey: planKeys.all });
   void queryClient.invalidateQueries({ queryKey: rediscoverKeys.all });
   if (tagsChanged) void queryClient.invalidateQueries({ queryKey: tagKeys.all });
+}
+
+function summaryOf({ id, name, tags, totalTimeMinutes, hasPhoto }: EditorRecipe): RecipeSummary {
+  return { id, name, tags, hasPhoto, ...(totalTimeMinutes === undefined ? {} : { totalTimeMinutes }) };
+}
+
+/**
+ * The to-make list with the saved recipe as it now stands: gone if it is off the list, updated in place if it was on it, or
+ * added at the end if just added, since the list is oldest first (PLAN-3) and nothing was added after it.
+ */
+function withPlanEntry(entries: ToMakeEntry[], recipe: EditorRecipe): ToMakeEntry[] {
+  if (recipe.toMake === undefined) return entries.filter((entry) => entry.id !== recipe.id);
+  const entry: ToMakeEntry = { ...summaryOf(recipe), addedAt: recipe.toMake.addedAt };
+  return entries.some((e) => e.id === recipe.id) ? entries.map((e) => (e.id === recipe.id ? entry : e)) : [...entries, entry];
+}
+
+/**
+ * "Haven't made in a while" with the saved recipe as it now stands. A recipe whose last cooking changed was just cooked, so it
+ * is now the most recently cooked and goes to the end (COOK-6). Left to the reload: recipes the cached list doesn't have, and a
+ * renamed recipe never cooked, since those are in name order and only the server sorts names (X-13).
+ */
+function withRediscoverEntry(entries: RediscoverEntry[], recipe: EditorRecipe): RediscoverEntry[] {
+  const old = entries.find((e) => e.id === recipe.id);
+  if (old === undefined) return entries;
+  if (recipe.lastCookedAt === undefined && old.name !== recipe.name) return entries;
+  const entry: RediscoverEntry = {
+    ...summaryOf(recipe),
+    ...(recipe.lastCookedAt === undefined ? {} : { lastCookedAt: recipe.lastCookedAt }),
+  };
+  if (old.lastCookedAt === recipe.lastCookedAt) return entries.map((e) => (e.id === recipe.id ? entry : e));
+  return [...entries.filter((e) => e.id !== recipe.id), entry];
+}
+
+const CHANGE_PREFIX = [...recipeKeys.all, "change"] as const;
+
+/**
+ * The recipes being taken off the to-make list right now (PLAN-4), from any page: the list leaves them out at once, and brings
+ * them back if the change fails. Read from the mutation cache, so it holds across leaving and reopening the list.
+ */
+export function usePendingPlanRemovals(): ReadonlySet<string> {
+  const ids = useMutationState({
+    filters: { mutationKey: CHANGE_PREFIX, status: "pending" },
+    select: (mutation) => {
+      const change = mutation.state.variables as RecipeChange | undefined;
+      const id = mutation.options.mutationKey?.[2];
+      return change?.kind === "removeFromPlan" && typeof id === "string" ? id : undefined;
+    },
+  });
+  return new Set(ids.filter((id) => id !== undefined));
+}
+
+/** A removal from the to-make list that the server refused or that didn't get through (PLAN-4). */
+export interface FailedPlanRemoval {
+  id: string;
+  error: unknown;
+  /** Identifies the attempt, so a page can tell a new failure from one it has shown. */
+  mutationId: number;
+}
+
+function isPlanRemoval(mutation: Pick<Mutation, "state">): boolean {
+  return (mutation.state.variables as RecipeChange | undefined)?.kind === "removeFromPlan";
+}
+
+/**
+ * The latest failed removal from the to-make list, if it is also the latest change to its recipe. Read from the mutation cache
+ * rather than from the page that started it, so a failure that lands after the editor has left the list and come back is
+ * still reported. Cleared by `clearFailedPlanRemovals`, or by a newer change to the recipe.
+ */
+export function useFailedPlanRemoval(): FailedPlanRemoval | undefined {
+  const changes = useMutationState({
+    filters: { mutationKey: CHANGE_PREFIX },
+    select: (mutation) => ({
+      id: mutation.options.mutationKey?.[2],
+      mutationId: mutation.mutationId,
+      submittedAt: mutation.state.submittedAt,
+      failed: mutation.state.status === "error" && isPlanRemoval(mutation),
+      error: mutation.state.error,
+    }),
+  });
+  const latest = new Map<unknown, (typeof changes)[number]>();
+  for (const change of changes) {
+    const seen = latest.get(change.id);
+    if (seen === undefined || change.submittedAt >= seen.submittedAt) latest.set(change.id, change);
+  }
+  let failure: FailedPlanRemoval | undefined;
+  let failedAt = -Infinity;
+  for (const change of latest.values()) {
+    if (change.failed && typeof change.id === "string" && change.submittedAt >= failedAt) {
+      failure = { id: change.id, error: change.error, mutationId: change.mutationId };
+      failedAt = change.submittedAt;
+    }
+  }
+  return failure;
+}
+
+/** Forgets failed removals once the editor has moved on, such as by starting another removal. */
+export function clearFailedPlanRemovals(queryClient: QueryClient): void {
+  const cache = queryClient.getMutationCache();
+  for (const mutation of cache.findAll({ mutationKey: CHANGE_PREFIX, status: "error" })) {
+    if (isPlanRemoval(mutation)) cache.remove(mutation);
+  }
 }
 
 /**

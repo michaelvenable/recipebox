@@ -3,10 +3,11 @@ import { EditorOnly } from "./auth/EditorOnly.js";
 import { Layout } from "./layout/Layout.js";
 import { AccountPage } from "./pages/AccountPage.js";
 import { NotFoundPage } from "./pages/NotFoundPage.js";
-import { Placeholder } from "./pages/Placeholder.js";
+import { PlanPage } from "./pages/PlanPage.js";
 import { EditRecipePage, NewRecipePage } from "./pages/RecipeFormPage.js";
 import { RecipeListPage } from "./pages/RecipeListPage.js";
 import { RecipePage } from "./pages/RecipePage.js";
+import { RediscoverPage } from "./pages/RediscoverPage.js";
 import { TrashPage } from "./pages/TrashPage.js";
 
 /**
@@ -21,8 +22,8 @@ export const routes: RouteObject[] = [
       { path: "/recipes/new", element: <EditorOnly><NewRecipePage /></EditorOnly> },
       { path: "/recipes/:id", element: <RecipePage /> },
       { path: "/recipes/:id/edit", element: <EditorOnly><EditRecipePage /></EditorOnly> },
-      { path: "/plan", element: <EditorOnly><Placeholder title="Want to make" /></EditorOnly> },
-      { path: "/recommendations", element: <EditorOnly><Placeholder title="Rediscover" /></EditorOnly> },
+      { path: "/plan", element: <EditorOnly><PlanPage /></EditorOnly> },
+      { path: "/recommendations", element: <EditorOnly><RediscoverPage /></EditorOnly> },
       { path: "/trash", element: <EditorOnly><TrashPage /></EditorOnly> },
       { path: "/account", element: <AccountPage /> },
       { path: "*", element: <NotFoundPage /> },
