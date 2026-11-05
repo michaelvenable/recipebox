@@ -6,53 +6,93 @@ import {
   entryField,
   formErrors,
   formFrom,
-  moved,
+  formatTotalTime,
   newEntry,
+  obviousErrors,
   photoProblem,
-  splitMinutes,
   tagField,
   totalMinutes,
 } from "../src/recipes/recipe-form.js";
 
-describe("REC-1 total time as hours and minutes", () => {
+describe("REC-1 total time as hours:minutes or minutes", () => {
   it.each([
-    ["", "", undefined],
-    ["", "45", 45],
-    ["1", "", 60],
-    ["1", "30", 90],
-    [" 2 ", " 5 ", 125],
-    ["1.5", "", 90],
-    ["1.1", "", 66],
-    ["0", "0", 0],
-    ["", "2.5", 2.5],
-    ["24", "1", 1441],
-  ])("hours %j and minutes %j send %j; the server checks the range and whole minutes", (hours, minutes, expected) => {
-    expect(totalMinutes(hours, minutes)).toBe(expected);
+    ["", undefined],
+    ["   ", undefined],
+    ["1:30", 90],
+    ["0:45", 45],
+    ["2:00", 120],
+    ["01:05", 65],
+    ["0:00", 0],
+    ["45", 45],
+    ["90", 90],
+    ["0", 0],
+    [" 1:30 ", 90],
+    ["\t45 ", 45],
+    ["24:00", 1440],
+    ["24:01", 1441],
+    ["1500", 1500],
+  ])("%j sends %j; the server checks the range (REC-1)", (typed, expected) => {
+    expect(totalMinutes(typed)).toBe(expected);
   });
 
   it.each([
-    ["abc", ""],
-    ["", "ten"],
-    ["1", "1,5"],
-    ["-1", "90"],
-    ["", "-5"],
-  ])("hours %j and minutes %j aren't numbers of zero or more, so nothing can be sent", (hours, minutes) => {
-    expect(totalMinutes(hours, minutes)).toBeNull();
+    ["-5"],
+    ["-1:30"],
+    ["abc"],
+    ["half an hour"],
+    ["1:75"],
+    ["1:60"],
+    ["1.5"],
+    ["1,5"],
+    ["1:5"],
+    ["1:300"],
+    [":30"],
+    ["1:"],
+    ["1:30:00"],
+    ["1 : 30"],
+    ["1 30"],
+    ["1h30"],
+    ["+45"],
+    ["1e3"],
+    ["٤٥"],
+    ["9".repeat(400)],
+  ])("refuses %j, so nothing is sent", (typed) => {
+    expect(totalMinutes(typed)).toBeNull();
   });
 
   it.each([
-    [undefined, "", ""],
-    [45, "", "45"],
-    [60, "1", ""],
-    [90, "1", "30"],
-    [1440, "24", ""],
-  ])("shows %j minutes as hours %j and minutes %j", (total, hours, minutes) => {
-    expect(splitMinutes(total)).toEqual({ hours, minutes });
+    [undefined, ""],
+    [45, "0:45"],
+    [60, "1:00"],
+    [90, "1:30"],
+    [120, "2:00"],
+    [65, "1:05"],
+    [1440, "24:00"],
+  ])("shows %j minutes as %j", (total, shown) => {
+    expect(formatTotalTime(total)).toBe(shown);
+  });
+
+  it.each([[45], [60], [90], [125], [1440]])("reads %j minutes back as shown", (total) => {
+    expect(totalMinutes(formatTotalTime(total))).toBe(total);
+  });
+
+  it("asks for hours:minutes or minutes when the time can't be read, on the total time field", () => {
+    const form = { ...formFrom(undefined), name: "Toast", totalTime: "1:75" };
+    form.ingredients = [newEntry("Bread")];
+    form.steps = [newEntry("Toast it.")];
+    expect(obviousErrors(form)).toEqual([
+      {
+        code: "totalTime.format",
+        field: "totalTimeMinutes",
+        message: "Enter the time as hours:minutes, like 1:30, or as minutes, like 45.",
+      },
+    ]);
+    expect(obviousErrors({ ...form, totalTime: "1:30" })).toEqual([]);
   });
 });
 
 describe("REC-1, REC-2, X-12 the content sent", () => {
-  it("is exactly a RecipeContentInput, as typed, with no total time when both fields are blank", () => {
+  it("is exactly a RecipeContentInput, as typed, with no total time when it is blank", () => {
     const form = { ...formFrom(undefined), name: "  Pad Thai ", tags: ["dinner"] };
     form.ingredients = [newEntry("2 eggs"), newEntry("  ")];
     const input = contentInput(form);
@@ -62,7 +102,13 @@ describe("REC-1, REC-2, X-12 the content sent", () => {
   });
 
   it("includes the total time in minutes", () => {
-    expect(contentInput({ ...formFrom(undefined), hours: "1", minutes: "5" }).totalTimeMinutes).toBe(65);
+    expect(contentInput({ ...formFrom(undefined), totalTime: "1:05" }).totalTimeMinutes).toBe(65);
+  });
+
+  it("starts an existing recipe's total time as hours:minutes", () => {
+    const recipe = { id: "r", name: "Stew", ingredients: ["Beef"], steps: ["Simmer."], totalTimeMinutes: 45, tags: [], hasPhoto: false };
+    expect(formFrom(recipe).totalTime).toBe("0:45");
+    expect(formFrom({ ...recipe, totalTimeMinutes: undefined }).totalTime).toBe("");
   });
 });
 
@@ -89,13 +135,6 @@ describe("REC-1 server errors in the form's fields", () => {
   it("puts an error on a row that isn't there on the list as a whole", () => {
     const errors = formErrors([{ code: "entry.tooLong", field: "steps[5]", message: "Too long." }], formFrom(undefined));
     expect(errors.fields.get("steps")).toEqual(["Too long."]);
-  });
-});
-
-describe("REC-3, REC-5 moving entries", () => {
-  it("moves an entry up or down, keeping the others in order", () => {
-    expect(moved(["a", "b", "c"], 2, 1)).toEqual(["a", "c", "b"]);
-    expect(moved(["a", "b", "c"], 0, 1)).toEqual(["b", "a", "c"]);
   });
 });
 

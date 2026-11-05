@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { type Entry, type EntryField, entryField, moved, newEntry } from "./recipe-form.js";
+import { type Entry, type EntryField, entryField, newEntry } from "./recipe-form.js";
 
 interface EntryListProps {
   field: EntryField;
@@ -14,56 +14,47 @@ const NOUNS: Record<EntryField, { title: string; one: string; One: string }> = {
   steps: { title: "Steps", one: "step", One: "Step" },
 };
 
-type FocusTarget = { key: number; control: "text" | "up" | "down" } | "add";
+/** A row's text field, by the row's key, or the + Add button. */
+type FocusTarget = number | "add";
 
 /**
- * Ingredients or steps as rows of free text, in order (REC-3), with adding, removing and moving up and down (REC-5). Each row is
- * a multi-line field, since an entry may run to 1,000 characters. The length is the server's to check: a browser's maxlength
- * counts UTF-16 units, not characters as a person sees them (X-13), so it would cut off entries the server accepts.
+ * Ingredients or steps as rows of free text, in order (REC-3), with adding and removing (REC-5). Each row is a multi-line field,
+ * since an entry may run to 1,000 characters. The length is the server's to check: a browser's maxlength counts UTF-16 units,
+ * not characters as a person sees them (X-13), so it would cut off entries the server accepts.
  */
 export function EntryList({ field, entries, onChange, errors }: EntryListProps) {
   const noun = NOUNS[field];
   const id = useId();
   const listErrors = errors.get(field);
   const addButton = useRef<HTMLButtonElement>(null);
-  const controls = useRef(new Map<string, HTMLElement>());
+  const textFields = useRef(new Map<number, HTMLTextAreaElement>());
   const [focus, setFocus] = useState<FocusTarget>();
 
-  // A row's controls move with it, but a moved or removed control loses focus; put it where the editor expects.
+  // A new row's field doesn't exist yet, and a removed row's button takes focus with it; put focus where the editor expects.
   useEffect(() => {
     if (focus === undefined) return;
     setFocus(undefined);
     if (focus === "add") addButton.current?.focus();
-    else controls.current.get(`${focus.key}:${focus.control}`)?.focus();
+    else textFields.current.get(focus)?.focus();
   }, [focus]);
 
-  function control(key: number, name: string) {
-    return (element: HTMLElement | null) => {
-      if (element === null) controls.current.delete(`${key}:${name}`);
-      else controls.current.set(`${key}:${name}`, element);
+  function textField(key: number) {
+    return (element: HTMLTextAreaElement | null) => {
+      if (element === null) textFields.current.delete(key);
+      else textFields.current.set(key, element);
     };
   }
 
   function add() {
     const entry = newEntry();
     onChange([...entries, entry]);
-    setFocus({ key: entry.key, control: "text" });
+    setFocus(entry.key);
   }
 
   function remove(index: number) {
     const next = entries[index + 1] ?? entries[index - 1];
     onChange(entries.filter((_, i) => i !== index));
-    setFocus(next === undefined ? "add" : { key: next.key, control: "text" });
-  }
-
-  function move(index: number, to: number) {
-    const entry = entries[index];
-    if (entry === undefined || to < 0 || to >= entries.length) return;
-    onChange(moved(entries, index, to));
-    // Stay on the same button, unless the row has reached the end it was moving towards and that button is now disabled.
-    const atEnd = to === 0 || to === entries.length - 1;
-    const control = to < index ? (atEnd ? "down" : "up") : atEnd ? "up" : "down";
-    setFocus({ key: entry.key, control });
+    setFocus(next === undefined ? "add" : next.key);
   }
 
   return (
@@ -83,7 +74,7 @@ export function EntryList({ field, entries, onChange, errors }: EntryListProps) 
               )}
               <div className="entry-text">
                 <textarea
-                  ref={control(entry.key, "text")}
+                  ref={textField(entry.key)}
                   className="text-input text-area"
                   aria-label={label}
                   rows={field === "steps" ? 3 : 1}
@@ -100,37 +91,11 @@ export function EntryList({ field, entries, onChange, errors }: EntryListProps) 
                   </p>
                 )}
               </div>
-              <div className="entry-controls">
-                <button
-                  ref={control(entry.key, "up")}
-                  type="button"
-                  className="icon-button"
-                  aria-label={`Move ${noun.one} ${index + 1} up`}
-                  disabled={index === 0}
-                  onClick={() => move(index, index - 1)}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M6 15l6-6 6 6" />
-                  </svg>
-                </button>
-                <button
-                  ref={control(entry.key, "down")}
-                  type="button"
-                  className="icon-button"
-                  aria-label={`Move ${noun.one} ${index + 1} down`}
-                  disabled={index === entries.length - 1}
-                  onClick={() => move(index, index + 1)}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M6 9l6 6 6-6" />
-                  </svg>
-                </button>
-                <button type="button" className="icon-button" aria-label={`Remove ${noun.one} ${index + 1}`} onClick={() => remove(index)}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-                    <path d="M6 6l12 12M18 6L6 18" />
-                  </svg>
-                </button>
-              </div>
+              <button type="button" className="icon-button" aria-label={`Remove ${noun.one} ${index + 1}`} onClick={() => remove(index)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
             </li>
           );
         })}

@@ -300,42 +300,33 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
 
           <PhotoField recipeId={saved.id} hasPhoto={saved.hasPhoto} change={photo} onChange={setPhoto} error={photoError} />
 
-          <fieldset className="field">
-            <legend className="field-title">Total time (optional)</legend>
-            <div className="time-inputs">
-              <label className="time-input">
-                <input
-                  className="text-input"
-                  type="text"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  value={form.hours}
-                  aria-invalid={timeErrors !== undefined || undefined}
-                  aria-describedby={timeErrors !== undefined ? `${id}-time-error` : undefined}
-                  onChange={(event) => set({ hours: event.target.value })}
-                />
-                <span>hours</span>
-              </label>
-              <label className="time-input">
-                <input
-                  className="text-input"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  value={form.minutes}
-                  aria-invalid={timeErrors !== undefined || undefined}
-                  aria-describedby={timeErrors !== undefined ? `${id}-time-error` : undefined}
-                  onChange={(event) => set({ minutes: event.target.value })}
-                />
-                <span>minutes</span>
-              </label>
-            </div>
+          <div className="field">
+            <label htmlFor={`${id}-time`} className="field-title">
+              Total time
+            </label>
+            {/*
+              A plain text keyboard: iOS's numeric and decimal keypads have no colon, so "1:30" couldn't be typed with them.
+            */}
+            <input
+              id={`${id}-time`}
+              className="text-input time-input"
+              type="text"
+              autoComplete="off"
+              enterKeyHint="done"
+              value={form.totalTime}
+              aria-invalid={timeErrors !== undefined || undefined}
+              aria-describedby={timeErrors !== undefined ? `${id}-time-error ${id}-time-hint` : `${id}-time-hint`}
+              onChange={(event) => set({ totalTime: event.target.value })}
+            />
             {timeErrors !== undefined && (
               <p id={`${id}-time-error`} className="field-error">
                 {timeErrors.join(" ")}
               </p>
             )}
-          </fieldset>
+            <p id={`${id}-time-hint`} className="field-hint">
+              Optional. Hours:minutes, like 1:30, or minutes, like 45.
+            </p>
+          </div>
 
           <EntryList field="ingredients" entries={form.ingredients} onChange={(ingredients: Entry[]) => set({ ingredients })} errors={fieldErrors} />
           <EntryList field="steps" entries={form.steps} onChange={(steps: Entry[]) => set({ steps })} errors={fieldErrors} />

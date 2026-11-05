@@ -5,7 +5,10 @@
 // obvious ones that the server would refuse anyway, so the editor hears about them without a round trip.
 import type { ErrorItem, PublicRecipe, RecipeContentInput } from "@recipebox/shared";
 
-/** An ingredient or step row. The key follows the row when it moves, so its text field, focus and error move with it. */
+/**
+ * An ingredient or step row. The key stays with the row when a row above it is removed, so its text field, focus and error stay
+ * with it rather than with whatever row now has its position.
+ */
 export interface Entry {
   key: number;
   text: string;
@@ -17,9 +20,8 @@ export interface FormValues {
   name: string;
   ingredients: Entry[];
   steps: Entry[];
-  /** Total time as typed, in two fields; both blank means no total time. */
-  hours: string;
-  minutes: string;
+  /** Total time as typed: hours:minutes such as "1:30", or minutes such as "45"; blank means no total time. */
+  totalTime: string;
   tags: string[];
 }
 
@@ -32,49 +34,42 @@ export function newEntry(text = ""): Entry {
 
 /** The form for an existing recipe, or an empty one with one ingredient row and one step row to type into. */
 export function formFrom(recipe: PublicRecipe | undefined): FormValues {
-  if (recipe === undefined) return { name: "", ingredients: [newEntry()], steps: [newEntry()], hours: "", minutes: "", tags: [] };
-  const time = splitMinutes(recipe.totalTimeMinutes);
+  if (recipe === undefined) return { name: "", ingredients: [newEntry()], steps: [newEntry()], totalTime: "", tags: [] };
   return {
     name: recipe.name,
     ingredients: recipe.ingredients.map((text) => newEntry(text)),
     steps: recipe.steps.map((text) => newEntry(text)),
-    ...time,
+    totalTime: formatTotalTime(recipe.totalTimeMinutes),
     tags: [...recipe.tags],
   };
 }
 
-/** A total time as hours and minutes fields, e.g. 90 as "1" and "30", and 45 as "" and "45". A zero part is left blank. */
-export function splitMinutes(total: number | undefined): { hours: string; minutes: string } {
-  if (total === undefined) return { hours: "", minutes: "" };
-  const hours = Math.floor(total / 60);
+/** A total time as the form shows it, hours:minutes: 90 as "1:30", 45 as "0:45", 120 as "2:00", and none as "". */
+export function formatTotalTime(total: number | undefined): string {
+  if (total === undefined) return "";
   const minutes = total % 60;
-  return { hours: hours === 0 ? "" : String(hours), minutes: minutes === 0 ? "" : String(minutes) };
+  return `${Math.floor(total / 60)}:${minutes < 10 ? "0" : ""}${minutes}`;
 }
 
-/** A part of the total time as a number, 0 when blank. */
-function timePart(text: string): number {
-  const trimmed = text.trim();
-  return trimmed === "" ? 0 : Number(trimmed);
-}
-
-function hasNegativePart(hours: string, minutes: string): boolean {
-  return timePart(hours) < 0 || timePart(minutes) < 0;
-}
+// Hours, a colon and two digits of minutes ("1:30", "0:45"), or a number of minutes ("45"). Only ASCII digits: no sign, no
+// decimal point. "1:5" is refused rather than guessed at, since it could mean 1:05 or 1:50.
+const HOURS_MINUTES = /^([0-9]+):([0-5][0-9])$/;
+const MINUTES = /^[0-9]+$/;
 
 /**
- * The total time to send, in minutes: undefined when both fields are blank, or null when a field isn't a number of zero or
- * more. A negative part isn't netted off against the other: "-1" hours and "90" minutes is a mistake, not 30 minutes. Whether
- * the result is a whole number from 1 to 1440 is the server's to check (REC-1), so "1.5" hours is 90 minutes and "0" is sent
- * and refused there.
+ * The total time to send, in minutes: undefined when blank, or null when it isn't hours:minutes or a number of minutes. Whether
+ * it is from 1 to 1440 is the server's to check (REC-1), so "0" and "25:00" are sent and refused there.
  */
-export function totalMinutes(hours: string, minutes: string): number | undefined | null {
-  if (hours.trim() === "" && minutes.trim() === "") return undefined;
-  if (hasNegativePart(hours, minutes)) return null;
-  const total = timePart(hours) * 60 + timePart(minutes);
-  if (!Number.isFinite(total)) return null;
-  // 1.1 hours is 66 minutes, not 66.00000000000001.
-  const whole = Math.round(total);
-  return Math.abs(total - whole) < 1e-9 ? whole : total;
+export function totalMinutes(typed: string): number | undefined | null {
+  const text = typed.trim();
+  if (text === "") return undefined;
+  let total: number;
+  const hoursMinutes = HOURS_MINUTES.exec(text);
+  if (hoursMinutes !== null) total = Number(hoursMinutes[1]) * 60 + Number(hoursMinutes[2]);
+  else if (MINUTES.test(text)) total = Number(text);
+  else return null;
+  // So many digits that the number isn't exact any more: no use sending it.
+  return Number.isSafeInteger(total) ? total : null;
 }
 
 /** The body of POST /recipes and PUT /recipes/{id}/content: the whole content, tags included (REC-5), never a time (X-12). */
@@ -85,27 +80,19 @@ export function contentInput(form: FormValues): RecipeContentInput {
     steps: form.steps.map((e) => e.text),
     tags: [...form.tags],
   };
-  const minutes = totalMinutes(form.hours, form.minutes);
+  const minutes = totalMinutes(form.totalTime);
   if (typeof minutes === "number") input.totalTimeMinutes = minutes;
   return input;
 }
 
 /** The content as typed, without row keys, to tell whether it has changed since it was loaded or saved. */
 export function contentSnapshot(form: FormValues): string {
-  return JSON.stringify([form.name, form.ingredients.map((e) => e.text), form.steps.map((e) => e.text), form.hours, form.minutes, form.tags]);
-}
-
-/** `list` with the item at `from` moved to `to`. */
-export function moved<T>(list: readonly T[], from: number, to: number): T[] {
-  const next = [...list];
-  const [item] = next.splice(from, 1);
-  if (item !== undefined) next.splice(to, 0, item);
-  return next;
+  return JSON.stringify([form.name, form.ingredients.map((e) => e.text), form.steps.map((e) => e.text), form.totalTime, form.tags]);
 }
 
 /**
  * The obvious problems the server would refuse anyway (REC-1, REC-2): no name, no ingredient or step that isn't blank, and a
- * total time that isn't a number. Paths and wording match the server's, so both are shown the same way.
+ * total time that can't be read as minutes. Paths and wording match the server's, so both are shown the same way.
  */
 export function obviousErrors(form: FormValues): ErrorItem[] {
   const errors: ErrorItem[] = [];
@@ -116,12 +103,12 @@ export function obviousErrors(form: FormValues): ErrorItem[] {
   if (form.steps.every((e) => e.text.trim() === "")) {
     errors.push({ code: "steps.required", field: "steps", message: "Add at least one step. Blank steps are ignored." });
   }
-  if (totalMinutes(form.hours, form.minutes) === null) {
-    errors.push(
-      hasNegativePart(form.hours, form.minutes)
-        ? { code: "totalTime.negative", field: "totalTimeMinutes", message: "Hours and minutes can't be negative." }
-        : { code: "totalTime.notNumber", field: "totalTimeMinutes", message: "Enter the time as numbers of hours and minutes." },
-    );
+  if (totalMinutes(form.totalTime) === null) {
+    errors.push({
+      code: "totalTime.format",
+      field: "totalTimeMinutes",
+      message: "Enter the time as hours:minutes, like 1:30, or as minutes, like 45.",
+    });
   }
   return errors;
 }
@@ -139,7 +126,7 @@ export function withTag(form: FormValues, typed: string): FormValues {
 export interface FormErrors {
   /**
    * Messages by field: "name", "photo", "totalTimeMinutes", "ingredients" and "steps" (the list as a whole), "ingredients#<key>"
-   * and "steps#<key>" (one row, by its key, so the message stays with the row if it moves), "tags", and "tag:<text>" (one tag).
+   * and "steps#<key>" (one row, by its key, so the message stays with the row when one above it is removed), "tags", and "tag:<text>" (one tag).
    */
   fields: ReadonlyMap<string, readonly string[]>;
   /** Messages that belong to no field shown in the form, such as "This recipe is in the trash." (REC-17). */

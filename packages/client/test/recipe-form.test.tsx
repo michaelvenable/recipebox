@@ -99,6 +99,8 @@ const openNew = (fake: FakeApi = {}) => openForm(fake, "/recipes/new");
 const openEdit = (fake: FakeApi = {}, recipe: EditorRecipe = PAD_THAI) =>
   openForm({ recipes: { [recipe.id]: () => recipe }, ...fake }, `/recipes/${recipe.id}/edit`);
 
+const TIME_HINT = "Optional. Hours:minutes, like 1:30, or minutes, like 45.";
+
 const field = (name: string) => screen.getByRole("textbox", { name });
 const button = (name: string) => screen.getByRole("button", { name });
 const save = () => userEvent.click(button("Save"));
@@ -168,7 +170,7 @@ describe("REC-1 create", () => {
     await userEvent.click(button("+ Add ingredient"));
     await userEvent.type(field("Ingredient 2"), "far too long");
     await userEvent.type(field("Step 1"), "Cook.");
-    await userEvent.type(field("hours"), "25");
+    await userEvent.type(field("Total time"), "25:00");
     await userEvent.click(button("+ Tag"));
     await userEvent.type(field("Add a tag"), "dinner, quick{Enter}");
     await save();
@@ -179,14 +181,14 @@ describe("REC-1 create", () => {
     expect(field("Name")).toHaveAccessibleDescription("Name must be at most 200 characters.");
     expect(field("Ingredient 1")).not.toHaveAttribute("aria-invalid");
     expect(field("Ingredient 2")).toHaveAccessibleDescription("An entry must be at most 1000 characters.");
-    expect(field("hours")).toHaveAccessibleDescription("Total time must be from 1 to 1440 minutes.");
-    expect(field("minutes")).toHaveAccessibleDescription("Total time must be from 1 to 1440 minutes.");
+    expect(field("Total time")).toHaveAttribute("aria-invalid", "true");
+    expect(field("Total time")).toHaveAccessibleDescription(`Total time must be from 1 to 1440 minutes. ${TIME_HINT}`);
     expect(field("Add a tag")).toHaveAccessibleDescription("“dinner, quick”: A tag can't contain a comma. Add each tag separately.");
     expect(router.state.location.pathname).toBe("/recipes/new");
     expect(changes(fetchMock)).toHaveLength(1);
   });
 
-  it("keeps a row's error with the row when it moves", async () => {
+  it("keeps a row's error with the row when a row above it is removed", async () => {
     await openNew({
       change: () => refused(400, "entry.tooLong", "An entry must be at most 1000 characters.", "ingredients[1]"),
     });
@@ -194,13 +196,16 @@ describe("REC-1 create", () => {
     await userEvent.type(field("Ingredient 1"), "Bread");
     await userEvent.click(button("+ Add ingredient"));
     await userEvent.type(field("Ingredient 2"), "Butter, a lot");
+    await userEvent.click(button("+ Add ingredient"));
+    await userEvent.type(field("Ingredient 3"), "Jam");
     await userEvent.type(field("Step 1"), "Toast it.");
     await save();
     await screen.findByText("Not saved. Fix the field marked below.");
 
-    await userEvent.click(button("Move ingredient 2 up"));
+    await userEvent.click(button("Remove ingredient 1"));
     expect(field("Ingredient 1")).toHaveValue("Butter, a lot");
     expect(field("Ingredient 1")).toHaveAccessibleDescription("An entry must be at most 1000 characters.");
+    expect(field("Ingredient 2")).toHaveValue("Jam");
     expect(field("Ingredient 2")).not.toHaveAttribute("aria-describedby");
   });
 
@@ -240,8 +245,7 @@ describe("REC-5 edit", () => {
     expect(field("Name")).toHaveValue("Pad Thai");
     expect(entryValues("Ingredient")).toEqual(PAD_THAI.ingredients);
     expect(entryValues("Step")).toEqual(PAD_THAI.steps);
-    expect(field("hours")).toHaveValue("1");
-    expect(field("minutes")).toHaveValue("30");
+    expect(field("Total time")).toHaveValue("1:30");
     expect(within(screen.getByRole("list", { name: "Tags" })).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
       "dinner",
       "noodles",
@@ -287,10 +291,9 @@ describe("REC-5 edit", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Pad Thai Jay" })).toBeInTheDocument();
   });
 
-  it("sends no total time once both fields are cleared", async () => {
+  it("sends no total time once it is cleared", async () => {
     const { fetchMock } = await openEdit({ change: () => PAD_THAI });
-    await userEvent.clear(field("hours"));
-    await userEvent.clear(field("minutes"));
+    await userEvent.clear(field("Total time"));
     await save();
     await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
     expect(changes(fetchMock)[0]?.body).not.toHaveProperty("totalTimeMinutes");
@@ -339,43 +342,38 @@ describe("REC-17, REC-4 a recipe in the trash", () => {
 });
 
 describe("REC-3, REC-5 ingredients and steps", () => {
-  it("adds, removes and moves entries, sending them in the order shown", async () => {
+  it("adds and removes entries, sending them in the order shown", async () => {
     const { fetchMock } = await openEdit({ change: () => PAD_THAI });
-    await userEvent.click(button("Move ingredient 3 up"));
-    expect(entryValues("Ingredient")).toEqual(["200 g flat rice noodles", "2 eggs", "3 tbsp tamarind paste"]);
-    expect(button("Move ingredient 2 up")).toHaveFocus();
-    await userEvent.click(button("Move ingredient 2 up"));
-    expect(entryValues("Ingredient")).toEqual(["2 eggs", "200 g flat rice noodles", "3 tbsp tamarind paste"]);
-    // At the top the up button can't be pressed, so focus stays on the row's down button.
-    expect(button("Move ingredient 1 down")).toHaveFocus();
+    await userEvent.click(button("Remove ingredient 1"));
+    expect(entryValues("Ingredient")).toEqual(["3 tbsp tamarind paste", "2 eggs"]);
+    // Focus goes to the row that took the removed one's place.
+    expect(field("Ingredient 1")).toHaveFocus();
 
     await userEvent.click(button("Remove ingredient 2"));
-    expect(entryValues("Ingredient")).toEqual(["2 eggs", "3 tbsp tamarind paste"]);
-    expect(field("Ingredient 2")).toHaveFocus();
+    expect(entryValues("Ingredient")).toEqual(["3 tbsp tamarind paste"]);
+    // The last row was removed, so focus goes to the one before it.
+    expect(field("Ingredient 1")).toHaveFocus();
 
     await userEvent.click(button("+ Add ingredient"));
-    expect(field("Ingredient 3")).toHaveFocus();
-    await userEvent.type(field("Ingredient 3"), "1 lime,\ncut into wedges");
+    expect(field("Ingredient 2")).toHaveFocus();
+    await userEvent.type(field("Ingredient 2"), "1 lime,\ncut into wedges");
 
-    await userEvent.click(button("Move step 1 down"));
-    expect(button("Move step 2 up")).toHaveFocus();
     await userEvent.click(button("+ Add step"));
     await userEvent.type(field("Step 3"), "Serve.");
     await save();
 
     await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
     expect(changes(fetchMock)[0]?.body).toMatchObject({
-      ingredients: ["2 eggs", "3 tbsp tamarind paste", "1 lime,\ncut into wedges"],
-      steps: ["Fry everything.", "Soak the noodles.", "Serve."],
+      ingredients: ["3 tbsp tamarind paste", "1 lime,\ncut into wedges"],
+      steps: ["Soak the noodles.", "Fry everything.", "Serve."],
     });
   });
 
-  it("disables moving the first entry up and the last one down", async () => {
+  it("offers only removing a row, not moving it", async () => {
     await openEdit();
-    expect(button("Move ingredient 1 up")).toBeDisabled();
-    expect(button("Move ingredient 3 down")).toBeDisabled();
-    expect(button("Move ingredient 2 up")).toBeEnabled();
-    expect(button("Move ingredient 2 down")).toBeEnabled();
+    const row = screen.getAllByRole("listitem").find((li) => within(li).queryByRole("textbox", { name: "Ingredient 2" }) !== null);
+    expect(within(row!).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Remove ingredient 2"]);
+    expect(screen.queryByRole("button", { name: /^Move / })).not.toBeInTheDocument();
   });
 
   it("focuses + Add when the last entry is removed", async () => {
@@ -387,25 +385,49 @@ describe("REC-3, REC-5 ingredients and steps", () => {
 });
 
 describe("REC-1 total time", () => {
-  it("sends hours and minutes as minutes", async () => {
-    const { fetchMock } = await openEdit({ change: () => PAD_THAI });
-    await userEvent.clear(field("hours"));
-    await userEvent.type(field("hours"), "2");
-    await userEvent.clear(field("minutes"));
-    await userEvent.type(field("minutes"), "15");
-    await save();
-    await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
-    expect(changes(fetchMock)[0]?.body).toMatchObject({ totalTimeMinutes: 135 });
+  it("is one text field with a hint showing the format, on a keyboard that has a colon", async () => {
+    await openNew();
+    expect(field("Total time")).toHaveValue("");
+    expect(field("Total time")).toHaveAccessibleDescription(TIME_HINT);
+    expect(field("Total time")).not.toHaveAttribute("inputmode");
+    expect(field("Total time")).not.toHaveAttribute("aria-invalid");
   });
 
-  it("asks for numbers rather than sending text that isn't one", async () => {
+  it.each([
+    ["2:15", 135],
+    ["0:45", 45],
+    [" 90 ", 90],
+  ])("sends %j as %j minutes", async (typed, minutes) => {
     const { fetchMock } = await openEdit({ change: () => PAD_THAI });
-    await userEvent.clear(field("minutes"));
-    await userEvent.type(field("minutes"), "half an hour");
+    await userEvent.clear(field("Total time"));
+    await userEvent.type(field("Total time"), typed);
+    await save();
+    await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
+    expect(changes(fetchMock)[0]?.body).toMatchObject({ totalTimeMinutes: minutes });
+  });
+
+  it.each([["half an hour"], ["-5"], ["1:75"], ["1.5"], ["1:5"]])("refuses %j in the browser, saying how to write it", async (typed) => {
+    const { fetchMock } = await openEdit({ change: () => PAD_THAI });
+    await userEvent.clear(field("Total time"));
+    await userEvent.type(field("Total time"), typed);
     await save();
     expect(await screen.findByText("Not saved. Fix the field marked below.")).toBeInTheDocument();
-    expect(field("minutes")).toHaveAccessibleDescription("Enter the time as numbers of hours and minutes.");
+    expect(field("Total time")).toHaveAttribute("aria-invalid", "true");
+    expect(field("Total time")).toHaveAccessibleDescription(
+      `Enter the time as hours:minutes, like 1:30, or as minutes, like 45. ${TIME_HINT}`,
+    );
     expect(changes(fetchMock)).toEqual([]);
+  });
+
+  it("starts a recipe under an hour as 0:minutes", async () => {
+    await openEdit({}, { ...PAD_THAI, totalTimeMinutes: 45 });
+    expect(field("Total time")).toHaveValue("0:45");
+  });
+
+  it("starts a recipe without a total time blank", async () => {
+    const { totalTimeMinutes: _, ...untimed } = PAD_THAI;
+    await openEdit({}, untimed);
+    expect(field("Total time")).toHaveValue("");
   });
 });
 
@@ -873,18 +895,5 @@ describe("REC-10 a tag typed but not added", () => {
     await save();
     await screen.findByText("Not saved. Fix the field marked below.");
     expect(field("Add a tag")).toHaveAccessibleDescription("“a, b”: A tag can't contain a comma. Add each tag separately.");
-  });
-});
-
-describe("REC-1 total time can't be negative", () => {
-  it("refuses a negative part rather than netting it off, describing the error on each field", async () => {
-    const { fetchMock } = await openEdit({ change: () => PAD_THAI });
-    await userEvent.clear(field("hours"));
-    await userEvent.type(field("hours"), "-1");
-    await save();
-    await screen.findByText("Not saved. Fix the field marked below.");
-    expect(field("hours")).toHaveAccessibleDescription("Hours and minutes can't be negative.");
-    expect(field("minutes")).toHaveAccessibleDescription("Hours and minutes can't be negative.");
-    expect(changes(fetchMock)).toEqual([]);
   });
 });

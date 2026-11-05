@@ -1421,22 +1421,10 @@ code {
   field-sizing: content;
 }
 
-.time-inputs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
 .time-input {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 16px;
-}
-
-.time-input .text-input {
   flex: none;
-  width: 88px;
+  align-self: flex-start;
+  width: 120px;
 }
 
 .photo-field {
@@ -1499,20 +1487,8 @@ code {
   gap: 4px;
 }
 
-/* Up and down stacked, remove beside them, so the text keeps most of a phone's width. */
-.entry-controls {
-  flex: none;
-  display: grid;
-  grid-template-columns: var(--touch) var(--touch);
-  grid-template-rows: var(--touch) var(--touch);
-}
-
-.entry-controls > :last-child {
-  grid-column: 2;
-  grid-row: 1;
-}
-
 .icon-button {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1529,12 +1505,6 @@ code {
 .icon-button:hover {
   background: var(--surface-muted);
   color: var(--text);
-}
-
-.icon-button:disabled {
-  cursor: default;
-  opacity: 0.35;
-  background: transparent;
 }
 
 .add-entry {
