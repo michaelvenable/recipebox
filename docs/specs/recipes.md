@@ -26,12 +26,14 @@ tag.
 - **REC-4. View.** A user can open a recipe and see all of its contents. Steps are numbered starting at 1. Opening a recipe that
   does not exist shows a "not found" message, not an error page. Visitors see the same page without editing controls or private
   information (X-1, X-8).
-- **REC-5. Edit.** A user can change any field of an existing recipe, including reordering, adding and removing ingredients and
-  steps. The same rules as REC-1 and REC-2 apply.
+- **REC-5. Edit.** A user can change any field of an existing recipe, including adding and removing ingredients and steps. The
+  same rules as REC-1 and REC-2 apply. Entries can't be reordered: steps are written in order, and the order of ingredients
+  matters little.
 - **REC-6. Delete to trash.** An editor can delete a recipe without being asked to confirm. The recipe moves to the trash (REC-14)
   and disappears at once from everywhere else: the list, search results, tag filters and counts, the "to make" list and the
   "haven't made in a while" view. Opening it shows "not found" (REC-4).
-  - Right after deleting, a "Recipe deleted" message with an Undo option is shown for at least 10 seconds. Undo restores the
+  - Right after deleting, a "‹name› moved to trash" message with an Undo option is shown for at least 10 seconds. Deleting
+    another recipe meanwhile replaces the message; the first can still be restored from the trash. Undo restores the
     recipe exactly as restoring from the trash does (REC-15).
 - **REC-7. Photo.** A user can add, replace or remove a recipe's photo.
   - Accepted: JPEG, PNG and WebP, up to 15 MB. HEIC is not accepted: an iPhone converts a photo picked from its library to JPEG

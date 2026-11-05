@@ -16,3 +16,17 @@ Decisions recorded on the canvas:
 - Many tags: chips scroll sideways on phones. An "All tags" sheet is deferred until there are dozens of tags.
 - Dark theme: follows the device setting, with no switch in the app.
 - Visitor recipe view: the editor view without editor actions, the plan indicator and cooking history (X-1).
+
+Decisions made while building the client, confirmed by the owner on 2026-11-04 (where they differ from the artboards, these win):
+- Total time is one field, typed as hours:minutes (`1:30`) or minutes (`45`), not a minutes-only field.
+- Ingredients and steps can't be reordered; there is no drag handle (REC-5).
+- The delete message reads "‹name› moved to trash" (REC-6).
+- "N months ago" rounds down to whole months, so a recipe cooked Aug 2 reads "2 months ago" on Oct 30.
+- A signed-in person who isn't an editor sees Recipes and the Account button, not "Sign in".
+- The Account page shows the ID as `provider:accountId`, the form an `EDITORS` entry takes.
+- Photo changes in the form wait for Save, so Cancel discards them.
+- Fonts are bundled with the app; nothing is loaded from Google.
+- The installed app's splash screen is the accent green (#2E6A4F) with the icon, in light and dark mode. No custom startup
+  images.
+- Offline: the app shell opens without a connection and a "You're offline" banner explains that loading and saving need one.
+  Nothing is stored for offline reading or editing (offline use stays out of scope).
