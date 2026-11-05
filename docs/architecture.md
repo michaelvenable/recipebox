@@ -98,7 +98,6 @@ sign-in pages, manages the session cookie, and passes the signed-in identity to 
 Outside requests cannot set those headers, but only while the auth layer is switched on: with it off, any request could claim to
 be an editor. So the API trusts these headers only when it runs on Container Apps and the setting `TRUST_AUTH_HEADERS=true` is
 present; the infrastructure script sets it in the same step that turns the auth layer on. Without it, everyone is a visitor.
-*(proposed)*
 
 - Configuration: "Allow unauthenticated access", so visitors can read public recipes; the API decides what needs an editor.
 - Sign-in links point at `https://api.recipes.mikevenable.net/.auth/login/{aad|google}`, with `post_login_redirect_uri` returning
@@ -120,8 +119,8 @@ really comes from the RecipeBox app:
   A form on another site cannot send such a request without the browser first asking the API's permission, which CORS refuses.
 - The one exception is the photo upload, `PUT /recipes/{id}/photo`, which is sent as `multipart/form-data`. That is safe only
   because it is a `PUT`: a cross-site form can only `POST`, and a cross-site `PUT` needs the API's permission first. The server
-  refuses to start if the upload exception is put on any other method. *(proposed)*
-- CORS allows the methods the client actually uses: `GET`, `POST`, `PUT` and `DELETE`. *(proposed)*
+  refuses to start if the upload exception is put on any other method.
+- CORS allows the methods the client actually uses: `GET`, `POST`, `PUT` and `DELETE`.
 - `GET` requests never change anything.
 
 Provider setup (done once, by hand):
@@ -151,7 +150,6 @@ Editors (X-7):
 Local development and tests have no built-in auth layer. The server therefore accepts identity headers only when running on
 Container Apps. Locally, a development-only sign-in stub (enabled by an environment variable, refused in production) lets tests
 act as a visitor, an editor or a non-editor. The server refuses to start in development or test mode on Container Apps.
-*(proposed)*
 
 ## Photos
 
