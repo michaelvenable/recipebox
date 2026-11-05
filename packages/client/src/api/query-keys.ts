@@ -13,13 +13,24 @@ export const recipeKeys = {
   detail: (id: string) => [...recipeKeys.all, "detail", id] as const,
   /** The mutation key of every change to one recipe, so a view can tell a change is still being saved (COOK-1). */
   change: (id: string) => [...recipeKeys.all, "change", id] as const,
+  /** The mutation key of creating a recipe (REC-1), which has no id until the server answers. */
+  create: () => [...recipeKeys.all, "create"] as const,
 };
 
 export const tagKeys = {
   /** GET /tags, the tags in use with counts (REC-13), and below it the suggestions (REC-12). */
   all: ["tags"] as const,
-  /** GET /tag-suggestions for one recipe and typed text (REC-12). */
-  suggestions: (recipeId: string, typed: string) => [...tagKeys.all, "suggestions", { recipeId, typed }] as const,
+  /** GET /tag-suggestions for one recipe (undefined for a new one) and typed text (REC-12). */
+  suggestions: (recipeId: string | undefined, typed: string) =>
+    [...tagKeys.all, "suggestions", { recipeId: recipeId ?? null, typed }] as const,
+};
+
+/**
+ * Not an API call: how many times this app has replaced or removed a recipe's photo (REC-7), added to the image addresses so
+ * the browser doesn't reuse the old image it has already loaded. Outside `recipeKeys.all`, so invalidating recipes leaves it.
+ */
+export const photoKeys = {
+  version: (id: string) => ["photoVersion", id] as const,
 };
 
 /** GET /plan, the to-make list (PLAN-3). Adding, removing and cooking (PLAN-5) change it. */

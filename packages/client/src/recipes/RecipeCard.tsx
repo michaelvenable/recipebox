@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { type ListedRecipe, isOnToMakeList, thumbnailUrl } from "../api/recipes.js";
 import { recipeMeta } from "./format.js";
+import { usePhotoVersion } from "./photo-version.js";
 
 /**
  * A recipe's thumbnail, or a neutral placeholder block when it has no photo (REC-8). Also falls back to the placeholder if the
@@ -9,11 +10,12 @@ import { recipeMeta } from "./format.js";
  */
 export function Thumbnail({ recipe }: { recipe: Pick<ListedRecipe, "id" | "name" | "hasPhoto"> }) {
   const [failed, setFailed] = useState(false);
+  const version = usePhotoVersion(recipe.id);
   if (!recipe.hasPhoto || failed) return <div className="thumb thumb-placeholder" aria-hidden="true" />;
   return (
     <img
       className="thumb"
-      src={thumbnailUrl(recipe.id)}
+      src={thumbnailUrl(recipe.id, version)}
       alt={`${recipe.name} photo`}
       loading="lazy"
       decoding="async"

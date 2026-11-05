@@ -11,6 +11,7 @@ import { RecipeActions } from "../recipes/RecipeActions.js";
 import { ToMakeBadge } from "../recipes/RecipeCard.js";
 import { type RecipeChange, changeErrorMessage, isTagChange, useRecipeChange } from "../recipes/recipe-changes.js";
 import { RecipeTags, type TagEditing } from "../recipes/RecipeTags.js";
+import { usePhotoVersion } from "../recipes/photo-version.js";
 import { useWakeLock } from "../recipes/use-wake-lock.js";
 
 /**
@@ -41,7 +42,7 @@ function RecipeView({ id }: { id: string }) {
 }
 
 /** An unknown id or a recipe in the trash: the server answers 404 to both (REC-4, REC-6). */
-function RecipeNotFound() {
+export function RecipeNotFound() {
   return (
     <>
       <h1>Recipe not found</h1>
@@ -194,9 +195,10 @@ function RecipeContent({ recipe }: { recipe: ViewedRecipe }) {
 /** The photo (REC-7), or nothing when the recipe has none or it can't be loaded. */
 function RecipePhoto({ recipe }: { recipe: ViewedRecipe }) {
   const [failed, setFailed] = useState(false);
+  const version = usePhotoVersion(recipe.id);
   if (!recipe.hasPhoto || failed) return null;
   return (
-    <img className="recipe-photo" src={photoUrl(recipe.id)} alt={`${recipe.name} photo`} decoding="async" onError={() => setFailed(true)} />
+    <img className="recipe-photo" src={photoUrl(recipe.id, version)} alt={`${recipe.name} photo`} decoding="async" onError={() => setFailed(true)} />
   );
 }
 

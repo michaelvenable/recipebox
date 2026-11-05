@@ -4,6 +4,7 @@ import { Layout } from "./layout/Layout.js";
 import { AccountPage } from "./pages/AccountPage.js";
 import { NotFoundPage } from "./pages/NotFoundPage.js";
 import { Placeholder } from "./pages/Placeholder.js";
+import { EditRecipePage, NewRecipePage } from "./pages/RecipeFormPage.js";
 import { RecipeListPage } from "./pages/RecipeListPage.js";
 import { RecipePage } from "./pages/RecipePage.js";
 
@@ -16,9 +17,9 @@ export const routes: RouteObject[] = [
     element: <Layout />,
     children: [
       { path: "/", element: <RecipeListPage /> },
-      { path: "/recipes/new", element: <EditorOnly><Placeholder title="New recipe" /></EditorOnly> },
+      { path: "/recipes/new", element: <EditorOnly><NewRecipePage /></EditorOnly> },
       { path: "/recipes/:id", element: <RecipePage /> },
-      { path: "/recipes/:id/edit", element: <EditorOnly><Placeholder title="Edit recipe" /></EditorOnly> },
+      { path: "/recipes/:id/edit", element: <EditorOnly><EditRecipePage /></EditorOnly> },
       { path: "/plan", element: <EditorOnly><Placeholder title="Want to make" /></EditorOnly> },
       { path: "/recommendations", element: <EditorOnly><Placeholder title="Rediscover" /></EditorOnly> },
       { path: "/trash", element: <EditorOnly><Placeholder title="Trash" /></EditorOnly> },

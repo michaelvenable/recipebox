@@ -17,13 +17,26 @@ export interface TagEditing {
   busy: boolean;
   /** Why the last tag change failed, from the server (e.g. a tag rule, REC-11), or undefined. */
   error: string | undefined;
+  /**
+   * The text typed and not yet added, when the owner needs it: the create and edit form adds it on Save and counts it as an
+   * unsaved change. Otherwise the add form keeps it to itself. Closing the add form clears it.
+   */
+  draft?: { text: string; setText: (text: string) => void } | undefined;
+}
+
+interface RecipeTagsProps {
+  /** Undefined in the form for a recipe not created yet. */
+  recipeId: string | undefined;
+  /** In the recipe view, as saved: the server's alphabetical order (REC-11). In the form, as added so far. */
+  tags: readonly string[];
+  editing?: TagEditing | undefined;
 }
 
 /**
- * A recipe's tags, in the server's alphabetical order (REC-11). Editors can also remove each one and add tags with suggestions
- * (REC-10, REC-12).
+ * A recipe's tags. Editors can also remove each one and add tags with suggestions (REC-10, REC-12), from the recipe view, where
+ * each change is saved at once, and from the create and edit form, where they are saved with the rest of the content.
  */
-export function RecipeTags({ recipeId, tags, editing }: { recipeId: string; tags: readonly string[]; editing?: TagEditing | undefined }) {
+export function RecipeTags({ recipeId, tags, editing }: RecipeTagsProps) {
   const [adding, setAdding] = useState(false);
   const addButton = useRef<HTMLButtonElement>(null);
   const closed = useRef(false);
@@ -56,6 +69,7 @@ export function RecipeTags({ recipeId, tags, editing }: { recipeId: string; tags
   function close() {
     closed.current = true;
     setAdding(false);
+    editing?.draft?.setText("");
   }
 
   function remove(editing: TagEditing, tag: string, pressed: Element) {
@@ -97,7 +111,7 @@ export function RecipeTags({ recipeId, tags, editing }: { recipeId: string; tags
           </li>
         )}
       </ul>
-      {editing !== undefined && adding && <AddTagForm recipeId={recipeId} editing={editing} close={close} />}
+      {editing !== undefined && adding && <AddTagForm recipeId={recipeId} tags={tags} editing={editing} close={close} />}
       {editing?.error !== undefined && !adding && (
         <p className="form-error" role="alert">
           {editing.error}
@@ -119,9 +133,24 @@ function useDebouncedValue<T>(value: T, ms: number): T {
 /**
  * Typing a tag, with the tags already used on other recipes offered as suggestions (REC-12). The text goes to the server as typed;
  * trimming, lowercasing and the tag rules are the server's (REC-11, X-13). The form stays open after adding, for the next tag.
+ *
+ * The server leaves out the tags the stored recipe has (REC-12). In the create and edit form the shown tags aren't saved yet, so
+ * suggestions already among them are left out here too; in the recipe view this changes nothing.
  */
-function AddTagForm({ recipeId, editing, close }: { recipeId: string; editing: TagEditing; close: () => void }) {
-  const [typed, setTyped] = useState("");
+function AddTagForm({
+  recipeId,
+  tags,
+  editing,
+  close,
+}: {
+  recipeId: string | undefined;
+  tags: readonly string[];
+  editing: TagEditing;
+  close: () => void;
+}) {
+  const [ownTyped, setOwnTyped] = useState("");
+  const typed = editing.draft?.text ?? ownTyped;
+  const setTyped = editing.draft?.setText ?? setOwnTyped;
   const input = useRef<HTMLInputElement>(null);
   const query = useDebouncedValue(typed, SUGGESTION_DEBOUNCE_MS);
   // Suggestions only help; if they can't be loaded, the editor can still type the tag.
@@ -130,6 +159,7 @@ function AddTagForm({ recipeId, editing, close }: { recipeId: string; editing: T
     queryFn: ({ signal }) => fetchTagSuggestions(recipeId, query, signal),
     placeholderData: keepPreviousData,
   });
+  const offered = (suggestions.data ?? []).filter((tag) => !tags.includes(tag));
 
   useEffect(() => input.current?.focus(), []);
 
@@ -181,9 +211,9 @@ function AddTagForm({ recipeId, editing, close }: { recipeId: string; editing: T
           {editing.error}
         </p>
       )}
-      {suggestions.data !== undefined && suggestions.data.length > 0 && (
+      {offered.length > 0 && (
         <div className="tag-suggestions" role="group" aria-label="Suggested tags">
-          {suggestions.data.map((tag) => (
+          {offered.map((tag) => (
             <button key={tag} type="button" className="chip" disabled={editing.busy} onClick={() => attach(tag)}>
               {tag}
             </button>

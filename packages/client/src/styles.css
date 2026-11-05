@@ -942,6 +942,306 @@ code {
   flex: 1;
 }
 
+/* Hidden from view but still focusable and announced, such as the file input inside its "Add photo" label. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+ * Create and edit form (REC-1, REC-5; docs/mockups/EditForm). One column on phones and tablets alike, at the page's width.
+ * Cancel and Save replace the navigation row (TopBar), in the same place and sticky like it.
+ */
+
+.top-bar-slot {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.form-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.form-bar h1 {
+  margin: 0;
+  font-size: 18px;
+  text-align: center;
+}
+
+.form-bar-cancel {
+  min-height: var(--touch);
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.form-bar-cancel[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.form-bar-save {
+  min-height: var(--touch);
+  padding: 0 18px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.form-bar-save:hover {
+  background: var(--accent-hover);
+}
+
+.form-bar-save:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.discard-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+}
+
+.discard-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.button-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.button-danger:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.recipe-form-page,
+.recipe-form,
+.form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.form-fields,
+.field:is(fieldset) {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.form-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 15px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-title {
+  display: block;
+  margin: 0 0 2px;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.field-error {
+  font-size: 14px;
+  color: var(--danger);
+}
+
+.field-hint {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.text-input[aria-invalid="true"] {
+  border: 2px solid var(--danger);
+}
+
+.recipe-form .text-input {
+  min-height: 48px;
+}
+
+.text-area {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  line-height: 1.4;
+  resize: vertical;
+  field-sizing: content;
+}
+
+.time-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.time-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+
+.time-input .text-input {
+  flex: none;
+  width: 88px;
+}
+
+.photo-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.photo-preview {
+  flex: none;
+  display: block;
+  width: 88px;
+  height: 88px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--surface-muted);
+}
+
+.file-button {
+  position: relative;
+}
+
+.file-button:has(input:focus-visible) {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.entry-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.entry-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.entry-number {
+  flex: none;
+  width: 24px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.entry-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Up and down stacked, remove beside them, so the text keeps most of a phone's width. */
+.entry-controls {
+  flex: none;
+  display: grid;
+  grid-template-columns: var(--touch) var(--touch);
+  grid-template-rows: var(--touch) var(--touch);
+}
+
+.entry-controls > :last-child {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch);
+  height: var(--touch);
+  padding: 0;
+  border: 0;
+  border-radius: 22px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.icon-button:disabled {
+  cursor: default;
+  opacity: 0.35;
+  background: transparent;
+}
+
+.add-entry {
+  align-self: flex-start;
+  min-height: var(--touch);
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--link);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 @media (min-width: 900px) {
   .page:has(> .recipe-view) {
     max-width: 1100px;

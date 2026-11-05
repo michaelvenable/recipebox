@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { EditorRecipe, Me } from "@recipebox/shared";
-import { ApiError, apiBaseUrl, apiChange, apiChangeNoContent, apiGet } from "../src/api/client.js";
+import { ApiError, apiBaseUrl, apiChange, apiChangeNoContent, apiGet, apiUpload } from "../src/api/client.js";
 import { API, EDITOR, jsonResponse, mockFetch } from "./helpers.js";
 
 function headersOf(init: RequestInit): Record<string, string> {
@@ -54,6 +54,21 @@ describe("API client: requests (docs/api.md, Conventions; docs/architecture.md, 
     expect(init.credentials).toBe("include");
     expect(headersOf(init)["content-type"]).toBe("application/json");
     expect(init.body).toBe("{}");
+  });
+
+  it("sends an upload as multipart PUT with exactly one file part, the session cookie, and no content type of its own (REC-7)", async () => {
+    const fetchMock = mockFetch(() => jsonResponse(200, { ...RECIPE, hasPhoto: true }));
+    const file = new File(["jpeg bytes"], "photo.jpg", { type: "image/jpeg" });
+    await expect(apiUpload(`/recipes/${RECIPE.id}/photo`, EditorRecipe, file)).resolves.toEqual({ ...RECIPE, hasPhoto: true });
+    const init = fetchMock.mock.calls[0]![1]!;
+    expect(init.method).toBe("PUT");
+    expect(init.credentials).toBe("include");
+    // The browser writes multipart/form-data with its boundary; setting it here would leave the boundary out.
+    expect(headersOf(init)["content-type"]).toBeUndefined();
+    expect(init.body).toBeInstanceOf(FormData);
+    const parts = [...(init.body as FormData).entries()];
+    expect(parts).toHaveLength(1);
+    expect(parts[0]![1]).toBe(file);
   });
 
   it("rejects a response that doesn't match the shared schema, rather than passing it on", async () => {

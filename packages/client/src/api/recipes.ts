@@ -1,7 +1,16 @@
-// Recipes, tags and their images (docs/api.md, "Public endpoints"), and the changes made from the recipe view (docs/api.md,
-// "Editor endpoints").
-import { EditorRecipe, EditorRecipeSummary, PublicRecipe, RecipeSummary, Tag, TagCount, type TagRequest } from "@recipebox/shared";
-import { type Schema, apiBaseUrl, apiChange, apiGet } from "./client.js";
+// Recipes, tags and their images (docs/api.md, "Public endpoints"), and the changes made from the recipe view and the create and
+// edit form (docs/api.md, "Editor endpoints").
+import {
+  EditorRecipe,
+  EditorRecipeSummary,
+  PublicRecipe,
+  type RecipeContentInput,
+  RecipeSummary,
+  Tag,
+  TagCount,
+  type TagRequest,
+} from "@recipebox/shared";
+import { type Schema, apiBaseUrl, apiChange, apiGet, apiUpload } from "./client.js";
 
 /** The name search (REC-9) and picked tags (REC-13). The server does the matching (X-13); the client only passes them on. */
 export interface RecipeFilter {
@@ -42,9 +51,14 @@ export function fetchTags(signal?: AbortSignal): Promise<TagCount[]> {
   return apiGet("/tags", TagCount.array(), signal);
 }
 
+/** `?v=…` for a photo changed in this app (recipes/photo-version.ts); the server ignores it. Nothing for version 0. */
+function versionQuery(version: number): string {
+  return version === 0 ? "" : `?v=${version}`;
+}
+
 /** The address of a recipe's thumbnail, for an `<img>` (REC-7, REC-8). Only meaningful when the recipe has a photo. */
-export function thumbnailUrl(id: string): string {
-  return `${apiBaseUrl()}/recipes/${encodeURIComponent(id)}/thumbnail`;
+export function thumbnailUrl(id: string, version = 0): string {
+  return `${apiBaseUrl()}/recipes/${encodeURIComponent(id)}/thumbnail${versionQuery(version)}`;
 }
 
 /** Whether a listed recipe is on the to-make list (PLAN-7). False for the public shape, which never has the field (X-1). */
@@ -80,8 +94,8 @@ export function fetchRecipe(id: string, signal?: AbortSignal): Promise<ViewedRec
 }
 
 /** The address of a recipe's photo, for an `<img>` (REC-7). Only meaningful when the recipe has a photo. */
-export function photoUrl(id: string): string {
-  return `${apiBaseUrl()}${recipePath(id)}/photo`;
+export function photoUrl(id: string, version = 0): string {
+  return `${apiBaseUrl()}${recipePath(id)}/photo${versionQuery(version)}`;
 }
 
 // Changes from the recipe view. Each answers with the changed recipe. The ones without input send `{}`, never a time: the
@@ -112,8 +126,34 @@ export function removeTag(id: string, tag: string): Promise<EditorRecipe> {
   return apiChange("DELETE", `${recipePath(id)}/tags`, EditorRecipe, { tag } satisfies TagRequest);
 }
 
-/** GET /tag-suggestions: tags on other recipes containing `typed`, as the server matches them (REC-12, X-13). */
-export function fetchTagSuggestions(recipeId: string, typed: string, signal?: AbortSignal): Promise<Tag[]> {
-  const query = `?typed=${encodeURIComponent(typed)}&recipeId=${encodeURIComponent(recipeId)}`;
-  return apiGet(`/tag-suggestions${query}`, Tag.array(), signal);
+/**
+ * GET /tag-suggestions: tags on other recipes containing `typed`, as the server matches them (REC-12, X-13). `recipeId` is
+ * undefined for a recipe not created yet, which the API takes as "no recipe" (docs/api.md).
+ */
+export function fetchTagSuggestions(recipeId: string | undefined, typed: string, signal?: AbortSignal): Promise<Tag[]> {
+  const forRecipe = recipeId === undefined ? "" : `&recipeId=${encodeURIComponent(recipeId)}`;
+  return apiGet(`/tag-suggestions?typed=${encodeURIComponent(typed)}${forRecipe}`, Tag.array(), signal);
+}
+
+// Changes from the create and edit form. The content goes as typed; trimming, discarding blank entries and every rule are the
+// server's (REC-1, REC-2, X-13).
+
+/** POST /recipes (REC-1). Answers with the created recipe, with the id the server chose. */
+export function createRecipe(content: RecipeContentInput): Promise<EditorRecipe> {
+  return apiChange("POST", "/recipes", EditorRecipe, content);
+}
+
+/** PUT /recipes/{id}/content: the whole content, tags included; photo, to-make status and history stay as they are (REC-5). */
+export function saveRecipeContent(id: string, content: RecipeContentInput): Promise<EditorRecipe> {
+  return apiChange("PUT", `${recipePath(id)}/content`, EditorRecipe, content);
+}
+
+/** PUT /recipes/{id}/photo: adds or replaces the photo, as multipart/form-data with the file as the only part (REC-7). */
+export function uploadPhoto(id: string, file: File): Promise<EditorRecipe> {
+  return apiUpload(`${recipePath(id)}/photo`, EditorRecipe, file);
+}
+
+/** DELETE /recipes/{id}/photo (REC-7). */
+export function removePhoto(id: string): Promise<EditorRecipe> {
+  return apiChange("DELETE", `${recipePath(id)}/photo`, EditorRecipe);
 }

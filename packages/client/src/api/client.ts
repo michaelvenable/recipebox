@@ -59,10 +59,20 @@ async function errorFrom(response: Response): Promise<ApiError> {
   return new ApiError(response.status, parsed.success ? parsed.data.errors : []);
 }
 
-async function send(method: string, path: string, init: { body?: unknown; signal?: AbortSignal | undefined }): Promise<Response> {
+interface SendOptions {
+  body?: unknown;
+  /** A multipart upload instead of a JSON body; only apiUpload sends one. */
+  form?: FormData;
+  signal?: AbortSignal | undefined;
+}
+
+async function send(method: string, path: string, init: SendOptions): Promise<Response> {
   const headers = baseHeaders();
   const request: RequestInit = { method, headers, credentials: "include" };
-  if (init.body !== undefined) {
+  if (init.form !== undefined) {
+    // No content type here: the browser writes multipart/form-data with the boundary it chose.
+    request.body = init.form;
+  } else if (init.body !== undefined) {
     // CSRF protection: every change is JSON (docs/architecture.md, "Sign-in").
     headers["content-type"] = "application/json";
     request.body = JSON.stringify(init.body);
@@ -84,6 +94,17 @@ export type ChangeMethod = "POST" | "PUT" | "DELETE";
 /** A change with a JSON body (`{}`, the EmptyRequest, when there is no input), with the response parsed by `schema`. */
 export async function apiChange<T>(method: ChangeMethod, path: string, schema: Schema<T>, body: unknown = {}): Promise<T> {
   const response = await send(method, path, { body });
+  return schema.parse(await response.json());
+}
+
+/**
+ * `PUT path` with one file as `multipart/form-data`, the one exception to the JSON rule (docs/api.md, PUT /recipes/{id}/photo).
+ * The server accepts it only on that route, and only with exactly one file part and nothing else.
+ */
+export async function apiUpload<T>(path: string, schema: Schema<T>, file: File): Promise<T> {
+  const form = new FormData();
+  form.append("photo", file);
+  const response = await send("PUT", path, { form });
   return schema.parse(await response.json());
 }
 

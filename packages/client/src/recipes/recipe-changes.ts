@@ -1,5 +1,5 @@
 // The changes an editor makes from the recipe view, and what each one makes stale.
-import { useIsMutating, useMutation, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useIsMutating, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { EditorRecipe } from "@recipebox/shared";
 import { ApiError } from "../api/client.js";
 import { planKeys, recipeKeys, rediscoverKeys, tagKeys } from "../api/query-keys.js";
@@ -47,18 +47,23 @@ export function useRecipeChange(id: string) {
     mutationKey,
     mutationFn: (change: RecipeChange) => send(id, change),
     // Runs even if the view that started the change has gone, so the cache always gets the saved recipe.
-    onSuccess: (recipe, change) => {
-      queryClient.setQueryData(recipeKeys.detail(id), recipe);
-      // Every list entry shows the recipe's tags, and some its to-make mark (REC-8, PLAN-3, PLAN-7, COOK-6).
-      void queryClient.invalidateQueries({ queryKey: recipeKeys.lists() });
-      void queryClient.invalidateQueries({ queryKey: planKeys.all });
-      void queryClient.invalidateQueries({ queryKey: rediscoverKeys.all });
-      // Tag counts (REC-13) and suggestions (REC-12).
-      if (isTagChange(change)) void queryClient.invalidateQueries({ queryKey: tagKeys.all });
-    },
+    onSuccess: (recipe, change) => showSavedRecipe(queryClient, recipe, { tagsChanged: isTagChange(change) }),
   });
   const busy = useIsMutating({ mutationKey }) > 0;
   return { mutation, busy };
+}
+
+/**
+ * Puts a recipe the server has just saved into the cache, and marks stale what shows part of it. Every list entry shows the
+ * recipe's name, tags and thumbnail, and some its to-make mark (REC-8, PLAN-3, PLAN-7, COOK-6); tag counts (REC-13) and
+ * suggestions (REC-12) change only when tags may have.
+ */
+export function showSavedRecipe(queryClient: QueryClient, recipe: EditorRecipe, { tagsChanged }: { tagsChanged: boolean }): void {
+  queryClient.setQueryData(recipeKeys.detail(recipe.id), recipe);
+  void queryClient.invalidateQueries({ queryKey: recipeKeys.lists() });
+  void queryClient.invalidateQueries({ queryKey: planKeys.all });
+  void queryClient.invalidateQueries({ queryKey: rediscoverKeys.all });
+  if (tagsChanged) void queryClient.invalidateQueries({ queryKey: tagKeys.all });
 }
 
 /**
