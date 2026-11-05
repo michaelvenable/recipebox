@@ -33,6 +33,17 @@ export function mockApiAs(me: Me): FetchMock {
   return mockFetch((url) => (url === `${API}/me` ? jsonResponse(200, me) : jsonResponse(500, { errors: [] })));
 }
 
+/**
+ * An API that answers GET /me with `me` and other requests with `handler`, which gets the parsed URL. Anything `handler`
+ * leaves unanswered (returns undefined) fails loudly with a 500.
+ */
+export function mockApi(me: Me, handler: (url: URL) => Response | Promise<Response> | undefined): FetchMock {
+  return mockFetch(async (url) => {
+    if (url === `${API}/me`) return jsonResponse(200, me);
+    return (await handler(new URL(url))) ?? jsonResponse(500, { errors: [] });
+  });
+}
+
 /** The URLs `fetch` was called with. */
 export function requestedUrls(fetchMock: FetchMock): string[] {
   return fetchMock.mock.calls.map(([input]) => String(input));

@@ -4,6 +4,7 @@ import { Layout } from "./layout/Layout.js";
 import { AccountPage } from "./pages/AccountPage.js";
 import { NotFoundPage } from "./pages/NotFoundPage.js";
 import { Placeholder } from "./pages/Placeholder.js";
+import { RecipeListPage } from "./pages/RecipeListPage.js";
 
 /**
  * Every page. Public pages: the recipe list and a recipe (X-1). Editor-only pages are wrapped in EditorOnly, so visitors get a
@@ -13,7 +14,7 @@ export const routes: RouteObject[] = [
   {
     element: <Layout />,
     children: [
-      { path: "/", element: <Placeholder title="RecipeBox" /> },
+      { path: "/", element: <RecipeListPage /> },
       { path: "/recipes/new", element: <EditorOnly><Placeholder title="New recipe" /></EditorOnly> },
       { path: "/recipes/:id", element: <Placeholder title="Recipe" /> },
       { path: "/recipes/:id/edit", element: <EditorOnly><Placeholder title="Edit recipe" /></EditorOnly> },
