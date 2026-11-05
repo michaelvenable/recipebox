@@ -1,0 +1,318 @@
+/* Global styles. Colors follow docs/mockups; the dark palette follows the device setting, with no switch in the app (X-14). */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: #f6f6f3;
+  --surface: #ffffff;
+  --surface-muted: #f0f2ee;
+  --text: #1d2420;
+  --muted: #59615c;
+  --border: #dcdfda;
+  --border-strong: #c9cec8;
+  --divider: #e4e6e1;
+  --accent: #2e6a4f;
+  --accent-hover: #1f4d38;
+  --on-accent: #ffffff;
+  --link: #2e6a4f;
+  --link-hover: #1f4d38;
+  --plan-bg: #fbeadc;
+  --plan-fg: #8a3a0c;
+  --chip-bg: #e3eee7;
+  --chip-fg: #1f4d38;
+  --danger: #b42318;
+  --danger-bg: #fdecea;
+
+  --font: "Atkinson Hyperlegible", system-ui, sans-serif;
+  --font-mono: ui-monospace, Menlo, Consolas, monospace;
+  --touch: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* From docs/mockups/RecipeViewDark.dc.html. */
+    --bg: #141815;
+    --surface: #1e2420;
+    --surface-muted: #2c332e;
+    --text: #ecefea;
+    --muted: #a9b3ac;
+    --border: #2c332e;
+    --accent: #7fc4a0;
+    --accent-hover: #a6ddbf;
+    --on-accent: #10241a;
+    --link: #7fc4a0;
+    --link-hover: #a6ddbf;
+    /* Not in the mockups; chosen to keep contrast on the dark surface. */
+    --border-strong: #3d4640;
+    --divider: #2c332e;
+    --plan-bg: #3d2a1c;
+    --plan-fg: #f4bf98;
+    --chip-bg: #24382d;
+    --chip-fg: #a6ddbf;
+    --danger: #f28b82;
+    --danger-bg: #3b1f1c;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+a {
+  color: var(--link);
+}
+
+a:hover {
+  color: var(--link-hover);
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+h1 {
+  margin: 0 0 12px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+p {
+  margin: 0;
+}
+
+code {
+  font-family: var(--font-mono);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Layout */
+
+.app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.page {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 18px 20px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Navigation row (X-8): scrolls sideways on narrow screens rather than wrapping; no drawer. */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-items {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.nav-item {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);
+  padding: 0 12px;
+  border-radius: 22px;
+  color: var(--text);
+  font-size: 15px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nav-item:hover {
+  color: var(--text);
+  background: var(--surface-muted);
+}
+
+.nav-sign-in {
+  color: var(--link);
+  font-weight: 700;
+}
+
+.nav-item[aria-current="page"] {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+
+.nav-account {
+  flex: none;
+  width: var(--touch);
+  height: var(--touch);
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.nav-account:hover {
+  color: var(--text);
+}
+
+.nav-account[aria-current="page"] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Buttons. Links styled as buttons too, for sign-in and sign-out, which leave the app. */
+
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.button-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.button-primary:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+  color: var(--on-accent);
+}
+
+.button-small {
+  flex: none;
+  min-height: var(--touch);
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 18px 16px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.badge-editor {
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+}
+
+/* Account page (X-11) */
+
+.account-details {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.account-details dt {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.account-details dd {
+  margin: 4px 0 0;
+}
+
+.account-id {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-id code {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-muted);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.copy-status {
+  flex-basis: 100%;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.copy-status:empty {
+  display: none;
+}
