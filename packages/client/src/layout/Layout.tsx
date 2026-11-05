@@ -2,11 +2,12 @@ import { useCallback, useMemo, useState } from "react";
 import { Outlet } from "react-router";
 import { NavBar } from "./NavBar.js";
 import { NoticeProvider, NoticeRegion } from "./notices.js";
+import { OfflineBanner } from "./OfflineBanner.js";
 import { TopBarContext, type TopBarSlot } from "./top-bar.js";
 
 /**
  * Every page: the navigation row, or the page's own top row in its place (TopBar), then the page itself. Messages such as Undo
- * after deleting (REC-6) live here too, so they stay when the app goes to another page.
+ * after deleting (REC-6) live here too, so they stay when the app goes to another page, as does "You're offline".
  */
 export function Layout() {
   const [element, setElement] = useState<HTMLElement | null>(null);
@@ -23,6 +24,7 @@ export function Layout() {
         <NoticeProvider>
           {claims === 0 && <NavBar />}
           <div ref={setElement} className="top-bar-slot" />
+          <OfflineBanner />
           <NoticeRegion />
           <main className="page">
             <Outlet />

@@ -1,3 +1,5 @@
-# X-10: ask search engines not to index RecipeBox.
+# X-10: RecipeBox asks search engines not to index it with a noindex meta tag (index.html) and an X-Robots-Tag header
+# (staticwebapp.config.json). Crawling stays allowed on purpose: a crawler barred here never fetches a page, so it never sees
+# the noindex, and can still list a linked address in results.
 User-agent: *
-Disallow: /
+Disallow:

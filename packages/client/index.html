@@ -3,16 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- X-10: ask search engines not to index RecipeBox (public/robots.txt says the same). -->
+    <!-- X-10: ask search engines not to index RecipeBox (the X-Robots-Tag header says the same; see public/robots.txt). -->
     <meta name="robots" content="noindex, nofollow" />
     <!-- X-14: light or dark to match the device. -->
     <meta name="color-scheme" content="light dark" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap"
-    />
+    <!--
+      X-4: installable. The build adds the link to /manifest.webmanifest (vite-plugin-pwa, pwa.config.ts).
+      The system bar takes the navigation row's color (--surface in src/styles.css), light or dark.
+    -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1e2420" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="RecipeBox" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>RecipeBox</title>
   </head>
   <body>

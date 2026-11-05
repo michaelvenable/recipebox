@@ -1,5 +1,6 @@
 // Short messages that outlive the page that started them, such as "Pad Thai moved to trash" with Undo after deleting, which is
 // shown on the recipe list the app goes to (REC-6, docs/mockups/DeletedUndo.dc.html). The layout keeps them, above the routes.
+// "A new version is available" (X-4) shows here too, below any of those.
 import {
   type FocusEvent,
   type MouseEvent,
@@ -15,6 +16,7 @@ import {
 import { useIsMutating } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { recipeKeys } from "../api/query-keys.js";
+import { useAppUpdate } from "../pwa/service-worker.js";
 import { focusIsUnclaimed } from "../recipes/focus.js";
 import { changeErrorMessage } from "../recipes/recipe-changes.js";
 import { useRestoreRecipe } from "../recipes/trash-changes.js";
@@ -79,6 +81,24 @@ export function NoticeRegion() {
     <div role="status" className="notice-region">
       {notice?.kind === "deleted" && <DeletedNotice key={notice.seq} notice={notice} dismiss={dismiss} />}
       {notice?.kind === "restored" && <RestoredNotice key={notice.seq} notice={notice} dismiss={dismiss} />}
+      <UpdateNotice />
+    </div>
+  );
+}
+
+/**
+ * "A new version is available" with Reload (X-4), once a new version of the app has been installed in the background. It stays
+ * until the user reloads: the app never reloads on its own, so nobody loses what they were typing.
+ */
+function UpdateNotice() {
+  const { available, updates } = useAppUpdate();
+  if (!available || updates === undefined) return null;
+  return (
+    <div className="notice">
+      <span className="notice-text">A new version is available</span>
+      <button type="button" className="notice-action" onClick={() => updates.apply()}>
+        Reload
+      </button>
     </div>
   );
 }

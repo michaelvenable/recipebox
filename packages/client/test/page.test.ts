@@ -13,9 +13,11 @@ describe("X-10 not in search engines", () => {
     expect(indexHtml).toMatch(/<meta name="robots" content="noindex, nofollow" \/>/);
   });
 
-  it("disallows every crawler in robots.txt", () => {
+  it("lets crawlers fetch pages in robots.txt, so they see the noindex and drop the page", () => {
+    // A crawler barred by robots.txt never reads noindex, and can still list a linked address without its content.
     expect(robotsTxt).toMatch(/^User-agent: \*$/m);
-    expect(robotsTxt).toMatch(/^Disallow: \/$/m);
+    expect(robotsTxt).toMatch(/^Disallow:$/m);
+    expect(robotsTxt).not.toMatch(/^Disallow: *\S/m);
   });
 });
 

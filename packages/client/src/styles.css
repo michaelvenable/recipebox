@@ -976,7 +976,9 @@ code {
   bottom: calc(28px + env(safe-area-inset-bottom, 0px));
   z-index: 10;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   pointer-events: none;
 }
 
@@ -1035,6 +1037,18 @@ code {
 /* Room below the page while a message shows, so it doesn't cover the last entry. */
 .app:has(.notice) .page {
   padding-bottom: 110px;
+}
+
+/* "You're offline" (X-4): a quiet strip under the top row while the browser has no connection. Not in the mockups. */
+
+.offline-banner {
+  margin: 0;
+  padding: 8px 16px;
+  background: var(--surface-muted);
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  font-size: 15px;
+  text-align: center;
 }
 
 /* Trash (REC-14, docs/mockups/Trash.dc.html). */
