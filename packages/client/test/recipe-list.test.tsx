@@ -180,7 +180,8 @@ describe("REC-9 search by name", () => {
     await screen.findByText("Pad Thai");
     expect(searchField()).toHaveValue("pad");
     expect(listQueries(fetchMock)).toEqual(["?name=pad"]);
-    expect(screen.getByRole("status")).toHaveTextContent("1 recipe matches “pad”");
+    // In the page: the layout has a live region of its own for messages such as Undo (REC-6).
+    expect(within(screen.getByRole("main")).getByRole("status")).toHaveTextContent("1 recipe matches “pad”");
   });
 
   it("restores the search on Back after opening a recipe", async () => {
@@ -308,7 +309,7 @@ describe("REC-13 filter by tags", () => {
     expect(await chip("quick · 1")).toHaveAttribute("aria-pressed", "false");
     expect(searchField()).toHaveValue("b");
     expect(listQueries(fetchMock)).toEqual(["?name=b&tags=dinner"]);
-    expect(screen.getByRole("status")).toHaveTextContent("1 recipe matches “b” with the tag dinner");
+    expect(within(screen.getByRole("main")).getByRole("status")).toHaveTextContent("1 recipe matches “b” with the tag dinner");
   });
 
   it("applies a term still being typed along with a picked tag", async () => {

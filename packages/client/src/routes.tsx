@@ -7,6 +7,7 @@ import { Placeholder } from "./pages/Placeholder.js";
 import { EditRecipePage, NewRecipePage } from "./pages/RecipeFormPage.js";
 import { RecipeListPage } from "./pages/RecipeListPage.js";
 import { RecipePage } from "./pages/RecipePage.js";
+import { TrashPage } from "./pages/TrashPage.js";
 
 /**
  * Every page. Public pages: the recipe list and a recipe (X-1). Editor-only pages are wrapped in EditorOnly, so visitors get a
@@ -22,7 +23,7 @@ export const routes: RouteObject[] = [
       { path: "/recipes/:id/edit", element: <EditorOnly><EditRecipePage /></EditorOnly> },
       { path: "/plan", element: <EditorOnly><Placeholder title="Want to make" /></EditorOnly> },
       { path: "/recommendations", element: <EditorOnly><Placeholder title="Rediscover" /></EditorOnly> },
-      { path: "/trash", element: <EditorOnly><Placeholder title="Trash" /></EditorOnly> },
+      { path: "/trash", element: <EditorOnly><TrashPage /></EditorOnly> },
       { path: "/account", element: <AccountPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],

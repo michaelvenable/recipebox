@@ -1,5 +1,5 @@
 // Every TanStack Query key for recipe data, in one place, so a change can invalidate what it affects. For example, deleting a
-// recipe (REC-6) or changing its tags (REC-10) invalidates `recipeKeys.all` and `tagKeys.all`; adding it to the to-make list
+// recipe (REC-6) or changing its tags (REC-10) invalidates the recipe lists and `tagKeys.all`; adding it to the to-make list
 // (PLAN-1) invalidates `recipeKeys.lists()` for the indicator (PLAN-7). /me has its own key, ME_QUERY_KEY in auth/sign-in.ts.
 import type { RecipeFilter } from "./recipes.js";
 
@@ -41,4 +41,15 @@ export const planKeys = {
 /** GET /recommendations, "Haven't made in a while" (COOK-6). Cooking a recipe changes its order. */
 export const rediscoverKeys = {
   all: ["recommendations"] as const,
+};
+
+/** GET /trash (REC-14). Deleting (REC-6) and restoring (REC-15) change it. */
+export const trashKeys = {
+  all: ["trash"] as const,
+  /**
+   * Not an API call: the trashed recipes whose restore the server refused because their 30 days are up (REC-16). The server
+   * still lists them until the daily cleanup removes them, so the trash leaves them out for as long as the app is open.
+   * Outside `trashKeys.all`, so invalidating the trash leaves it.
+   */
+  expired: () => ["trashExpired"] as const,
 };

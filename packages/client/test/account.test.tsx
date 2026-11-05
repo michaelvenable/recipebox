@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { API, APP, EDITOR, NON_EDITOR, VISITOR, jsonResponse, mockApiAs, mockFetch, renderAt } from "./helpers.js";
@@ -80,7 +80,8 @@ describe("X-11 Account page, signed in as an editor", () => {
     renderAt("/account");
     await user.click(await screen.findByRole("button", { name: "Copy" }));
     await expect(navigator.clipboard.readText()).resolves.toBe("google:109876543210987654321");
-    expect(screen.getByRole("status")).toHaveTextContent("Copied");
+    // In the page: the layout has a live region of its own for messages such as Undo (REC-6).
+    expect(within(screen.getByRole("main")).getByRole("status")).toHaveTextContent("Copied");
   });
 
   it("says so when the clipboard refuses", async () => {
@@ -89,7 +90,7 @@ describe("X-11 Account page, signed in as an editor", () => {
     mockApiAs(EDITOR);
     renderAt("/account");
     await user.click(await screen.findByRole("button", { name: "Copy" }));
-    expect(screen.getByRole("status")).toHaveTextContent("Couldn't copy");
+    expect(within(screen.getByRole("main")).getByRole("status")).toHaveTextContent("Couldn't copy");
   });
 });
 

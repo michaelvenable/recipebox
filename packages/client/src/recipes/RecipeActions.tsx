@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { EditorRecipe } from "@recipebox/shared";
-import { formatDate, formatLastCooked, isOnLocalDay } from "./dates.js";
+import { formatDate, formatRecentDay, isOnLocalDay } from "./dates.js";
 import { focusIsUnclaimed } from "./focus.js";
 import { useLocalDay } from "./use-local-day.js";
 
@@ -106,7 +106,7 @@ function CookingHistory({ recipe, today }: { recipe: EditorRecipe; today: string
   return (
     <>
       <p className="cook-summary">
-        Last cooked {formatLastCooked(recipe.lastCookedAt, today)} · {timesCooked(recipe.timesCooked)} ·{" "}
+        Last cooked {formatRecentDay(recipe.lastCookedAt, today)} · {timesCooked(recipe.timesCooked)} ·{" "}
         <button type="button" className="link-button history-toggle" aria-expanded={open} aria-controls={listId} onClick={() => setOpen(!open)}>
           History
         </button>

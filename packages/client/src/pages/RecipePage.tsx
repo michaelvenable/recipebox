@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { EditorRecipe } from "@recipebox/shared";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { ApiError } from "../api/client.js";
 import { recipeKeys } from "../api/query-keys.js";
 import { type ViewedRecipe, fetchRecipe, isEditorRecipe, photoUrl } from "../api/recipes.js";
 import { useViewer } from "../auth/sign-in.js";
+import { useNotices } from "../layout/notices.js";
 import { formatTotalTime } from "../recipes/format.js";
 import { RecipeActions } from "../recipes/RecipeActions.js";
 import { ToMakeBadge } from "../recipes/RecipeCard.js";
 import { type RecipeChange, changeErrorMessage, isTagChange, useRecipeChange } from "../recipes/recipe-changes.js";
 import { RecipeTags, type TagEditing } from "../recipes/RecipeTags.js";
 import { usePhotoVersion } from "../recipes/photo-version.js";
+import { useDeleteRecipe } from "../recipes/trash-changes.js";
 import { useWakeLock } from "../recipes/use-wake-lock.js";
 
 /**
@@ -179,16 +181,45 @@ function RecipeContent({ recipe }: { recipe: ViewedRecipe }) {
           </ol>
         </section>
 
-        {/* Delete (REC-6) joins Edit here, at the bottom, in a later task. */}
-        {editorRecipe !== undefined && (
-          <div className="recipe-bottom-actions">
-            <Link to={`/recipes/${encodeURIComponent(recipe.id)}/edit`} className="button">
-              Edit
-            </Link>
-          </div>
-        )}
+        {editorRecipe !== undefined && <BottomActions recipe={editorRecipe} busy={change.busy} />}
       </div>
     </article>
+  );
+}
+
+/**
+ * Edit and Delete, at the bottom of the recipe, away from the cooking actions (docs/mockups/RecipeView.dc.html). Delete asks
+ * nothing (REC-6): the recipe goes to the trash, the app goes to the list, and the layout shows the Undo message there. `busy`
+ * covers every change to this recipe, the delete included, so nothing else is sent while it is saved.
+ */
+function BottomActions({ recipe, busy }: { recipe: EditorRecipe; busy: boolean }) {
+  const navigate = useNavigate();
+  const notices = useNotices();
+  const remove = useDeleteRecipe(recipe, notices.deleted);
+
+  function onDelete() {
+    if (busy) return;
+    // Only while this view is still open: if the editor has gone elsewhere meanwhile, they stay there (the message still shows).
+    // Replacing the recipe's history entry, so Back doesn't lead to "not found".
+    remove.mutate(undefined, { onSuccess: () => void navigate("/", { replace: true }) });
+  }
+
+  return (
+    <>
+      <div className="recipe-bottom-actions">
+        <Link to={`/recipes/${encodeURIComponent(recipe.id)}/edit`} className="button">
+          Edit
+        </Link>
+        <button type="button" className="button button-delete" disabled={busy} onClick={onDelete}>
+          Delete
+        </button>
+      </div>
+      {remove.isError && (
+        <p className="form-error" role="alert">
+          {changeErrorMessage(remove.error)}
+        </p>
+      )}
+    </>
   );
 }
 

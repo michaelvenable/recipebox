@@ -9,8 +9,9 @@ import {
   Tag,
   TagCount,
   type TagRequest,
+  TrashEntry,
 } from "@recipebox/shared";
-import { type Schema, apiBaseUrl, apiChange, apiGet, apiUpload } from "./client.js";
+import { type Schema, apiBaseUrl, apiChange, apiChangeNoContent, apiGet, apiUpload } from "./client.js";
 
 /** The name search (REC-9) and picked tags (REC-13). The server does the matching (X-13); the client only passes them on. */
 export interface RecipeFilter {
@@ -156,4 +157,25 @@ export function uploadPhoto(id: string, file: File): Promise<EditorRecipe> {
 /** DELETE /recipes/{id}/photo (REC-7). */
 export function removePhoto(id: string): Promise<EditorRecipe> {
   return apiChange("DELETE", `${recipePath(id)}/photo`, EditorRecipe);
+}
+
+// The trash (docs/api.md, "Trash"). Delete and restore send `{}`, never a time: the server records its own and measures the 30
+// days by its own clock (X-12, REC-16).
+
+/** DELETE /recipes/{id}: moves the recipe to the trash (REC-6). Deleting one already there changes nothing (REC-17). */
+export function deleteRecipe(id: string): Promise<void> {
+  return apiChangeNoContent("DELETE", recipePath(id));
+}
+
+/** GET /trash: the deleted recipes, most recently deleted first (REC-14). */
+export function fetchTrash(signal?: AbortSignal): Promise<TrashEntry[]> {
+  return apiGet("/trash", TrashEntry.array(), signal);
+}
+
+/**
+ * POST /trash/{id}/restore (REC-15). Answers with the restored recipe; 409 `trash.expired` once its 30 days are up (REC-16).
+ * Restoring a recipe that isn't in the trash changes nothing and answers with it.
+ */
+export function restoreRecipe(id: string): Promise<EditorRecipe> {
+  return apiChange("POST", `/trash/${encodeURIComponent(id)}/restore`, EditorRecipe);
 }

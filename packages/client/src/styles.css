@@ -22,6 +22,10 @@
   --chip-fg: #1f4d38;
   --danger: #b42318;
   --danger-bg: #fdecea;
+  --notice-bg: #1d2420;
+  --notice-fg: #ffffff;
+  --notice-action-bg: #7fc4a0;
+  --notice-action-fg: #10241a;
 
   --font: "Atkinson Hyperlegible", system-ui, sans-serif;
   --font-mono: ui-monospace, Menlo, Consolas, monospace;
@@ -51,6 +55,10 @@
     --chip-fg: #a6ddbf;
     --danger: #f28b82;
     --danger-bg: #3b1f1c;
+    --notice-bg: #ecefea;
+    --notice-fg: #141815;
+    --notice-action-bg: #2e6a4f;
+    --notice-action-fg: #ffffff;
   }
 }
 
@@ -940,6 +948,145 @@ code {
 
 .recipe-bottom-actions .button {
   flex: 1;
+}
+
+/* Delete (REC-6): red text without a frame, quieter than Edit beside it (docs/mockups/RecipeView.dc.html). */
+.button.button-delete {
+  border-color: transparent;
+  background: transparent;
+  color: var(--danger);
+  font-weight: 400;
+}
+
+.button.button-delete:hover {
+  border-color: transparent;
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/*
+ * Messages that outlive a page, such as "Pad Thai moved to trash" with Undo (REC-6, docs/mockups/DeletedUndo.dc.html): a dark
+ * bar floating at the bottom, light in the dark theme. The region itself is always there, empty, for screen readers.
+ */
+
+.notice-region {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.notice {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 8px 8px 18px;
+  border-radius: 14px;
+  background: var(--notice-bg);
+  color: var(--notice-fg);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  pointer-events: auto;
+}
+
+.notice-text {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.notice-action {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);
+  padding: 0 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--notice-action-bg);
+  color: var(--notice-action-fg);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.notice-action:hover {
+  color: var(--notice-action-fg);
+}
+
+/* The usual focus ring would barely show against the bar. */
+.notice :focus-visible {
+  outline-color: var(--notice-action-bg);
+}
+
+.notice-action[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* Room below the page while a message shows, so it doesn't cover the last entry. */
+.app:has(.notice) .page {
+  padding-bottom: 110px;
+}
+
+/* Trash (REC-14, docs/mockups/Trash.dc.html). */
+
+.trash-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trash-page h1 {
+  margin: 0;
+}
+
+.trash-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.trash-entry {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  background: var(--surface);
+  border-radius: 14px;
+}
+
+.trash-entry .thumb {
+  width: 56px;
+  height: 56px;
+  opacity: 0.75;
+}
+
+.trash-entry .recipe-card-name {
+  font-size: 17px;
+}
+
+.button.trash-restore {
+  border-color: var(--accent);
+  border-radius: 22px;
+  color: var(--link);
+  font-weight: 700;
+}
+
+.button.trash-restore:hover {
+  border-color: var(--accent-hover);
+  color: var(--link-hover);
 }
 
 /* Hidden from view but still focusable and announced, such as the file input inside its "Add photo" label. */
