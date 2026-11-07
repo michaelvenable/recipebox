@@ -330,6 +330,29 @@ code {
   display: none;
 }
 
+/* The Privacy link at the foot of the Account page (X-15). */
+.account-footer {
+  margin-top: 12px;
+}
+
+/* Privacy page (X-15, docs/mockups/Privacy.dc.html): short sections of plain text. */
+
+.prose {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.prose h1 {
+  margin: 0 0 6px;
+}
+
+.prose h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
 /*
  * Links that look like text but act as buttons, such as "Show all recipes". The touch target is the full 44px (--touch), while
  * the negative margins keep the surrounding line as tall as plain text.

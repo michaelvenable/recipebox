@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
 import type { Me } from "@recipebox/shared";
 import { PROVIDER_NAMES, appUrl, isAppPath, signOutUrl, useViewer } from "../auth/sign-in.js";
 import { SignInButtons } from "../auth/SignInButtons.js";
@@ -35,6 +35,15 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+/** X-15: the Privacy page, linked from the foot of the Account page whether signed in or not. */
+function PrivacyLink() {
+  return (
+    <p className="muted account-footer">
+      <Link to="/privacy">Privacy</Link>
+    </p>
+  );
+}
+
 /** X-11: provider, account ID with a copy button, editor or not, and sign out; or sign-in buttons when signed out. */
 export function AccountPage() {
   const { viewer, me } = useViewer();
@@ -45,6 +54,7 @@ export function AccountPage() {
       <>
         <h1>Account</h1>
         <p role="status">Loading…</p>
+        <PrivacyLink />
       </>
     );
   }
@@ -58,6 +68,7 @@ export function AccountPage() {
         <h1>Account</h1>
         <p className="muted">Sign in to add and edit recipes. Anyone can view recipes without signing in.</p>
         <SignInButtons returnTo={returnTo} />
+        <PrivacyLink />
       </>
     );
   }
@@ -96,6 +107,7 @@ export function AccountPage() {
           Sign out
         </a>
       </div>
+      <PrivacyLink />
     </>
   );
 }

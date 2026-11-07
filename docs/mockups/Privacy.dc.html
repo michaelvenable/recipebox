@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Privacy</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2E6A4F}a:hover{color:#1F4D38}
+</style>
+</helmet>
+<div style="width: 390px; height: 1648px; box-sizing: border-box; background: #F6F6F3; color: #1D2420; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <nav aria-label="Main" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; background: #FFFFFF; border-bottom: 1px solid #DCDFDA">
+    <a href="Main.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 22px; color: #1D2420; font-size: 15px; text-decoration: none">Catalog</a>
+    <a href="Account.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; color: #2E6A4F; font-size: 15px; font-weight: 700">Sign in</a>
+  </nav>
+  <main style="display: flex; flex-direction: column; gap: 18px; padding: 18px 20px 32px">
+    <div>
+      <h1 style="margin: 0 0 6px; font-size: 26px; font-weight: 700; line-height: 1.2">Privacy</h1>
+      <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #59615C">Recipe Box is a recipe app for one household. This page says what it stores and who can see it.</p>
+    </div>
+    <sc-for list="{{sections}}" as="s" hint-placeholder-count="8">
+      <section>
+        <h2 style="margin: 0 0 6px; font-size: 20px; font-weight: 700; line-height: 1.25">{{s.title}}</h2>
+        <p style="margin: 0; font-size: 17px; line-height: 1.45">{{s.text}}</p>
+      </section>
+    </sc-for>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1648}}'>
+class Component extends DCLogic {
+  renderVals() {
+    // X-15: the page as a visitor sees it, in the visitor nav. The same text as packages/client/src/pages/PrivacyPage.tsx.
+    const sections = [
+      { title: "Recipes and photos", text: "Recipes and their photos are public: anyone with the app's address can see them without signing in. When a photo is uploaded, the location and other details the camera saved in it are removed." },
+      { title: "The household's lists", text: "The \"to make\" list, cooking history and trash can be seen only by the household's editors, and so can photos of recipes in the trash. The one exception is a shopping list an editor sends: for 7 days, anyone with its link can see the current shopping list, and nothing else." },
+      { title: "Signing in", text: "You sign in with a Microsoft or Google account, on Microsoft's or Google's own page; the app never sees your password. From signing in, the app uses only which of the two you used and your permanent account ID. It doesn't keep your name or email address. The list of editors holds each editor's provider and account ID, and apart from that list the app keeps no record of who signs in." },
+      { title: "Cookies", text: "The only cookies are the ones signing in sets, to keep you signed in. There are no advertising, tracking or analytics cookies. So that it can be installed and start quickly, the app keeps a copy of its own files on your device." },
+      { title: "Server logs", text: "The server logs each request: what was asked for, when, and the network address it came from. The logs don't include names, email addresses or who was signed in. They are used only to keep the app running, and are kept for 30 days." },
+      { title: "Deleting", text: "A deleted recipe stays in the trash for 30 days. Within a day after that, it is removed for good, with its photo and cooking history. Replacing or removing a photo deletes the old one. Backup copies are kept for 7 days, then they expire." },
+      { title: "Sharing", text: "Nothing is sold or shared with anyone else. The app runs on Microsoft Azure, which stores its data." },
+      { title: "Questions", text: "Ask the household member who shared the app with you." },
+    ];
+    return { sections };
+  }
+}
+</script>
+</body>
+</html>

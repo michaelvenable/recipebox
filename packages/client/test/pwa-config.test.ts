@@ -107,6 +107,8 @@ describe("X-4 service worker", () => {
       "/recommendations",
       "/trash",
       "/account",
+      // X-15: linked from the Google sign-in consent screen, so it must open as a deep link.
+      "/privacy",
     ]) {
       expect(servesApp(page), page).toBe(true);
     }
@@ -162,6 +164,11 @@ describe("X-4 and X-10 Static Web Apps configuration", () => {
     expect(excluded("/list/k7Qm2xV9pR4tZ8wL-a1B_c")).toBe(false);
     expect(excluded("/assets/index-abc.js")).toBe(true);
     expect(excluded("/robots.txt")).toBe(true);
+  });
+
+  it("X-15 answers the Privacy page with the app, so its address opens directly; X-10's header covers it too", () => {
+    expect(excluded("/privacy")).toBe(false);
+    expect(config.routes.some((r) => r.route === "/privacy" || r.route.startsWith("/privacy/"))).toBe(false);
   });
 
   it("PLAN-9 never passes a sent shopping list's address on from its page", () => {
