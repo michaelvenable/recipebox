@@ -1,7 +1,7 @@
 import { type FormEvent, type Ref, useEffect, useId, useRef, useState } from "react";
 import { type QueryClient, useIsMutating, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { EditorRecipe, PublicRecipe, RecipeContentInput } from "@recipebox/shared";
-import { useBlocker, useLocation, useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { ApiError } from "../api/client.js";
 import { recipeKeys } from "../api/query-keys.js";
 import { createRecipe, removePhoto, saveRecipeContent, uploadPhoto } from "../api/recipes.js";
@@ -92,8 +92,8 @@ function recipePath(id: string): string {
 
 /**
  * Creating a recipe (REC-1) at /recipes/new, or editing one (REC-5) at /recipes/:id/edit. Cancel and Save take the place of the
- * navigation row, so a stray tap can't leave the form (docs/mockups/README.md, "Edit form"); leaving with unsaved changes asks
- * first, and closing or reloading the page makes the browser warn.
+ * navigation row, so a stray tap can't leave the form (docs/mockups/README.md, "Edit form"). Leaving, by Cancel or any other
+ * way, drops unsaved changes without asking.
  */
 export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
   const queryClient = useQueryClient();
@@ -107,11 +107,7 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
   // The recipe as last saved: its id once created, the content then sent, and whether it has a photo.
   const [saved, setSaved] = useState(() => ({ id: recipe?.id, content: contentSnapshot(initial), hasPhoto: recipe?.hasPhoto ?? false }));
   const [problem, setProblem] = useState<Problem>();
-  const [askingToDiscard, setAskingToDiscard] = useState(false);
 
-  const dirty = contentSnapshot(form) !== saved.content || photo.kind !== "keep";
-  // Set just before leaving on purpose (after saving, or discarding), so the leaving isn't stopped to ask.
-  const leaving = useRef(false);
   // A save outlives the form if the editor is signed out meanwhile; then it must not navigate from whatever page is shown.
   const mounted = useRef(true);
   useEffect(() => {
@@ -120,26 +116,11 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
       mounted.current = false;
     };
   }, []);
-  const cancelButton = useRef<HTMLButtonElement>(null);
 
   // The recipe's own key, so its view waits while this saves, and this waits for a change made there (COOK-1).
   const mutationKey = saved.id === undefined ? recipeKeys.create() : recipeKeys.change(saved.id);
   const mutation = useMutation({ mutationKey, mutationFn: (plan: SavePlan) => save(queryClient, plan) });
   const busy = useIsMutating({ mutationKey }) > 0;
-
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) => dirty && !leaving.current && currentLocation.pathname !== nextLocation.pathname,
-  );
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      // Older browsers need returnValue set to show their warning.
-      event.returnValue = "";
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
 
   const summary = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -147,15 +128,9 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
   }, [problem]);
 
   function leave() {
-    leaving.current = true;
     // Back where the editor came from, if that was in the app; otherwise to the recipe, or the list for a recipe never saved.
     if (location.key !== "default") void navigate(-1);
     else void navigate(saved.id === undefined ? "/" : recipePath(saved.id), { replace: true });
-  }
-
-  function cancel() {
-    if (dirty) setAskingToDiscard(true);
-    else leave();
   }
 
   async function submit() {
@@ -176,7 +151,6 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
     }
     if (!mounted.current) return;
     if (result.photoError === undefined) {
-      leaving.current = true;
       void navigate(recipePath(result.id), { replace: true });
       return;
     }
@@ -198,7 +172,6 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
 
   const nameErrors = fieldErrors.get("name");
   const timeErrors = fieldErrors.get("totalTimeMinutes");
-  const confirming = askingToDiscard || blocker.state === "blocked";
 
   return (
     <div className="recipe-form-page">
@@ -206,15 +179,14 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
         <header className="form-bar">
           {/*
             Not while saving: the save would finish after leaving, and its outcome would have nowhere to go. aria-disabled rather
-            than disabled, so it can still hold focus, such as after Keep editing during a save.
+            than disabled, so it keeps focus while the save runs.
           */}
           <button
-            ref={cancelButton}
             type="button"
             className="form-bar-cancel"
             aria-disabled={busy || undefined}
             onClick={() => {
-              if (!busy) cancel();
+              if (!busy) leave();
             }}
           >
             Cancel
@@ -224,25 +196,6 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
             {busy ? "Saving…" : "Save"}
           </button>
         </header>
-        {confirming && (
-          <DiscardConfirm
-            busy={busy}
-            discard={() => {
-              setAskingToDiscard(false);
-              if (blocker.state === "blocked") {
-                leaving.current = true;
-                blocker.proceed();
-              } else {
-                leave();
-              }
-            }}
-            keepEditing={() => {
-              setAskingToDiscard(false);
-              if (blocker.state === "blocked") blocker.reset();
-              cancelButton.current?.focus();
-            }}
-          />
-        )}
       </TopBar>
 
       {problem !== undefined && <Summary ref={summary} problem={problem} />}
@@ -328,34 +281,6 @@ function Summary({ problem, ref }: { problem: Problem; ref: Ref<HTMLDivElement> 
         <p key={message}>{message}</p>
       ))}
       {contentSaved && errors.fields.has("photo") && <p>Save again to try the photo again, or remove it.</p>}
-    </div>
-  );
-}
-
-/** "Discard your changes?", in the page rather than a browser dialog, so it reads like the rest of the app. */
-function DiscardConfirm({ busy, discard, keepEditing }: { busy: boolean; discard: () => void; keepEditing: () => void }) {
-  const id = useId();
-  const keep = useRef<HTMLButtonElement>(null);
-  useEffect(() => keep.current?.focus(), []);
-  return (
-    <div
-      className="discard-confirm"
-      role="alertdialog"
-      aria-labelledby={`${id}-title`}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") keepEditing();
-      }}
-    >
-      <p id={`${id}-title`}>Discard your changes?</p>
-      <div className="discard-actions">
-        <button ref={keep} type="button" className="button button-small" onClick={keepEditing}>
-          Keep editing
-        </button>
-        {/* Not while saving, as for Cancel: leaving waits until the save is done. */}
-        <button type="button" className="button button-small button-danger" disabled={busy} onClick={discard}>
-          Discard
-        </button>
-      </div>
     </div>
   );
 }

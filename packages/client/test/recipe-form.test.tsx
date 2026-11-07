@@ -389,13 +389,6 @@ describe("REC-21 one entry per line", () => {
     await screen.findByText("Not saved. Fix the field marked below.");
     expect(field("Prep")).toHaveAccessibleDescription("Line 3: An entry must be at most 1000 characters.");
   });
-
-  it("counts a changed box as an unsaved change", async () => {
-    await openEdit();
-    await userEvent.type(field("Prep"), "Soak.");
-    await userEvent.click(button("Cancel"));
-    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeInTheDocument();
-  });
 });
 
 describe("REC-1 total time", () => {
@@ -513,13 +506,6 @@ describe("REC-10, REC-11, REC-12 tags in the form", () => {
     await waitFor(() => expect(suggested()).toEqual(["curry"]));
     await userEvent.click(field("Name"));
     expect(screen.queryByRole("group", { name: "Suggested tags" })).not.toBeInTheDocument();
-  });
-
-  it("counts a changed tag as an unsaved change", async () => {
-    await openEdit();
-    await userEvent.type(field("Tags"), ", spicy");
-    await userEvent.click(button("Cancel"));
-    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeInTheDocument();
   });
 
   it("ties a refused tag's message to the tags field, naming the tag", async () => {
@@ -720,63 +706,31 @@ describe("Edit form: Cancel and Save replace the navigation row (docs/mockups/RE
     expect(changes(fetchMock)).toEqual([]);
   });
 
-  it("asks before discarding changes on Cancel; Keep editing keeps them, Discard leaves without saving", async () => {
+  it("leaves at once on Cancel with unsaved changes, without asking or saving", async () => {
     const { router, fetchMock } = await openEdit();
     await userEvent.type(field("Name"), " Jay");
+    await userEvent.upload(screen.getByLabelText("Add photo"), jpeg());
     await userEvent.click(button("Cancel"));
-
-    const dialog = screen.getByRole("alertdialog", { name: "Discard your changes?" });
-    expect(within(dialog).getByRole("button", { name: "Keep editing" })).toHaveFocus();
-    await userEvent.click(within(dialog).getByRole("button", { name: "Keep editing" }));
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-    expect(field("Name")).toHaveValue("Pad Thai Jay");
-    expect(router.state.location.pathname).toBe(`/recipes/${ID}/edit`);
-
-    await userEvent.click(button("Cancel"));
-    await userEvent.click(button("Discard"));
     expect(router.state.location.pathname).toBe(`/recipes/${ID}`);
     expect(changes(fetchMock)).toEqual([]);
   });
 
-  it("counts a picked photo as a change", async () => {
-    await openEdit();
-    await userEvent.upload(screen.getByLabelText("Add photo"), jpeg());
-    await userEvent.click(button("Cancel"));
-    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeInTheDocument();
-  });
-
-  it("asks before leaving with unsaved changes some other way, such as the browser's back button", async () => {
-    const { router } = await openEdit();
+  it("leaves with unsaved changes some other way, such as the browser's back button, without asking or saving", async () => {
+    const { router, fetchMock } = await openEdit();
     await userEvent.type(field("Ingredients"), " (wide)");
-    await act(() => router.navigate("/"));
-
-    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe(`/recipes/${ID}/edit`);
-    await userEvent.click(button("Keep editing"));
-    expect(router.state.location.pathname).toBe(`/recipes/${ID}/edit`);
-
-    await act(() => router.navigate("/"));
-    await userEvent.click(button("Discard"));
-    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
-  });
-
-  it("doesn't stop leaving without changes", async () => {
-    const { router } = await openEdit();
     await act(() => router.navigate("/"));
     expect(router.state.location.pathname).toBe("/");
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(changes(fetchMock)).toEqual([]);
   });
 
-  it("has the browser warn on closing or reloading the page only with unsaved changes", async () => {
+  it("doesn't have the browser warn on closing or reloading the page, even with unsaved changes", async () => {
     await openEdit();
-    const unload = () => {
-      const event = new Event("beforeunload", { cancelable: true });
-      window.dispatchEvent(event);
-      return event.defaultPrevented;
-    };
-    expect(unload()).toBe(false);
     await userEvent.type(field("Name"), " Jay");
-    expect(unload()).toBe(true);
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
   });
 
   it("goes back to the page the editor came from on Cancel, when there is one in the app", async () => {
@@ -791,14 +745,6 @@ describe("Edit form: Cancel and Save replace the navigation row (docs/mockups/RE
     await userEvent.click(button("Cancel"));
     await waitFor(() => expect(router.state.location.pathname).toBe("/"));
     expect(router.state.historyAction).toBe("POP");
-  });
-
-  it("returns focus to Cancel after Keep editing", async () => {
-    await openEdit();
-    await userEvent.type(field("Name"), " Jay");
-    await userEvent.click(button("Cancel"));
-    await userEvent.click(button("Keep editing"));
-    expect(button("Cancel")).toHaveFocus();
   });
 });
 
@@ -868,25 +814,15 @@ describe("REC-5, REC-10 the form starts from the recipe as saved", () => {
 });
 
 describe("REC-1, REC-5 leaving while a save is in flight", () => {
-  it("can't Cancel, or Discard when leaving some other way, until the save is done", async () => {
+  it("can't Cancel until the save is done", async () => {
     let answer: (response: Response) => void = () => {};
     const { router } = await openEdit({ change: () => new Promise<Response>((resolve) => (answer = resolve)) });
     await userEvent.type(field("Name"), " Jay");
     await save();
-    // aria-disabled rather than disabled, so it can still take focus back from the dialog.
+    // aria-disabled rather than disabled, so it keeps focus while the save runs.
     expect(button("Cancel")).toHaveAttribute("aria-disabled", "true");
     await userEvent.click(button("Cancel"));
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/recipes/${ID}/edit`);
-
-    await act(() => router.navigate("/"));
-    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeInTheDocument();
-    expect(button("Discard")).toBeDisabled();
-    expect(router.state.location.pathname).toBe(`/recipes/${ID}/edit`);
-    await userEvent.click(button("Keep editing"));
-    expect(button("Cancel")).toHaveFocus();
-
-    await act(() => router.navigate("/"));
 
     answer(jsonResponse(200, { ...PAD_THAI, name: "Pad Thai Jay" }));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/recipes/${ID}`));

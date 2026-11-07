@@ -1,6 +1,6 @@
 // The service worker (X-4, built from pwa.config.ts) and switching to a new version. A new version is never applied on its own:
 // the app shows "A new version is available" with Reload (src/layout/notices.tsx), and only that button reloads the page, so an
-// editor is never interrupted mid-edit. Reloading with unsaved changes still asks first (RecipeForm's beforeunload warning).
+// editor is never interrupted mid-edit; Reload drops unsaved changes in the form without asking.
 import { createContext, useContext, useSyncExternalStore } from "react";
 import { Workbox } from "workbox-window";
 

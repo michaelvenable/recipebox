@@ -1465,23 +1465,6 @@ button.pill-button:disabled {
   opacity: 0.6;
 }
 
-.discard-confirm {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  font-weight: 700;
-}
-
-.discard-actions {
-  display: flex;
-  gap: 8px;
-}
-
 .button-danger {
   border-color: var(--danger);
   color: var(--danger);
