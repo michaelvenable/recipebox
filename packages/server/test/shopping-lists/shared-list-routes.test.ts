@@ -1,6 +1,6 @@
 // Sending the shopping list as a link (PLAN-9; docs/api.md) against the in-memory repositories, with the spec's example. The
-// rules themselves (7 days, the copy) are tested in packages/domain; these tests show the endpoints apply them, and check
-// who may send (X-6), what a visitor sees (X-1) and whose clock counts (X-12).
+// rules themselves (7 days, the empty plan) are tested in packages/domain; these tests show the endpoints apply them, that the
+// list is live, and check who may send (X-6), what a visitor sees (X-1) and whose clock counts (X-12).
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { describe, expect, it, vi } from "vitest";
 import { ShareToken } from "@recipebox/domain";
@@ -89,7 +89,7 @@ const SPEC_ROWS = [
 ];
 
 describe("PLAN-9 sending the shopping list", () => {
-  it("makes a link from the stored plan: its code, the app's path for it and when it stops working (server time, X-12)", async () => {
+  it("makes a link: its code, the app's path for it and when it stops working (server time, X-12)", async () => {
     const { app, recipes, sharedLists } = await sharedListApp();
     await seedSpecExample(recipes);
 
@@ -101,9 +101,8 @@ describe("PLAN-9 sending the shopping list", () => {
     expect(link.path).toBe(`/list/${link.token}`);
     expect(link.expiresAt).toBe("2026-11-14T09:00:00.000Z");
     expect(res.headers["cache-control"]).toBe("private, no-store");
-    const [stored] = sharedLists.snapshots();
-    expect(stored?.id).toBe(link.token);
-    expect(stored?.createdAt).toBe(SENT_AT);
+    // Only the code and when it was made: nothing of the list (PLAN-9).
+    expect(sharedLists.documentsStored()).toEqual([{ id: link.token, createdAt: SENT_AT }]);
   });
 
   it("spec example: anyone with the link sees the same items in the same order, each with its recipe's name", async () => {
@@ -124,48 +123,103 @@ describe("PLAN-9 sending the shopping list", () => {
     });
   });
 
-  it("is the list as it was when sent: later changes to the plan and the recipes don't change it", async () => {
-    const { app, recipes, clock } = await sharedListApp();
-    const { shakshuka, chili } = await seedSpecExample(recipes);
-    const link = await sendLink(app);
-    const before = await opened(app, link.token);
+});
 
-    clock.set("2026-11-08T10:00:00.000Z");
-    await change(app, "PUT", `/recipes/${chili.id.value}/content`, { name: "Texas Chili", ingredients: ["2 kg beef"], steps: ["Cook."] });
-    await change(app, "POST", `/recipes/${shakshuka.id.value}/cookings`);
-    await change(app, "DELETE", `/recipes/${chili.id.value}`);
+describe("PLAN-9 a link shows the current shopping list", () => {
+  async function linked() {
+    const t = await sharedListApp();
+    const recipes = await seedSpecExample(t.recipes);
+    const link = await sendLink(t.app);
+    t.clock.set("2026-11-08T10:00:00.000Z");
+    return { ...t, ...recipes, link };
+  }
+
+  it("shows a recipe added to the plan after the link was sent", async () => {
+    const { app, recipes, link } = await linked();
     const stew = await seed(recipes, content("Stew", { ingredients: ["beef"] }));
     await change(app, "POST", `/recipes/${stew.id.value}/add-to-plan`);
-
-    expect(await opened(app, link.token)).toEqual(before);
-    expect(rows(before)).toEqual(SPEC_ROWS);
+    expect(rows(await opened(app, link.token))).toEqual([...SPEC_ROWS, ["beef", "Stew"]]);
   });
 
-  it("makes a new link on each Send; an earlier link keeps working with the list it was sent with", async () => {
-    const { app, recipes, clock } = await sharedListApp();
-    const { chili } = await seedSpecExample(recipes);
-    const first = await sendLink(app);
-    clock.set("2026-11-08T09:00:00.000Z");
+  it("leaves out a recipe taken off the plan after the link was sent", async () => {
+    const { app, chili, link } = await linked();
     await change(app, "POST", `/recipes/${chili.id.value}/remove-from-plan`);
-
-    const second = await sendLink(app);
-
-    expect(second.token).not.toBe(first.token);
-    expect(second.expiresAt).toBe("2026-11-15T09:00:00.000Z");
-    expect(rows(await opened(app, first.token))).toEqual(SPEC_ROWS);
-    expect(rows(await opened(app, second.token))).toEqual([
+    expect(rows(await opened(app, link.token))).toEqual([
       ["1 can tomatoes", "Shakshuka"],
       ["6 eggs", "Shakshuka"],
     ]);
   });
 
+  it("shows an ingredient edited after the link was sent, and a new recipe name", async () => {
+    const { app, chili, link } = await linked();
+    await change(app, "PUT", `/recipes/${chili.id.value}/content`, {
+      name: "Texas Chili",
+      ingredients: ["1 can tomatoes", "1 kg beef mince"],
+      steps: ["Cook."],
+    });
+    expect(rows(await opened(app, link.token))).toEqual([
+      ["1 can tomatoes", "Shakshuka"],
+      ["1 can tomatoes", "Texas Chili"],
+      ["1 kg beef mince", "Texas Chili"],
+      ["6 eggs", "Shakshuka"],
+    ]);
+  });
+
+  it("drops a recipe's lines once it is cooked (PLAN-5) or deleted (REC-6)", async () => {
+    const { app, shakshuka, chili, link } = await linked();
+    await change(app, "POST", `/recipes/${shakshuka.id.value}/cookings`);
+    expect(rows(await opened(app, link.token))).toEqual([
+      ["1 can tomatoes", "Chili"],
+      ["500 g beef mince", "Chili"],
+    ]);
+    await change(app, "DELETE", `/recipes/${chili.id.value}`);
+    expect((await opened(app, link.token)).items).toEqual([]);
+  });
+
+  it("is still there, with no items, when the plan becomes empty", async () => {
+    const { app, shakshuka, chili, link } = await linked();
+    await change(app, "POST", `/recipes/${shakshuka.id.value}/remove-from-plan`);
+    await change(app, "POST", `/recipes/${chili.id.value}/remove-from-plan`);
+    const res = await open(app, link.token);
+    expect(res.statusCode, res.body).toBe(200);
+    expect(SharedShoppingList.parse(res.json())).toEqual({ items: [], expiresAt: "2026-11-14T09:00:00.000Z" });
+  });
+
+  it("is the same list as the editor's shopping list (PLAN-8)", async () => {
+    const { app, link } = await linked();
+    const editors = await get(app, "/plan/shopping-list", AS_EDITOR);
+    expect((await opened(app, link.token)).items).toEqual(editors.json());
+  });
+
+  it("makes a new link on each Send; every link shows the same current list until its own 7 days are up", async () => {
+    const { app, chili, link: first, clock } = await linked();
+    const second = await sendLink(app);
+    expect(second.token).not.toBe(first.token);
+    expect(second.expiresAt).toBe("2026-11-15T10:00:00.000Z");
+
+    await change(app, "POST", `/recipes/${chili.id.value}/remove-from-plan`);
+    const firstList = await opened(app, first.token);
+    const secondList = await opened(app, second.token);
+    expect(firstList.items).toEqual(secondList.items);
+    expect(rows(firstList)).toEqual([
+      ["1 can tomatoes", "Shakshuka"],
+      ["6 eggs", "Shakshuka"],
+    ]);
+
+    clock.set("2026-11-14T09:00:00.000Z");
+    expect((await open(app, first.token)).statusCode).toBe(404);
+    expect(rows(await opened(app, second.token))).toEqual(rows(secondList));
+  });
+});
+
+describe("PLAN-9 sending the shopping list: refusals", () => {
   it("refuses when the plan is empty, since there is nothing to send, and stores nothing", async () => {
     const { app, recipes, sharedLists } = await sharedListApp();
     await seed(recipes, content("Not planned"));
     await seed(recipes, content("Trashed"), { toMakeAt: "2026-09-01T08:00:00.000Z", deletedAt: "2026-09-02T08:00:00.000Z" });
 
     expectErrors(await send(app), 409, ["shoppingList.empty"]);
-    expect(sharedLists.snapshots()).toEqual([]);
+    expect(sharedLists.documentsStored()).toEqual([]);
   });
 
   it.each([
@@ -177,7 +231,7 @@ describe("PLAN-9 sending the shopping list", () => {
     await seedSpecExample(recipes);
     const res = await send(app, AS_EDITOR, payload);
     expect(res.statusCode, res.body).toBe(400);
-    expect(sharedLists.snapshots()).toEqual([]);
+    expect(sharedLists.documentsStored()).toEqual([]);
   });
 
   it("is refused without a JSON body (CSRF, docs/architecture.md)", async () => {
@@ -190,7 +244,7 @@ describe("PLAN-9 sending the shopping list", () => {
       payload: "",
     });
     expect(res.statusCode).toBe(415);
-    expect(sharedLists.snapshots()).toEqual([]);
+    expect(sharedLists.documentsStored()).toEqual([]);
   });
 
   it("changes no recipe", async () => {
@@ -214,7 +268,7 @@ describe("X-6 only editors can send the shopping list (PLAN-9)", () => {
 
     expectErrors(res, status, [code]);
     expect(res.body).not.toContain("tomatoes");
-    expect(sharedLists.snapshots()).toEqual([]);
+    expect(sharedLists.documentsStored()).toEqual([]);
     expect(newShareToken).not.toHaveBeenCalled();
   });
 });
@@ -322,10 +376,10 @@ describe("PLAN-9 opening a link", () => {
     await seedSpecExample(recipes);
     const link = await sendLink(app);
     const recipesBefore = await storedSnapshots(recipes);
-    const listsBefore = sharedLists.snapshots();
+    const listsBefore = sharedLists.documentsStored();
     await open(app, link.token);
     expect(await storedSnapshots(recipes)).toEqual(recipesBefore);
-    expect(sharedLists.snapshots()).toEqual(listsBefore);
+    expect(sharedLists.documentsStored()).toEqual(listsBefore);
   });
 });
 

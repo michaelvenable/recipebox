@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
-import { Instant, Recipe, RecipeId, type Result, SharedShoppingList, shoppingList } from "@recipebox/domain";
+import { Instant, Recipe, RecipeId, type Result, ShoppingListLink, shoppingList } from "@recipebox/domain";
 import { randomShareToken } from "../../src/clock.js";
 import type { SharedListRepository } from "../../src/shopping-lists/shared-list-repository.js";
 
@@ -16,44 +16,44 @@ export function sharedListRepositoryContract(name: string, createRepository: () 
       repository = await createRepository();
     });
 
-    it("returns a stored list with the same snapshot", async () => {
-      const list = sentList();
-      await repository.add(list);
-      expect((await repository.get(list.token))?.toSnapshot()).toEqual(list.toSnapshot());
+    it("returns a stored link with the same snapshot", async () => {
+      const link = madeLink();
+      await repository.add(link);
+      expect((await repository.get(link.token))?.toSnapshot()).toEqual(link.toSnapshot());
     });
 
     it("returns undefined for an unknown token", async () => {
-      await repository.add(sentList());
+      await repository.add(madeLink());
       expect(await repository.get(randomShareToken())).toBeUndefined();
     });
 
-    it("never replaces a stored list: the same token again throws and the first list stays", async () => {
-      const list = sentList();
-      await repository.add(list);
-      const other = valueOf(SharedShoppingList.create(list.token, items("Other"), at("2026-11-08T09:00:00Z")));
+    it("never replaces a stored link: the same token again throws and the first link stays", async () => {
+      const link = madeLink("2026-11-07T09:00:00Z");
+      await repository.add(link);
+      const other = valueOf(ShoppingListLink.create(link.token, planItems(), at("2026-11-08T09:00:00Z")));
       await expect(repository.add(other)).rejects.toThrow();
-      expect((await repository.get(list.token))?.toSnapshot()).toEqual(list.toSnapshot());
+      expect((await repository.get(link.token))?.createdAt.toIso()).toBe("2026-11-07T09:00:00.000Z");
     });
 
-    it("keeps lists apart by token", async () => {
-      const a = sentList("A");
-      const b = sentList("B");
+    it("keeps links apart by token", async () => {
+      const a = madeLink("2026-11-07T09:00:00Z");
+      const b = madeLink("2026-11-08T10:00:00Z");
       await repository.add(a);
       await repository.add(b);
-      expect((await repository.get(a.token))?.items[0]?.recipeName.value).toBe("A");
-      expect((await repository.get(b.token))?.items[0]?.recipeName.value).toBe("B");
+      expect((await repository.get(a.token))?.createdAt.toIso()).toBe("2026-11-07T09:00:00.000Z");
+      expect((await repository.get(b.token))?.createdAt.toIso()).toBe("2026-11-08T10:00:00.000Z");
     });
   });
 }
 
-/** A list sent on 2026-11-07 at 09:00 with one planned recipe's two ingredients. */
-export function sentList(recipeName = "Shakshuka"): SharedShoppingList {
-  return valueOf(SharedShoppingList.create(randomShareToken(), items(recipeName), at("2026-11-07T09:00:00Z")));
+/** A link made at `iso` while one recipe is on the plan. */
+export function madeLink(iso = "2026-11-07T09:00:00Z"): ShoppingListLink {
+  return valueOf(ShoppingListLink.create(randomShareToken(), planItems(), at(iso)));
 }
 
-function items(recipeName: string) {
+function planItems() {
   const id = valueOf(RecipeId.create(randomUUID()));
-  const recipe = valueOf(Recipe.create(id, { name: recipeName, ingredients: ["6 eggs", "1 can tomatoes"], steps: ["Cook."] }));
+  const recipe = valueOf(Recipe.create(id, { name: "Shakshuka", ingredients: ["6 eggs", "1 can tomatoes"], steps: ["Cook."] }));
   valueOf(recipe.addToMakeList(at("2026-11-01T09:00:00Z")));
   return shoppingList([recipe]);
 }

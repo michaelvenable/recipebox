@@ -108,7 +108,7 @@ async function copyText(text: string): Promise<Delivery> {
 }
 
 /**
- * The heading, the count and "Send" (PLAN-9). Send asks the server for a new link to the list as it is now, then offers it
+ * The heading, the count and "Send" (PLAN-9). Send asks the server for a new link to the live list, then offers it
  * through the device's share function, or copies it where there is none. Either way the link and the date it stops working
  * stay on screen, with "Copy link". Each Send makes a new link; earlier ones keep working.
  */

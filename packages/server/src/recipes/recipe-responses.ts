@@ -2,7 +2,7 @@
 // public/editor split (X-1) is decided here: the public builders read nothing private, and the editor builders add it.
 import type {
   Recipe,
-  SharedShoppingList as DomainSharedShoppingList,
+  ShoppingListLink,
   ShoppingItem as DomainShoppingItem,
 } from "@recipebox/domain";
 import type {
@@ -105,22 +105,19 @@ export function toRediscoverEntry(recipe: Recipe): RediscoverEntry {
   return { ...toRecipeSummary(recipe), lastCookedAt: recipe.lastCookedAt?.toIso() };
 }
 
-/** One line of the shopping list (PLAN-8): the ingredient as entered and its recipe. Editor-only (X-1). */
+/**
+ * One line of the shopping list (PLAN-8): the ingredient as entered, its recipe's id and name. For editors, and for anyone
+ * with a shopping list link (PLAN-9); nothing in it is private (X-1).
+ */
 export function toShoppingItem(item: DomainShoppingItem): ShoppingItem {
   return { text: item.ingredient.value, recipeId: item.recipe.id.value, recipeName: item.recipe.content.name.value };
 }
 
 /**
- * A sent shopping list (PLAN-9), for anyone with its link: the lines as they were when sent and when the link stops working.
- * The one public view of the to-make list (X-1), so it is built from the stored copy alone: not when it was made, nor its token.
+ * A shopping list link's page (PLAN-9), for anyone with the link: the current shopping list (`shoppingList`, PLAN-8), each line
+ * with its recipe's name, and when the link stops working. The one public view of the to-make list (X-1): no to-make dates,
+ * no creation time, no code.
  */
-export function toSharedShoppingList(list: DomainSharedShoppingList): SharedShoppingList {
-  return {
-    items: list.items.map((line) => ({
-      text: line.text.value,
-      recipeId: line.recipeId.value,
-      recipeName: line.recipeName.value,
-    })),
-    expiresAt: list.expiresAt.toIso(),
-  };
+export function toSharedShoppingList(items: readonly DomainShoppingItem[], link: ShoppingListLink): SharedShoppingList {
+  return { items: items.map(toShoppingItem), expiresAt: link.expiresAt.toIso() };
 }

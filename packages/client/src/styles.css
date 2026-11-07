@@ -1136,6 +1136,22 @@ button.pill-button:disabled {
   font-size: 14px;
 }
 
+/* A shopping list link while the plan is empty (PLAN-9). */
+.shared-list-empty {
+  margin: 0;
+  padding: 24px 16px;
+  font-size: 17px;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* A shopping list link whose last reload failed (PLAN-9): the list stays, with this note under the heading. */
+.list-page-header .shared-list-stale {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--danger);
+}
+
 /* "This link works until …" under the count on a sent list (docs/mockups/SharedList.dc.html). */
 .list-page-header .shared-list-until {
   margin-top: 4px;

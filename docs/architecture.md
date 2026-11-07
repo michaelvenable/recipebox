@@ -89,8 +89,8 @@ in `packages/shared`:
 Rules:
 - Visitors only ever receive `PublicRecipe`. A recipe in the trash is "not found" for visitors, and so is its photo.
 - Editor-only endpoints (to-make list, rediscovery view, trash) refuse visitors.
-- The one exception is a sent shopping list (PLAN-9): anyone with its link gets `SharedShoppingList`, a copy of the shopping
-  list's lines and the date the link stops working, and nothing else (see "Sent shopping lists").
+- The one exception is a shopping list link (PLAN-9): anyone with it gets `SharedShoppingList`, the current shopping list's
+  lines and the date the link stops working, and nothing else (see "Sent shopping lists").
 - Tests check every visitor-facing endpoint for the absence of private fields. This is a likely place for a leak, so reviewers
   should check it on every change that touches responses.
 
@@ -226,23 +226,29 @@ Safety rules for the job, because it deletes data permanently:
 
 ## Sent shopping lists
 
-PLAN-9 lets an editor send the shopping list as a link that works for 7 days without signing in.
+PLAN-9 lets an editor send the shopping list as a link that works for 7 days without signing in. The link is live: it shows
+the current shopping list, so only the link itself is stored.
 
 - `POST /plan/shopping-list/shares` follows "How a change is applied": editor check, the stored recipes, one domain call
-  (`SharedShoppingList.create`) with the server's time and a code the server makes (`crypto.randomBytes`, 128 bits, base64url),
-  then the snapshot is saved. The body must be `{}`, so the client can't supply the list, the code or a time.
-- Each list is one document in the `shopping-lists` container, partitioned by `/id` (the code). It is written once, with
-  `create`, so a list is never replaced.
+  (`ShoppingListLink.create`, which refuses an empty plan) with the server's time and a code the server makes
+  (`crypto.randomBytes`, 128 bits, base64url), then the snapshot is saved. The body must be `{}`, so the client can't supply
+  the code or a time.
+- Each link is one document in the `shopping-lists` container, partitioned by `/id` (the code): `{ id, createdAt, ttl }` and
+  nothing of the list. It is written once, with `create`, so a link is never replaced.
 - Removal: the container has Cosmos DB time to live switched on with no default (`defaultTtl: -1`), and each document carries
-  `ttl` = its 7 days plus one hour, counted from the write, which is when the list was made. Cosmos DB stops returning it at
+  `ttl` = its 7 days plus one hour, counted from the write, which is when the link was made. Cosmos DB stops returning it at
   that point and deletes it in the background, within a day after the link stops working. Until then the domain
   (`isAvailable`, by the server's clock) already refuses it, so the margin only guards against the database's clock running a
   little ahead. The trash cleanup job is not involved.
-- `GET /shopping-lists/{token}` needs no sign-in and answers everyone alike. An expired, unknown or malformed code gets the same
-  404. The answer has `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
+- `GET /shopping-lists/{token}` needs no sign-in and answers everyone alike. It reads the link, checks `isAvailable` by the
+  server's clock, then builds the list with `shoppingList` from the stored recipes, as `GET /plan/shopping-list` does; an empty
+  plan gives an empty list. An expired, unknown or malformed code gets the same 404. The answer has `Cache-Control: no-store`
+  and `Referrer-Policy: no-referrer`.
 - The code is the only key, so it is kept out of logs: the API's request log writes the path as `/shopping-lists/[redacted]`
   (`http/request-log.ts`). The client's page for it, `/list/{token}`, is served by Static Web Apps with
-  `Referrer-Policy: no-referrer` (`staticwebapp.config.json`).
+  `Referrer-Policy: no-referrer` (`staticwebapp.config.json`). That page loads the list again when the person comes back to
+  it (window focus or the tab becoming visible) and on reload. A 404 then shows the expired page in place of the list; any
+  other failed reload keeps the last list and its ticks, with a note that it couldn't be refreshed.
 - Locally the container is created on first run like the recipes container (`openStorage`); deployed, it comes from
   `infra/main.bicep` and its name from `COSMOS_SHOPPING_LIST_CONTAINER`. It shares the database's free throughput.
 

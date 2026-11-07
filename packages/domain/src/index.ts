@@ -21,9 +21,8 @@ export {
 } from "./finding.js";
 export { orderForRediscovery } from "./rediscovery.js";
 export {
-  SharedShoppingList,
+  ShoppingListLink,
   ShareToken,
-  SHARED_LIST_DAYS,
-  type SharedShoppingLine,
-  type SharedShoppingListSnapshot,
-} from "./shared-shopping-list.js";
+  LINK_DAYS,
+  type ShoppingListLinkSnapshot,
+} from "./shopping-list-link.js";

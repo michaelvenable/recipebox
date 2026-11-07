@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Me, SharedShoppingList, ShoppingItem, ShoppingListLink } from "@recipebox/shared";
@@ -282,7 +282,7 @@ describe("PLAN-9 sending the shopping list", () => {
   });
 });
 
-describe("PLAN-9 opening a sent shopping list", () => {
+describe("PLAN-9 opening a shopping list link", () => {
   function mockListServer(me: Me, answer: () => Response = () => jsonResponse(200, { items: ITEMS, expiresAt: EXPIRES } satisfies SharedShoppingList)) {
     return mockApi(me, (url, init) => {
       if ((init.method ?? "GET") === "GET" && url.pathname === `/shopping-lists/${TOKEN}`) return answer();
@@ -290,7 +290,7 @@ describe("PLAN-9 opening a sent shopping list", () => {
     });
   }
 
-  it("spec example: shows anyone the list as sent, in the same order with recipe names, and the date it stops working", async () => {
+  it("spec example: shows anyone the current list in the server's order with recipe names, and the date it stops working", async () => {
     const fetchMock = mockListServer(VISITOR);
     renderAt(`/list/${TOKEN}`);
 
@@ -371,6 +371,134 @@ describe("PLAN-9 opening a sent shopping list", () => {
     mockApi(VISITOR, () => new Promise<Response>(() => {}));
     renderAt(`/list/${TOKEN}`);
     expect(await screen.findByText("Loading the shopping list…")).toBeInTheDocument();
+  });
+});
+
+describe("PLAN-9 a shopping list link is live", () => {
+  /** The server's current list for the link; tests change it between loads. */
+  let current: ShoppingItem[];
+  /** How the next load fails instead, if it does: the link has expired (404), or the request never reaches the server. */
+  let failure: "expired" | "network" | undefined;
+
+  async function openLive(items: ShoppingItem[] = ITEMS) {
+    current = items;
+    failure = undefined;
+    const fetchMock = mockApi(VISITOR, (url) => {
+      if (url.pathname !== `/shopping-lists/${TOKEN}`) return undefined;
+      if (failure === "expired") return jsonResponse(404, { errors: [{ code: "sharedList.notFound", message: "Gone." }] });
+      if (failure === "network") return Promise.reject(new TypeError("Failed to fetch"));
+      return jsonResponse(200, { items: current, expiresAt: EXPIRES });
+    });
+    renderAt(`/list/${TOKEN}`);
+    await screen.findByRole("heading", { level: 1, name: "Shopping list" });
+    return fetchMock;
+  }
+
+  function loads(fetchMock: FetchMock): number {
+    return fetchMock.mock.calls.filter(([input]) => new URL(String(input)).pathname === `/shopping-lists/${TOKEN}`).length;
+  }
+
+  /** The person comes back to the page: the tab becomes visible again. */
+  async function comeBack(fetchMock: FetchMock) {
+    const before = loads(fetchMock);
+    act(() => {
+      window.dispatchEvent(new Event("visibilitychange"));
+    });
+    await waitFor(() => expect(loads(fetchMock)).toBe(before + 1));
+  }
+
+  const BEEF: ShoppingItem = { text: "1 kg beef", recipeId: "0b6a3c2e-0000-4000-8000-000000000023", recipeName: "Beef Stew" };
+
+  it("loads the list again when the person comes back, bringing in a line added meanwhile", async () => {
+    const fetchMock = await openLive();
+    await screen.findByRole("list", { name: "Shopping list" });
+    current = [BEEF, ...ITEMS];
+
+    await comeBack(fetchMock);
+
+    await waitFor(() => expect(lines()).toEqual([["1 kg beef", "Beef Stew"], ...ROWS]));
+    expect(screen.getByText("5 items from 3 recipes")).toBeInTheDocument();
+  });
+
+  it("keeps a tick on its line while that line is still on the list, even with lines added around it", async () => {
+    const user = userEvent.setup();
+    const fetchMock = await openLive();
+    await user.click(await screen.findByRole("checkbox", { name: "1 can tomatoes, Shakshuka" }));
+    current = [BEEF, ...ITEMS.filter((i) => i.recipeId !== CHILI_ID)];
+
+    await comeBack(fetchMock);
+
+    await waitFor(() => expect(lines()).toHaveLength(3));
+    expect(screen.getByRole("checkbox", { name: "1 can tomatoes, Shakshuka" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "1 kg beef, Beef Stew" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "6 eggs, Shakshuka" })).not.toBeChecked();
+  });
+
+  it("drops a tick when its line leaves the list, so the line comes back unticked", async () => {
+    const user = userEvent.setup();
+    const fetchMock = await openLive();
+    await user.click(await screen.findByRole("checkbox", { name: "6 eggs, Shakshuka" }));
+    current = ITEMS.filter((i) => i.recipeId !== SHAKSHUKA_ID);
+
+    await comeBack(fetchMock);
+    await waitFor(() => expect(screen.queryByRole("checkbox", { name: "6 eggs, Shakshuka" })).not.toBeInTheDocument());
+
+    current = ITEMS;
+    await comeBack(fetchMock);
+    expect(await screen.findByRole("checkbox", { name: "6 eggs, Shakshuka" })).not.toBeChecked();
+    expect(screen.getAllByRole("checkbox").filter((box) => (box as HTMLInputElement).checked)).toHaveLength(0);
+  });
+
+  it("shows the expired page, without the old list, when the link has expired by the time the person comes back", async () => {
+    const user = userEvent.setup();
+    const fetchMock = await openLive();
+    await user.click(await screen.findByRole("checkbox", { name: "6 eggs, Shakshuka" }));
+    failure = "expired";
+
+    await comeBack(fetchMock);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "This link has expired" })).toBeInTheDocument();
+    expect(screen.getByText("Shopping list links work for 7 days. Ask for a new one.")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Shopping list" })).not.toBeInTheDocument();
+    expect(screen.queryByText("6 eggs")).not.toBeInTheDocument();
+    expect(screen.queryByText(/This link works until/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the list and its ticks when a reload fails for another reason, with a short note", async () => {
+    const user = userEvent.setup();
+    const fetchMock = await openLive();
+    await user.click(await screen.findByRole("checkbox", { name: "6 eggs, Shakshuka" }));
+    failure = "network";
+
+    await comeBack(fetchMock);
+
+    expect(await screen.findByText("Couldn't refresh the list, so it may be out of date. Check the connection.")).toBeInTheDocument();
+    expect(lines()).toEqual(ROWS);
+    expect(screen.getByRole("checkbox", { name: "6 eggs, Shakshuka" })).toBeChecked();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText("This link has expired")).not.toBeInTheDocument();
+
+    // The next successful reload clears the note.
+    failure = undefined;
+    await comeBack(fetchMock);
+    await waitFor(() => expect(screen.queryByText(/Couldn't refresh the list/)).not.toBeInTheDocument());
+    expect(screen.getByRole("checkbox", { name: "6 eggs, Shakshuka" })).toBeChecked();
+  });
+
+  it("says there is nothing to shop for right now when the plan is empty, and shows items when they come", async () => {
+    const fetchMock = await openLive([]);
+    expect(await screen.findByText("Nothing to shop for right now.")).toBeInTheDocument();
+    expect(screen.getByText("This link works until Sat, Nov 14.")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Shopping list" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/items? from/)).not.toBeInTheDocument();
+    expect(screen.queryByText("This link has expired")).not.toBeInTheDocument();
+
+    current = ITEMS;
+    await comeBack(fetchMock);
+
+    await screen.findByRole("list", { name: "Shopping list" });
+    expect(lines()).toEqual(ROWS);
+    expect(screen.queryByText("Nothing to shop for right now.")).not.toBeInTheDocument();
   });
 });
 

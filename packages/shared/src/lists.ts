@@ -52,8 +52,9 @@ export const ShoppingListLink = z.strictObject({
 export type ShoppingListLink = z.infer<typeof ShoppingListLink>;
 
 /**
- * GET /shopping-lists/{token} returns SharedShoppingList (PLAN-9), to anyone with the link: the shopping list as it was when
- * sent, in the same order, and when the link stops working. Nothing else; in particular no to-make dates (X-1).
+ * GET /shopping-lists/{token} returns SharedShoppingList (PLAN-9), to anyone with the link: the current shopping list (as GET
+ * /plan/shopping-list, PLAN-8; empty when the plan is) and when the link stops working. Nothing else; in particular no to-make
+ * dates (X-1).
  */
 export const SharedShoppingList = z.strictObject({
   items: ShoppingItem.array(),

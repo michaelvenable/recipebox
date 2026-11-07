@@ -1,4 +1,4 @@
-import { SharedShoppingList, type SharedShoppingListSnapshot, type ShareToken } from "@recipebox/domain";
+import { ShoppingListLink, type ShoppingListLinkSnapshot, type ShareToken } from "@recipebox/domain";
 import type { SharedListRepository } from "./shared-list-repository.js";
 
 /**
@@ -8,19 +8,19 @@ import type { SharedListRepository } from "./shared-list-repository.js";
 export class InMemorySharedListRepository implements SharedListRepository {
   private readonly documents = new Map<string, string>();
 
-  async add(list: SharedShoppingList): Promise<void> {
-    const snapshot = list.toSnapshot();
-    if (this.documents.has(snapshot.id)) throw new Error("A shared shopping list with this token is already stored");
+  async add(link: ShoppingListLink): Promise<void> {
+    const snapshot = link.toSnapshot();
+    if (this.documents.has(snapshot.id)) throw new Error("A shopping list link with this token is already stored");
     this.documents.set(snapshot.id, JSON.stringify(snapshot));
   }
 
-  async get(token: ShareToken): Promise<SharedShoppingList | undefined> {
+  async get(token: ShareToken): Promise<ShoppingListLink | undefined> {
     const json = this.documents.get(token.value);
-    return json === undefined ? undefined : SharedShoppingList.fromSnapshot(JSON.parse(json) as SharedShoppingListSnapshot);
+    return json === undefined ? undefined : ShoppingListLink.fromSnapshot(JSON.parse(json) as ShoppingListLinkSnapshot);
   }
 
-  /** Every stored snapshot, for tests that check what was stored. */
-  snapshots(): SharedShoppingListSnapshot[] {
-    return [...this.documents.values()].map((json) => JSON.parse(json) as SharedShoppingListSnapshot);
+  /** Every stored document, for tests that check what was stored. */
+  documentsStored(): Record<string, unknown>[] {
+    return [...this.documents.values()].map((json) => JSON.parse(json) as Record<string, unknown>);
   }
 }

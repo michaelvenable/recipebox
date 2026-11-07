@@ -10,7 +10,7 @@ import {
   sharedListDocument,
 } from "../../src/shopping-lists/cosmos-shared-list-repository.js";
 import { emulatorCosmosConfig } from "../emulator.js";
-import { sentList, sharedListRepositoryContract } from "./shared-list-repository-contract.js";
+import { madeLink, sharedListRepositoryContract } from "./shared-list-repository-contract.js";
 
 // Needs the Cosmos DB emulator: `npm run services:up`. Each run uses its own container and deletes it afterwards.
 // Always the emulator, whatever COSMOS_* says; emulatorCosmosConfig() throws before connecting to anything else.
@@ -40,15 +40,15 @@ describe("PLAN-9 CosmosSharedListRepository: removed within a day after expiry",
     expect(resource?.partitionKey?.paths).toEqual(["/id"]);
   });
 
-  it("stores exactly the snapshot plus its time to live", async () => {
-    const list = sentList();
-    await new CosmosSharedListRepository(container).add(list);
+  it("stores only the code, when it was made and the time to live", async () => {
+    const link = madeLink();
+    await new CosmosSharedListRepository(container).add(link);
 
-    const { resource } = await container.item(list.token.value, list.token.value).read<SharedListDocument>();
+    const { resource } = await container.item(link.token.value, link.token.value).read<SharedListDocument>();
 
     expect(resource).toBeDefined();
     const { _rid, _self, _etag, _attachments, _ts, ...stored } = resource as unknown as SharedListDocument & Record<string, unknown>;
-    expect(stored).toStrictEqual(sharedListDocument(list));
+    expect(stored).toStrictEqual(sharedListDocument(link));
   });
 });
 

@@ -63,8 +63,8 @@ export const trashKeys = {
 };
 
 /**
- * GET /shopping-lists/{token}, a sent list (PLAN-9). It never changes once sent, and is the same for every caller, so nothing
- * invalidates it; it only stops being available after 7 days.
+ * GET /shopping-lists/{token}, a shopping list link's page (PLAN-9): the current shopping list, the same for every caller. The
+ * page reloads it when the person comes back to it (SharedListPage), so no change here invalidates it.
  */
 export const sharedListKeys = {
   detail: (token: string) => ["sharedList", token] as const,

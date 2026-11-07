@@ -171,28 +171,28 @@ function shoppingList(recipes: readonly Recipe[]): { ingredient: TextEntry; reci
 - `suggestTags` returns tags in use on other recipes that contain the typed text, ignoring case, alphabetically. Tags `forRecipe`
   already has are left out (REC-12). With `forRecipe` undefined (a recipe not yet created), only the typed text matters.
 
-### Sent shopping list
+### Shopping list link
 
 ```ts
-class SharedShoppingList {
-  static create(token: ShareToken, items: readonly ShoppingItem[], at: Instant): Result<SharedShoppingList>;  // PLAN-9
+class ShoppingListLink {
+  static create(token: ShareToken, items: readonly ShoppingItem[], at: Instant): Result<ShoppingListLink>;  // PLAN-9
   get token(): ShareToken;
-  get items(): readonly { text: TextEntry; recipeId: RecipeId; recipeName: RecipeName }[];
   get createdAt(): Instant;
   get expiresAt(): Instant;            // createdAt + 7 days
   isAvailable(now: Instant): boolean;  // now < expiresAt
-  toSnapshot(): SharedShoppingListSnapshot;
-  static fromSnapshot(s: SharedShoppingListSnapshot): SharedShoppingList;
+  toSnapshot(): ShoppingListLinkSnapshot;
+  static fromSnapshot(s: ShoppingListLinkSnapshot): ShoppingListLink;
 }
 ```
 
-- `create` copies the lines of `shoppingList` (PLAN-8) in their order: each line's text, recipe id and recipe name, and nothing
-  else, so later changes to the plan or the recipes don't change it and no to-make date or history is in it (X-1). It fails with
-  `shoppingList.empty` when there are no lines.
-- The 7 days are a domain rule (`SHARED_LIST_DAYS`). `isAvailable` is true while `now` is before `expiresAt` and false at or
+- A link is live: it holds no lines. Whoever opens it gets the current `shoppingList` (PLAN-8), built when the link is opened,
+  so changes to the plan or its recipes show up, and nothing private is in it (X-1).
+- `create` takes the shopping list at that moment only to refuse an empty one with `shoppingList.empty`: there is nothing to
+  send. It keeps none of it.
+- The 7 days are a domain rule (`LINK_DAYS`). `isAvailable` is true while `now` is before `expiresAt` and false at or
   after it; `now` is the server's clock (X-12). Example: made 2026-11-07 09:00, available at 2026-11-14 08:59, not at 09:00.
 - The domain has no randomness: the token is made by the server from a secure random source and passed in, like `RecipeId`.
-- `expiresAt` is derived from `createdAt`, never stored. Removing the list after it expires is the infrastructure's job
+- `expiresAt` is derived from `createdAt`, never stored. Removing the link after it expires is the infrastructure's job
   (docs/architecture.md, "Sent shopping lists").
 
 ### Rediscovery ordering
@@ -232,20 +232,20 @@ interface RecipeSnapshot {
 `fromSnapshot` re-validates through the same value objects and throws if the stored data is invalid. Bad data in the database is a
 bug, not user input. `schemaVersion` lets future changes migrate old documents.
 
-### Sent shopping list snapshot
+### Shopping list link snapshot
 
-Stored as its own Cosmos document, in the `shopping-lists` container.
+Stored as its own Cosmos document, in the `shopping-lists` container. PLAN-9: only the link's code and when it was made.
 
 ```ts
-interface SharedShoppingListSnapshot {
+interface ShoppingListLinkSnapshot {
   id: string;                     // the token
-  items: { text: string; recipeId: string; recipeName: string }[];  // in the order sent; at least one
   createdAt: string;              // ISO 8601 timestamp
-  schemaVersion: 1;
 }
 ```
 
-`fromSnapshot` re-validates in the same way as for a recipe and throws on invalid data, without the token in the message.
+`fromSnapshot` re-validates in the same way as for a recipe and throws on invalid data, including any other field, without the
+token in the message. There is no `schemaVersion`: nothing else is to be stored, and a later change can tell old documents
+by their fields.
 
 ## Boundaries: what is NOT in the domain
 
@@ -281,7 +281,7 @@ packages/domain/
     recipe.ts
     finding.ts        # findRecipes, tagsInUse, suggestTags, trashContents
     rediscovery.ts
-    shared-shopping-list.ts  # ShareToken, SharedShoppingList (PLAN-9)
+    shopping-list-link.ts  # ShareToken, ShoppingListLink (PLAN-9)
     index.ts          # public exports only
   test/
     *.test.ts         # describe blocks named by spec ID, e.g. describe("COOK-5 ...")

@@ -1,12 +1,13 @@
-// Sending the shopping list as a link (PLAN-9, docs/api.md): an editor makes the link, and anyone with it can read the list for
-// 7 days. The one exception to X-1's private to-make list.
+// Sending the shopping list as a link (PLAN-9, docs/api.md): an editor makes the link, and for 7 days anyone with it can read
+// the current shopping list. The one exception to X-1's private to-make list.
 //
 // Making a link follows docs/architecture.md, "How a change is applied", as far as it applies to something new: requireEditor
-// (X-6), read the stored recipes, build the list with the domain from them and the server's time (X-12) and a token made here,
-// then save the snapshot. Nothing from the request is stored: the body must be `{}`.
+// (X-6), read the stored recipes (only to refuse an empty plan), create the link with the domain from the server's time (X-12)
+// and a token made here, then save its snapshot: the code and the time, nothing of the list. Nothing from the request is
+// stored: the body must be `{}`.
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { SharedShoppingList, ShareToken, shoppingList } from "@recipebox/domain";
-import type { SharedShoppingList as SharedShoppingListResponse, ShoppingListLink } from "@recipebox/shared";
+import { ShareToken, ShoppingListLink, shoppingList } from "@recipebox/domain";
+import type { SharedShoppingList, ShoppingListLink as ShoppingListLinkResponse } from "@recipebox/shared";
 import type { Clock, ShareTokenGenerator } from "../clock.js";
 import { requireEditor } from "../http/caller.js";
 import type { RecipeRepository } from "../recipes/recipe-repository.js";
@@ -42,41 +43,43 @@ export function registerSharedListRoutes(
   app: FastifyInstance,
   { recipes, sharedLists, clock, newShareToken }: SharedListRouteDependencies,
 ): void {
-  // PLAN-9, X-6: editor-only. The list is the domain's shoppingList (PLAN-8) of the stored recipes, never one sent by the
-  // client, and the times are the server's (X-12). Each call makes a new link; earlier ones keep working.
+  // PLAN-9, X-6: editor-only. An empty plan, by the domain's shoppingList (PLAN-8) of the stored recipes, has nothing to send.
+  // The code and the time are the server's (X-12). Each call makes a new link; earlier ones keep working.
   app.post(
     "/plan/shopping-list/shares",
     { preHandler: requireEditor },
-    async (request, reply): Promise<ShoppingListLink | FastifyReply> => {
+    async (request, reply): Promise<ShoppingListLinkResponse | FastifyReply> => {
       reply.header("cache-control", "private, no-store");
       const refused = refuseUnlessEmpty(request.body, reply);
       if (refused !== undefined) return refused;
-      const created = SharedShoppingList.create(newShareToken(), shoppingList(await recipes.list()), clock());
+      const created = ShoppingListLink.create(newShareToken(), shoppingList(await recipes.list()), clock());
       // shoppingList.empty: the plan's state refuses it, as recipe states do (docs/api.md, 409).
       if (!created.ok) return sendErrors(reply, 409, created.errors);
-      const list = created.value;
-      await sharedLists.add(list);
-      const link: ShoppingListLink = {
-        token: list.token.value,
-        path: sharedListPath(list.token),
-        expiresAt: list.expiresAt.toIso(),
+      const link = created.value;
+      await sharedLists.add(link);
+      const body: ShoppingListLinkResponse = {
+        token: link.token.value,
+        path: sharedListPath(link.token),
+        expiresAt: link.expiresAt.toIso(),
       };
-      return reply.code(201).send(link);
+      return reply.code(201).send(body);
     },
   );
 
   // PLAN-9: public, signed in or not, and the same for everyone. Whether the link still works is the domain's, by the server's
-  // clock (X-12). The address is a password: no cache may keep the answer, and no page it leads to learns it.
+  // clock (X-12). The list is live: the same shoppingList (PLAN-8) as GET /plan/shopping-list, built from the stored recipes
+  // on every request, empty when the plan is. The address is a password: no cache may keep the answer, and no page it leads
+  // to learns it.
   app.get<{ Params: TokenParams }>(
     "/shopping-lists/:token",
-    async (request, reply): Promise<SharedShoppingListResponse | FastifyReply> => {
+    async (request, reply): Promise<SharedShoppingList | FastifyReply> => {
       reply.header("cache-control", "no-store");
       reply.header("referrer-policy", "no-referrer");
       const token = ShareToken.create(request.params.token);
       if (!token.ok) return sendLinkNotFound(reply);
-      const list = await sharedLists.get(token.value);
-      if (list === undefined || !list.isAvailable(clock())) return sendLinkNotFound(reply);
-      return toSharedShoppingList(list);
+      const link = await sharedLists.get(token.value);
+      if (link === undefined || !link.isAvailable(clock())) return sendLinkNotFound(reply);
+      return toSharedShoppingList(shoppingList(await recipes.list()), link);
     },
   );
 }
