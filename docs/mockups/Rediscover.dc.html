@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Haven't made in a while</title>
+<title>Recommendations</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -26,8 +26,7 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
     </a>
   </nav>
   <header style="padding: 18px 20px 12px">
-    <h1 style="margin: 0; font-size: 26px; font-weight: 700">Haven't made in a while</h1>
-    <p style="margin: 6px 0 0; font-size: 15px; color: #59615C">Least recently cooked first</p>
+    <h1 style="margin: 0; font-size: 26px; font-weight: 700">Recommendations</h1>
   </header>
   <ul style="flex: 1; list-style: none; margin: 0; padding: 0 20px; display: flex; flex-direction: column; gap: 10px; overflow: hidden">
     <sc-for list="{{items}}" as="r" hint-placeholder-count="6">
@@ -48,7 +47,7 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   navItems(cur) {
-    const pages = [['Recipes', 'ListEditor.dc.html'], ['Want to make', 'ToMake.dc.html'], ['Rediscover', 'Rediscover.dc.html'], ['Trash', 'Trash.dc.html']];
+    const pages = [['Catalog', 'ListEditor.dc.html'], ['Plan', 'ToMake.dc.html'], ['Recommendations', 'Rediscover.dc.html'], ['Trash', 'Trash.dc.html']];
     return pages.map(([label, href]) => {
       const on = label === cur;
       return { label, href, current: on ? 'page' : 'false', bg: on ? '#2E6A4F' : 'transparent', fg: on ? '#FFFFFF' : '#1D2420', fw: on ? '700' : '400' };
@@ -57,7 +56,7 @@ class Component extends DCLogic {
   renderVals() {
     const never = '#8A3A0C', old = '#1D2420', recent = '#59615C';
     return {
-      nav: this.navItems('Rediscover'), acctBg: '#F0F2EE', acctFg: '#1D2420',
+      nav: this.navItems('Recommendations'), acctBg: '#F0F2EE', acctFg: '#1D2420',
       items: [
         { name: 'Fish Tacos', last: 'Never cooked', ago: 'New', agoColor: never, tint: '#CFDCCB' },
         { name: 'Lemon Risotto', last: 'Never cooked', ago: 'New', agoColor: never, tint: '#E9E2B8' },

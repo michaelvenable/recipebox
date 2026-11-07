@@ -26,7 +26,7 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
     </a>
   </nav>
   <header style="display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 16px">
-    <h1 style="margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em">Recipes</h1>
+    <h1 style="margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em">Catalog</h1>
     <a href="EditForm.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 22px; background: #2E6A4F; color: #FFFFFF; font-size: 16px; font-weight: 700; text-decoration: none">Add recipe</a>
   </header>
   <ul style="flex: 1; list-style: none; margin: 0; padding: 0 20px; display: flex; flex-direction: column; gap: 10px; overflow: hidden">
@@ -49,7 +49,7 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   navItems(cur) {
-    const pages = [['Recipes', 'ListEditor.dc.html'], ['Want to make', 'ToMake.dc.html'], ['Rediscover', 'Rediscover.dc.html'], ['Trash', 'Trash.dc.html']];
+    const pages = [['Catalog', 'ListEditor.dc.html'], ['Plan', 'ToMake.dc.html'], ['Recommendations', 'Rediscover.dc.html'], ['Trash', 'Trash.dc.html']];
     return pages.map(([label, href]) => {
       const on = label === cur;
       return { label, href, current: on ? 'page' : 'false', bg: on ? '#2E6A4F' : 'transparent', fg: on ? '#FFFFFF' : '#1D2420', fw: on ? '700' : '400' };
@@ -57,7 +57,7 @@ class Component extends DCLogic {
   }
   renderVals() {
     return {
-      nav: this.navItems('Recipes'), acctBg: '#F0F2EE', acctFg: '#1D2420',
+      nav: this.navItems('Catalog'), acctBg: '#F0F2EE', acctFg: '#1D2420',
       recipes: [
         { name: 'Beef Stew', meta: '2 h 30 min · dinner, slow', tint: '#D9C7B4' },
         { name: 'Chicken Tikka Masala', meta: '50 min · curry, dinner', tint: '#E6C3A8' },

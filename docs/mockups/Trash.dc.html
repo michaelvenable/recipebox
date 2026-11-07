@@ -25,10 +25,9 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{acctFg}}" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg>
     </a>
   </nav>
-  <header style="padding: 18px 20px 10px">
+  <header style="padding: 18px 20px 12px">
     <h1 style="margin: 0; font-size: 26px; font-weight: 700">Trash</h1>
   </header>
-  <p style="margin: 0 20px 14px; font-size: 15px; line-height: 1.4; color: #59615C">Deleted recipes stay here for 30 days, then they're removed for good.</p>
   <ul style="flex: 1; list-style: none; margin: 0; padding: 0 20px; display: flex; flex-direction: column; gap: 10px; overflow: hidden">
     <sc-for list="{{items}}" as="r" hint-placeholder-count="3">
       <li style="display: flex; align-items: center; gap: 14px; padding: 10px; background: #FFFFFF; border-radius: 14px">
@@ -46,7 +45,7 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   navItems(cur) {
-    const pages = [['Recipes', 'ListEditor.dc.html'], ['Want to make', 'ToMake.dc.html'], ['Rediscover', 'Rediscover.dc.html'], ['Trash', 'Trash.dc.html']];
+    const pages = [['Catalog', 'ListEditor.dc.html'], ['Plan', 'ToMake.dc.html'], ['Recommendations', 'Rediscover.dc.html'], ['Trash', 'Trash.dc.html']];
     return pages.map(([label, href]) => {
       const on = label === cur;
       return { label, href, current: on ? 'page' : 'false', bg: on ? '#2E6A4F' : 'transparent', fg: on ? '#FFFFFF' : '#1D2420', fw: on ? '700' : '400' };

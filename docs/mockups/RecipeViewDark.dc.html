@@ -14,7 +14,7 @@ body{margin:0}
 a{color:#7FC4A0}a:hover{color:#A6DDBF}
 </style>
 </helmet>
-<div style="width: 390px; height: 844px; box-sizing: border-box; background: #141815; color: #ECEFEA; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+<div style="width: 390px; height: 1000px; box-sizing: border-box; background: #141815; color: #ECEFEA; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
   <nav aria-label="Main" style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #1E2420; border-bottom: 1px solid #2C332E">
     <div style="flex: 1; min-width: 0; display: flex; gap: 4px; overflow-x: auto">
       <sc-for list="{{nav}}" as="n" hint-placeholder-count="4">
@@ -26,14 +26,26 @@ a{color:#7FC4A0}a:hover{color:#A6DDBF}
     </a>
   </nav>
   <h1 style="margin: 0; padding: 18px 20px 0; font-size: 26px; font-weight: 700">Pad Thai</h1>
-  <p role="status" style="margin: 10px 20px 0; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #A9B3AC">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7FC4A0" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
-    Screen stays on while this recipe is open
-  </p>
   <main style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; overflow: hidden">
-    <h2 style="margin: 0; font-size: 22px; font-weight: 700">Steps</h2>
+    <h2 style="margin: 0; font-size: 22px; font-weight: 700">Prep</h2>
     <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px">
-      <sc-for list="{{steps}}" as="s" hint-placeholder-count="5">
+      <sc-for list="{{prep}}" as="s" hint-placeholder-count="3">
+        <li style="display: flex; gap: 8px; align-items: flex-start">
+          <button type="button" aria-pressed="{{s.pressed}}" aria-label="{{s.label}}" onClick="{{s.toggle}}" style="flex: none; width: 44px; height: 44px; margin-top: -4px; padding: 0; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer">
+            <span style="width: 34px; height: 34px; border-radius: 17px; box-sizing: border-box; background: {{s.bg}}; border: 2px solid #7FC4A0; color: #10241A; font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center">
+              <sc-if value="{{s.done}}" hint-placeholder-val="{{ false }}">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7FC4A0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>
+              </sc-if>
+              <sc-if value="{{s.todo}}" hint-placeholder-val="{{ true }}">{{s.n}}</sc-if>
+            </span>
+          </button>
+          <span style="font-size: 21px; line-height: 1.45; color: {{s.fg}}">{{s.text}}</span>
+        </li>
+      </sc-for>
+    </ol>
+    <h2 style="margin: 8px 0 0; font-size: 22px; font-weight: 700">Steps</h2>
+    <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px">
+      <sc-for list="{{steps}}" as="s" hint-placeholder-count="4">
         <li style="display: flex; gap: 8px; align-items: flex-start">
           <button type="button" aria-pressed="{{s.pressed}}" aria-label="{{s.label}}" onClick="{{s.toggle}}" style="flex: none; width: 44px; height: 44px; margin-top: -4px; padding: 0; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer">
             <span style="width: 34px; height: 34px; border-radius: 17px; box-sizing: border-box; background: {{s.bg}}; border: 2px solid #7FC4A0; color: #10241A; font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center">
@@ -49,38 +61,47 @@ a{color:#7FC4A0}a:hover{color:#A6DDBF}
     </ol>
   </main>
   <div style="padding: 14px 16px 22px; background: #1E2420; border-top: 1px solid #2C332E">
-    <button type="button" style="width: 100%; min-height: 56px; border: 0; border-radius: 14px; background: #7FC4A0; color: #10241A; font: inherit; font-size: 19px; font-weight: 700">I cooked this today</button>
+    <button type="button" style="width: 100%; min-height: 48px; border: 1px solid #3D4640; border-radius: 14px; background: #1E2420; color: #ECEFEA; font: inherit; font-size: 16px">I cooked this today</button>
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1000}}'>
 class Component extends DCLogic {
+  numbered(entries, done, noun, key) {
+    return entries.map((text, i) => ({
+      n: i + 1, text, done: !!done[i], todo: !done[i],
+      pressed: done[i] ? 'true' : 'false',
+      label: noun + ' ' + (i + 1) + ' done',
+      bg: done[i] ? 'transparent' : '#7FC4A0', fg: done[i] ? '#A9B3AC' : '#ECEFEA',
+      toggle: () => {
+        const next = done.slice();
+        next[i] = !next[i];
+        this.setState({ [key]: next });
+      }
+    }));
+  }
   renderVals() {
-    const steps = [
+    const prep = [
       'Soak the rice noodles in warm water for 25 minutes, then drain.',
-      'Stir the tamarind, fish sauce and sugar together until the sugar dissolves.',
+      'Chop the garlic and slice the shallot.',
+      'Stir the tamarind, fish sauce and sugar together until the sugar dissolves.'
+    ];
+    const steps = [
       'Fry the garlic and shallot in a hot wok for 30 seconds.',
       'Add the prawns and cook until pink. Push to one side and scramble the eggs.',
-      'Add the noodles and sauce; toss for 2 minutes until the noodles soften.'
+      'Add the noodles and sauce; toss for 2 minutes until the noodles soften.',
+      'Fold in the bean sprouts and spring onions. Serve with peanuts and lime.'
     ];
-    const stepDone = (this.state && this.state.stepDone) || steps.map((_, i) => i < 2);
-    const nav = [['Recipes', 'ListEditor.dc.html'], ['Want to make', 'ToMake.dc.html'], ['Rediscover', 'Rediscover.dc.html'], ['Trash', 'Trash.dc.html']].map(([label, href]) => {
-      const on = label === 'Recipes';
+    const prepDone = (this.state && this.state.prepDone) || prep.map(() => true);
+    const stepDone = (this.state && this.state.stepDone) || steps.map((_, i) => i < 1);
+    const nav = [['Catalog', 'ListEditor.dc.html'], ['Plan', 'ToMake.dc.html'], ['Recommendations', 'Rediscover.dc.html'], ['Trash', 'Trash.dc.html']].map(([label, href]) => {
+      const on = label === 'Catalog';
       return { label, href, current: on ? 'page' : 'false', bg: on ? '#7FC4A0' : 'transparent', fg: on ? '#10241A' : '#ECEFEA', fw: on ? '700' : '400' };
     });
     return {
       nav,
-      steps: steps.map((text, i) => ({
-        n: i + 1, text, done: !!stepDone[i], todo: !stepDone[i],
-        pressed: stepDone[i] ? 'true' : 'false',
-        label: 'Step ' + (i + 1) + ' done',
-        bg: stepDone[i] ? 'transparent' : '#7FC4A0', fg: stepDone[i] ? '#A9B3AC' : '#ECEFEA',
-        toggle: () => {
-          const next = stepDone.slice();
-          next[i] = !next[i];
-          this.setState({ stepDone: next });
-        }
-      }))
+      prep: this.numbered(prep, prepDone, 'Prep', 'prepDone'),
+      steps: this.numbered(steps, stepDone, 'Step', 'stepDone')
     };
   }
 }

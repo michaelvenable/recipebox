@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Want to make list — empty</title>
+<title>Plan — empty</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -26,14 +26,13 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
     </a>
   </nav>
   <header style="padding: 18px 20px 12px">
-    <h1 style="margin: 0; font-size: 26px; font-weight: 700">Want to make</h1>
+    <h1 style="margin: 0; font-size: 26px; font-weight: 700">Plan</h1>
   </header>
   <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 0 40px; text-align: center">
     <div style="width: 72px; height: 72px; border-radius: 36px; background: #FBEADC; display: flex; align-items: center; justify-content: center">
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#8A3A0C" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"></path></svg>
     </div>
     <h2 style="margin: 0; font-size: 21px; font-weight: 700">Nothing planned yet</h2>
-    <p style="margin: 0; font-size: 17px; line-height: 1.45; color: #59615C">Open a recipe and choose "I want to cook this" to save it here for later.</p>
     <a href="ListEditor.dc.html" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; border-radius: 24px; background: #2E6A4F; color: #FFFFFF; font-size: 16px; font-weight: 700; text-decoration: none">Browse recipes</a>
   </div>
 </div>
@@ -41,14 +40,14 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   navItems(cur) {
-    const pages = [['Recipes', 'ListEditor.dc.html'], ['Want to make', 'ToMakeEmpty.dc.html'], ['Rediscover', 'Rediscover.dc.html'], ['Trash', 'Trash.dc.html']];
+    const pages = [['Catalog', 'ListEditor.dc.html'], ['Plan', 'ToMakeEmpty.dc.html'], ['Recommendations', 'Rediscover.dc.html'], ['Trash', 'Trash.dc.html']];
     return pages.map(([label, href]) => {
       const on = label === cur;
       return { label, href, current: on ? 'page' : 'false', bg: on ? '#2E6A4F' : 'transparent', fg: on ? '#FFFFFF' : '#1D2420', fw: on ? '700' : '400' };
     });
   }
   renderVals() {
-    return { nav: this.navItems('Want to make'), acctBg: '#F0F2EE', acctFg: '#1D2420' };
+    return { nav: this.navItems('Plan'), acctBg: '#F0F2EE', acctFg: '#1D2420' };
   }
 }
 </script>

@@ -7,11 +7,12 @@ Each `.dc.html` file is one artboard: plain HTML with inline styles, plus sample
 the end. Phone artboards are 390 x 844, tablet 1024 x 768.
 
 Decisions recorded on the canvas:
-- Navigation: a top row inline on every page. Editors: Recipes, Want to make, Rediscover, Trash, and an Account button at the
-  right. Visitors: Recipes and Sign in. On phones the row scrolls sideways; no drawer, no More menu.
+- Navigation: a top row inline on every page. Editors: Catalog, Plan, Recommendations, Trash, and an Account button at the
+  right. Visitors: Catalog and Sign in. On phones the row scrolls sideways; no drawer, no More menu.
 - Edit form: Cancel and Save replace the top row, so a stray tap can't lose unsaved changes.
-- Screen awake: the screen stays on while a recipe is open, with a small note saying so.
-- Ticks: ingredients have checkboxes; tapping a step's number marks it done; "Clear ticks" resets both.
+- Screen awake: the screen stays on while a recipe is open. No note says so.
+- Ticks: ingredients have checkboxes; tapping a prep or step number marks it done. Leaving the recipe clears them; there is no
+  "Clear ticks".
 - Delete: no confirmation; the recipe moves to the trash with an Undo message. Delete stays at the bottom of the recipe.
 - Many tags: chips scroll sideways on phones. An "All tags" sheet is deferred until there are dozens of tags.
 - Dark theme: follows the device setting, with no switch in the app.
@@ -31,11 +32,16 @@ Decisions made while building the client, confirmed by the owner on 2026-11-04 (
 - Offline: the app shell opens without a connection and a "You're offline" banner explains that loading and saving need one.
   Nothing is stored for offline reading or editing (offline use stays out of scope).
 
-Updated 2026-11-07 (owner request): `ToMake.dc.html` and the new `ShoppingList.dc.html` were saved again from the canvas.
-- The Plan artboard uses the app's current names (Catalog, Plan, Recommendations) and shows a "Shopping list" button.
+Updated 2026-11-07 (owner request): every artboard was saved again from the canvas, redrawn to match the app.
+- Names: Catalog, Plan, Recommendations; the visitor heading is "Recipe Box". The search box has no visible label and reads
+  "Find a recipe".
+- Recipe views: a numbered, tickable Prep section before Steps (REC-20); read-only tags (REC-10); "I cooked this today" is a
+  secondary button. The edit form has one box each for ingredients, prep and steps (REC-21) and a comma-separated tags field.
+- Known gaps: the tablet artboards still show the app name and an "Account" text button in the top row, and the edit form's
+  photo buttons read "Replace" and "Remove" where the app says "Replace photo" and "Remove photo".
+- The Plan artboard shows a "Shopping list" button.
 - Shopping list: every ingredient of every recipe on the Plan, in one list sorted A–Z (X-13), each with its recipe's name.
-  Ingredients are free text, so duplicates stay as typed. Ticks are never saved; leaving the page clears them. The other
-  artboards still show the older names.
+  Ingredients are free text, so duplicates stay as typed. Ticks are never saved; leaving the page clears them.
 - Send (proposed, not yet in the specs): the Shopping list has a Send button. It makes a link with a random, unguessable code
   and opens the phone's share sheet with it (the link is copied where there is no share sheet). Anyone with the link sees a
   copy of the list as sent, without signing in, for 7 days (`SharedList.dc.html`); after that, and for unknown links, the

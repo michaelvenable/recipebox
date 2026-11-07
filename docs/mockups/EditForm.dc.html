@@ -39,54 +39,40 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 6px">
-      <label for="time" style="font-size: 15px; font-weight: 700">Total time (minutes)</label>
-      <input id="time" type="number" value="30" style="width: 120px; height: 48px; padding: 0 14px; border: 1px solid #C9CEC8; border-radius: 12px; font: inherit; font-size: 17px; background: #FFFFFF">
+      <label for="time" style="font-size: 15px; font-weight: 700">Total time</label>
+      <input id="time" type="text" value="0:30" aria-describedby="time-hint" style="width: 120px; height: 48px; padding: 0 14px; border: 1px solid #C9CEC8; border-radius: 12px; font: inherit; font-size: 17px; background: #FFFFFF">
+      <span id="time-hint" style="font-size: 13px; color: #59615C">Optional. Examples: 1:30, :45.</span>
     </div>
 
-    <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
-      <legend style="padding: 0; margin-bottom: 8px; font-size: 15px; font-weight: 700">Ingredients</legend>
-      <sc-for list="{{ingredients}}" as="i" hint-placeholder-count="4">
-        <div style="display: flex; align-items: center; gap: 6px">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="#8C948F" role="img" aria-label="Drag to reorder"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg>
-          <input type="text" value="{{i}}" aria-label="Ingredient" style="flex: 1; min-width: 0; height: 46px; padding: 0 12px; border: 1px solid #C9CEC8; border-radius: 10px; font: inherit; font-size: 16px; background: #FFFFFF">
-          <button type="button" aria-label="Remove ingredient" style="flex: none; width: 44px; height: 44px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#59615C" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
-          </button>
-        </div>
-      </sc-for>
-      <button type="button" style="align-self: flex-start; min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: #2E6A4F; font: inherit; font-size: 16px; font-weight: 700">+ Add ingredient</button>
-    </fieldset>
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="ingredients" style="font-size: 15px; font-weight: 700">Ingredients</label>
+      <textarea id="ingredients" rows="5" style="width: 100%; box-sizing: border-box; min-height: 141px; padding: 10px 12px; border: 1px solid #C9CEC8; border-radius: 12px; font: inherit; font-size: 17px; line-height: 1.4; background: #FFFFFF; color: #1D2420; resize: vertical">200 g flat rice noodles
+3 tbsp tamarind paste
+3 tbsp fish sauce
+2 tbsp brown sugar</textarea>
+    </div>
 
-    <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
-      <legend style="padding: 0; margin-bottom: 8px; font-size: 15px; font-weight: 700">Steps</legend>
-      <div style="display: flex; align-items: flex-start; gap: 8px">
-        <span style="flex: none; width: 28px; height: 46px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #59615C">1</span>
-        <textarea aria-label="Step 1" aria-invalid="true" aria-describedby="steps-err" style="flex: 1; min-height: 72px; padding: 10px 12px; border: 2px solid #B42318; border-radius: 10px; font: inherit; font-size: 16px; background: #FFFFFF; resize: vertical"></textarea>
-      </div>
-      <span id="steps-err" style="font-size: 14px; color: #B42318">Add at least one step. Blank steps are ignored.</span>
-      <button type="button" style="align-self: flex-start; min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: #2E6A4F; font: inherit; font-size: 16px; font-weight: 700">+ Add step</button>
-    </fieldset>
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="prep" style="font-size: 15px; font-weight: 700">Prep</label>
+      <textarea id="prep" rows="5" style="width: 100%; box-sizing: border-box; min-height: 141px; padding: 10px 12px; border: 1px solid #C9CEC8; border-radius: 12px; font: inherit; font-size: 17px; line-height: 1.4; background: #FFFFFF; color: #1D2420; resize: vertical">Soak the rice noodles in warm water for 25 minutes, then drain.
+Chop the garlic and slice the shallot.
+Stir the tamarind, fish sauce and sugar together until the sugar dissolves.</textarea>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="steps" style="font-size: 15px; font-weight: 700">Steps</label>
+      <textarea id="steps" rows="5" aria-invalid="true" aria-describedby="steps-err" style="width: 100%; box-sizing: border-box; min-height: 141px; padding: 10px 12px; border: 2px solid #B42318; border-radius: 12px; font: inherit; font-size: 17px; line-height: 1.4; background: #FFFFFF; color: #1D2420; resize: vertical"></textarea>
+      <span id="steps-err" style="font-size: 14px; color: #B42318">Add at least one step. Blank lines are ignored.</span>
+    </div>
 
     <div style="display: flex; flex-direction: column; gap: 8px">
-      <label for="tag" style="font-size: 15px; font-weight: 700">Tags</label>
-      <div style="display: flex; flex-wrap: wrap; gap: 8px">
-        <sc-for list="{{tags}}" as="t" hint-placeholder-count="3">
-          <span style="display: inline-flex; align-items: center; gap: 2px; padding-left: 12px; border-radius: 18px; background: #E3EEE7; color: #1F4D38; font-size: 15px">{{t}}
-            <button type="button" aria-label="Remove tag {{t}}" style="width: 36px; height: 36px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F4D38" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
-            </button>
-          </span>
+      <label for="tags" style="font-size: 15px; font-weight: 700">Tags</label>
+      <input id="tags" type="text" value="{{tagsTyped}}" autocapitalize="none" style="width: 100%; box-sizing: border-box; height: 48px; padding: 0 14px; border: 2px solid #2E6A4F; border-radius: 12px; font: inherit; font-size: 17px; background: #FFFFFF">
+      <div role="group" aria-label="Suggested tags" style="display: flex; flex-wrap: wrap; gap: 8px">
+        <sc-for list="{{suggestions}}" as="t" hint-placeholder-count="2">
+          <button type="button" style="flex: none; min-height: 44px; padding: 0 14px; border: 1px solid #C9CEC8; border-radius: 20px; background: #FFFFFF; color: #1D2420; font: inherit; font-size: 15px">{{t}}</button>
         </sc-for>
       </div>
-      <div style="position: relative">
-        <input id="tag" type="text" value="ve" placeholder="Add a tag" aria-autocomplete="list" aria-controls="tag-suggest" style="width: 100%; box-sizing: border-box; height: 48px; padding: 0 14px; border: 2px solid #2E6A4F; border-radius: 12px; font: inherit; font-size: 17px; background: #FFFFFF">
-        <ul id="tag-suggest" role="listbox" style="list-style: none; margin: 6px 0 0; padding: 6px; background: #FFFFFF; border: 1px solid #C9CEC8; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.08)">
-          <li role="option" aria-selected="true" style="display: flex; justify-content: space-between; align-items: center; min-height: 44px; padding: 0 10px; border-radius: 8px; background: #F0F4F1; font-size: 16px"><span>vegetarian</span><span style="color: #59615C; font-size: 14px">9 recipes</span></li>
-          <li role="option" aria-selected="false" style="display: flex; justify-content: space-between; align-items: center; min-height: 44px; padding: 0 10px; font-size: 16px"><span>vegan</span><span style="color: #59615C; font-size: 14px">3 recipes</span></li>
-          <li role="option" aria-selected="false" style="display: flex; align-items: center; min-height: 44px; padding: 0 10px; font-size: 16px; color: #2E6A4F; font-weight: 700">Add new tag "ve"</li>
-        </ul>
-      </div>
-      <span style="font-size: 13px; color: #59615C">Tags are saved in lowercase. Up to 20 per recipe.</span>
     </div>
   </form>
 </div>
@@ -95,8 +81,8 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
 class Component extends DCLogic {
   renderVals() {
     return {
-      ingredients: ['200 g flat rice noodles', '3 tbsp tamarind paste', '3 tbsp fish sauce', ''],
-      tags: ['dinner', 'noodles', 'quick']
+      tagsTyped: 'dinner, noodles, quick, ve',
+      suggestions: ['vegan', 'vegetarian']
     };
   }
 }

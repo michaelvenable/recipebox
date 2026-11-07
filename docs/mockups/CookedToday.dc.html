@@ -36,10 +36,7 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
       </div>
     </section>
     <section style="display: flex; flex-direction: column; gap: 10px; padding: 16px; background: #FFFFFF; border-radius: 16px">
-      <button type="button" disabled style="min-height: 56px; border: 1px solid #A9CDB8; border-radius: 14px; background: #E3EEE7; color: #1F4D38; font: inherit; font-size: 19px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px">
-        Cooked today
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1F4D38" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
-      </button>
+      <button type="button" aria-disabled="true" style="min-height: 48px; border: 1px solid #E3EEE7; border-radius: 14px; background: #E3EEE7; color: #1F4D38; font: inherit; font-size: 16px; cursor: default">Cooked today ✓</button>
       <button type="button" style="min-height: 48px; border: 1px solid #C9CEC8; border-radius: 14px; background: #FFFFFF; color: #1D2420; font: inherit; font-size: 16px">I want to cook this</button>
       <p style="margin: 4px 0 0; font-size: 15px; color: #59615C">Last cooked today · cooked 4 times · <a href="#history" style="font-weight: 700">History</a></p>
     </section>
@@ -54,14 +51,14 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   navItems(cur) {
-    const pages = [['Recipes', 'ListEditor.dc.html'], ['Want to make', 'ToMake.dc.html'], ['Rediscover', 'Rediscover.dc.html'], ['Trash', 'Trash.dc.html']];
+    const pages = [['Catalog', 'ListEditor.dc.html'], ['Plan', 'ToMake.dc.html'], ['Recommendations', 'Rediscover.dc.html'], ['Trash', 'Trash.dc.html']];
     return pages.map(([label, href]) => {
       const on = label === cur;
       return { label, href, current: on ? 'page' : 'false', bg: on ? '#2E6A4F' : 'transparent', fg: on ? '#FFFFFF' : '#1D2420', fw: on ? '700' : '400' };
     });
   }
   renderVals() {
-    return { nav: this.navItems('Recipes'), acctBg: '#F0F2EE', acctFg: '#1D2420' };
+    return { nav: this.navItems('Catalog'), acctBg: '#F0F2EE', acctFg: '#1D2420' };
   }
 }
 </script>
