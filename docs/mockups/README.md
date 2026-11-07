@@ -47,4 +47,5 @@ Updated 2026-11-07 (owner request): every artboard was saved again from the canv
   current shopping list, live, without signing in, for 7 days (`SharedList.dc.html`); after that, and for unknown links, the
   page says the link has expired (`SharedListExpired.dc.html`). The panel after Send also has a Share button.
 - Recommendations (COOK-9): the same tag chips as the Catalog, with counts, above the list. Picking tags keeps only recipes
-  that have all of them, still least recently cooked first. The filter is separate from the Catalog's.
+  that have all of them, still least recently cooked first; when none match, "Show all recipes" clears the filter. The
+  filter is separate from the Catalog's.

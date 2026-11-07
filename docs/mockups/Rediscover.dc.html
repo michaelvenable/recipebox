@@ -34,7 +34,7 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
     </sc-for>
   </div>
   <sc-if value="{{none}}" hint-placeholder-val="{{ false }}">
-    <p role="status" style="margin: 0 20px 12px; font-size: 15px; color: #59615C">{{noneText}}</p>
+    <p role="status" style="margin: 0 20px 12px; font-size: 15px; color: #59615C">{{noneText}} <button type="button" onClick="{{clear}}" style="min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: #2E6A4F; font: inherit; font-size: 15px; font-weight: 700; text-decoration: underline; cursor: pointer">Show all recipes</button></p>
   </sc-if>
   <ul style="flex: 1; list-style: none; margin: 0; padding: 0 20px; display: flex; flex-direction: column; gap: 10px; overflow: hidden">
     <sc-for list="{{items}}" as="r" hint-placeholder-count="6">
@@ -90,6 +90,7 @@ class Component extends DCLogic {
       }),
       none: items.length === 0,
       noneText: 'No recipes tagged ' + picked.join(' and '),
+      clear: () => this.setState({ picked: [] }),
       items
     };
   }
