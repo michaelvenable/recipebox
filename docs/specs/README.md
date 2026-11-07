@@ -10,7 +10,7 @@ been cooked in a while.
 | ---------------------------------------- | ------ | ------------------------------------------------------------------- |
 | [recipes.md](recipes.md)                 | REC    | Create, view, edit, photo, search, tags, trash                      |
 | [meal-plan.md](meal-plan.md)             | PLAN   | The "to make" list and its shopping list                            |
-| [cooking-history.md](cooking-history.md) | COOK   | "I cooked this today", last-cooked dates, "haven't made in a while" |
+| [cooking-history.md](cooking-history.md) | COOK   | "I cooked this today", last-cooked dates, recommendations by tag    |
 
 ## How to read and write these specs
 

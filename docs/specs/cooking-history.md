@@ -22,6 +22,14 @@ ones that haven't been made in a while. Cooking history is private: only signed-
 - **COOK-8. Cooked-today button.** If a recipe was last cooked earlier on the device's current day, its "I cooked this today"
   button reads "Cooked today ✓" and can't be tapped again until the next day. This prevents most accidental duplicates; the server
   still accepts them (COOK-4).
+- **COOK-9. Filter recommendations by tags.** On the "haven't made in a while" view (COOK-6), an editor can pick one or more
+  tags to filter by, such as "breakfast", to look only at those recipes.
+  - The tags offered, their order and their counts are the same as on the recipe list (REC-13): every tag in use, in
+    alphabetical order (X-13), with the number of recipes that have it.
+  - With several tags picked, only recipes that have all of them are shown, still in the COOK-6 order. Clearing all picked tags
+    shows every recipe again.
+  - When no recipe has all the picked tags, the view says so ("No recipes tagged breakfast and quick").
+  - The filter on this view is separate from the one on the recipe list: picking a tag on one doesn't pick it on the other.
 
 ## Examples
 
@@ -30,6 +38,7 @@ ones that haven't been made in a while. Cooking history is private: only signed-
 | Mark cooked at 6 pm                                          | Button reads "Cooked today ✓" until midnight    |
 | Two devices each mark the recipe cooked, one after the other | Two entries                                     |
 | Recipes: A (never), B (last 2026-01-10), C (last 2026-08-02) | View order: A, B, C                             |
+| Same recipes; only A and C tagged "breakfast"; filter it     | View order: A, C                                |
 
 ## Out of scope
 
