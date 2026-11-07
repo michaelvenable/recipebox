@@ -7,6 +7,7 @@ import {
   type RecipeContentInput,
   RecipeSummary,
   RediscoverEntry,
+  ShoppingItem,
   Tag,
   TagCount,
   ToMakeEntry,
@@ -121,6 +122,14 @@ export function removeFromPlan(id: string): Promise<EditorRecipe> {
 /** GET /plan: the to-make list, oldest first (PLAN-3). Editors only (X-1). */
 export function fetchPlan(signal?: AbortSignal): Promise<ToMakeEntry[]> {
   return apiGet("/plan", ToMakeEntry.array(), signal);
+}
+
+/**
+ * GET /plan/shopping-list: every ingredient of every recipe on the to-make list, sorted by the server (PLAN-8, X-13). Editors
+ * only (X-1).
+ */
+export function fetchShoppingList(signal?: AbortSignal): Promise<ShoppingItem[]> {
+  return apiGet("/plan/shopping-list", ShoppingItem.array(), signal);
 }
 
 /** GET /recommendations: never cooked first by name, then least recently cooked first (COOK-6). Editors only (X-1). */

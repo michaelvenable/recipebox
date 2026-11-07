@@ -2,7 +2,8 @@ import { Instant } from "./instant.js";
 import { RecipeName } from "./recipe-name.js";
 import type { Recipe } from "./recipe.js";
 import { Tag } from "./tag.js";
-import { containsText } from "./text.js";
+import type { TextEntry } from "./text-entry.js";
+import { collateText, compareText, containsText } from "./text.js";
 
 /**
  * The recipe list, filtered (REC-8, REC-9, REC-13): recipes whose name matches `name` and that have every picked tag,
@@ -72,6 +73,30 @@ export function toMakeList(recipes: readonly Recipe[]): Recipe[] {
     .flatMap((r) => (r.addedToMakeListAt === undefined ? [] : [{ recipe: r, addedAt: r.addedToMakeListAt }]))
     .sort((a, b) => Instant.compare(a.addedAt, b.addedAt))
     .map((entry) => entry.recipe);
+}
+
+/** One line of the shopping list (PLAN-8): an ingredient as entered, and the recipe it comes from. */
+export interface ShoppingItem {
+  ingredient: TextEntry;
+  recipe: Recipe;
+}
+
+/**
+ * The shopping list (PLAN-8): every ingredient of every recipe on the to-make list, in one list sorted alphabetically (X-13).
+ * Ingredients are free text, so they are never combined: the same text in two recipes appears twice, ordered by recipe name.
+ * "The same" is as X-13 sorts: texts differing only in case or accents, such as "Eggs" and "eggs", count as equal here.
+ * Prep entries and steps are not included. Deleted recipes are skipped, as on the list (REC-6, PLAN-6). Recipes with the same
+ * name fall back to their id, so the order is the same on every request.
+ */
+export function shoppingList(recipes: readonly Recipe[]): ShoppingItem[] {
+  return toMakeList(recipes)
+    .flatMap((recipe) => recipe.content.ingredients.map((ingredient) => ({ ingredient, recipe })))
+    .sort(
+      (a, b) =>
+        collateText(a.ingredient.value, b.ingredient.value) ||
+        RecipeName.compare(a.recipe.content.name, b.recipe.content.name) ||
+        compareText(a.recipe.id.value, b.recipe.id.value),
+    );
 }
 
 /** By name, ignoring case and accents (REC-8, X-13). Returns a new array. */

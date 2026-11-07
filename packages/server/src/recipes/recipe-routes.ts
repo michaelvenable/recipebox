@@ -1,6 +1,6 @@
 // The recipe endpoints (docs/api.md) other than photos (photos/photo-routes.ts): list, tags, view, create, edit, delete, trash
-// and restore; attaching and removing tags and tag suggestions; the "to make" list; cooking history and the "haven't made in
-// a while" view.
+// and restore; attaching and removing tags and tag suggestions; the "to make" list and its shopping list; cooking history and
+// the "haven't made in a while" view.
 //
 // Every change follows docs/architecture.md, "How a change is applied": requireEditor (X-6), read the stored recipe, call one
 // domain method with the request's input and the server's time (X-12), answer domain errors without saving, then save the
@@ -13,6 +13,7 @@ import {
   Recipe,
   RecipeId,
   type Result,
+  shoppingList,
   suggestTags,
   tagsInUse,
   toMakeList,
@@ -28,6 +29,7 @@ import {
   RecipeContentInput,
   type RecipeSummary,
   type RediscoverEntry,
+  type ShoppingItem,
   type Tag,
   type TagCount,
   TagRequest,
@@ -45,6 +47,7 @@ import {
   toRecipeFor,
   toRecipeSummary,
   toRediscoverEntry,
+  toShoppingItem,
   toTag,
   toTagCount,
   toToMakeEntry,
@@ -303,6 +306,12 @@ export function registerRecipeRoutes(app: FastifyInstance, { recipes, clock, new
   // PLAN-3: which recipes are listed and in what order is the domain's (toMakeList).
   app.get("/plan", { preHandler: requireEditor }, async (): Promise<ToMakeEntry[]> =>
     toMakeList(await recipes.list()).map(toToMakeEntry),
+  );
+
+  // PLAN-8: read-only; which ingredients are listed and in what order is the domain's (shoppingList). Ticks are the client's
+  // and never reach the server.
+  app.get("/plan/shopping-list", { preHandler: requireEditor }, async (): Promise<ShoppingItem[]> =>
+    shoppingList(await recipes.list()).map(toShoppingItem),
   );
 
   // PLAN-1, PLAN-2: the added time is the server's (X-12); adding again keeps the original one.

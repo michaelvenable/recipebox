@@ -1,8 +1,8 @@
 // The changes an editor makes from the recipe view, and what each one makes stale.
 import { type Mutation, type QueryClient, useIsMutating, useMutation, useMutationState, useQueryClient } from "@tanstack/react-query";
-import type { EditorRecipe, RecipeSummary, RediscoverEntry, ToMakeEntry } from "@recipebox/shared";
+import type { EditorRecipe, RecipeSummary, RediscoverEntry, ShoppingItem, ToMakeEntry } from "@recipebox/shared";
 import { ApiError } from "../api/client.js";
-import { planKeys, recipeKeys, rediscoverKeys, tagKeys } from "../api/query-keys.js";
+import { planKeys, recipeKeys, rediscoverKeys, shoppingListKeys, tagKeys } from "../api/query-keys.js";
 import { type ListedRecipe, addToPlan, markCooked, removeFromPlan } from "../api/recipes.js";
 
 /** Tags are changed only in the create and edit form, not from the view (REC-10). */
@@ -61,6 +61,36 @@ export function showSavedRecipe(queryClient: QueryClient, recipe: EditorRecipe, 
   void queryClient.invalidateQueries({ queryKey: planKeys.all });
   void queryClient.invalidateQueries({ queryKey: rediscoverKeys.all });
   if (tagsChanged) void queryClient.invalidateQueries({ queryKey: tagKeys.all });
+  updateShoppingList(queryClient, recipe);
+}
+
+/**
+ * The shopping list (PLAN-8) after a recipe was saved. A recipe off the to-make list leaves it at once. A recipe on the list
+ * whose ingredients or name differ from the cached lines (just added, or edited) can't be put in place here, since only the
+ * server sorts (X-13), so the cached list is dropped and reloaded rather than shown stale. Either way it is then reloaded.
+ */
+function updateShoppingList(queryClient: QueryClient, recipe: EditorRecipe): void {
+  const items = queryClient.getQueryData<ShoppingItem[]>(shoppingListKeys.all);
+  if (recipe.toMake === undefined) {
+    if (items !== undefined) queryClient.setQueryData(shoppingListKeys.all, withoutShoppingItems(items, recipe.id));
+  } else if (items !== undefined && !showsCurrentIngredients(items, recipe)) {
+    void queryClient.resetQueries({ queryKey: shoppingListKeys.all });
+    return;
+  }
+  void queryClient.invalidateQueries({ queryKey: shoppingListKeys.all });
+}
+
+export function withoutShoppingItems(items: ShoppingItem[], recipeId: string): ShoppingItem[] {
+  return items.filter((item) => item.recipeId !== recipeId);
+}
+
+/** Whether the cached lines of `recipe` are exactly its ingredients and name. Order doesn't matter: only equality is checked. */
+function showsCurrentIngredients(items: readonly ShoppingItem[], recipe: EditorRecipe): boolean {
+  const own = items.filter((item) => item.recipeId === recipe.id);
+  if (own.some((item) => item.recipeName !== recipe.name)) return false;
+  const cached = own.map((item) => item.text).sort();
+  const current = [...recipe.ingredients].sort();
+  return cached.length === current.length && cached.every((text, i) => text === current[i]);
 }
 
 function summaryOf({ id, name, tags, totalTimeMinutes, hasPhoto }: EditorRecipe): RecipeSummary {

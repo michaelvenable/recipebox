@@ -154,11 +154,15 @@ function tagsInUse(recipes: readonly Recipe[]): { tag: Tag; count: number }[];  
 function suggestTags(recipes: readonly Recipe[], forRecipe: Recipe | undefined, typed: string): Tag[];  // REC-12
 function trashContents(recipes: readonly Recipe[]): Recipe[];                                     // REC-14
 function toMakeList(recipes: readonly Recipe[]): Recipe[];                                        // PLAN-3
+function shoppingList(recipes: readonly Recipe[]): { ingredient: TextEntry; recipe: Recipe }[];   // PLAN-8
 ```
 
 - `findRecipes`, `tagsInUse`, `suggestTags` and `orderForRediscovery` (below) skip deleted recipes (REC-6).
 - `trashContents` returns only deleted recipes, most recently deleted first (REC-14).
 - `toMakeList` returns non-deleted recipes on the to-make list, oldest added first; ties sorted by name (PLAN-3).
+- `shoppingList` returns every ingredient of every recipe in `toMakeList`, never combined, sorted by text ignoring case and
+  accents (X-13); texts equal under X-13 (even if they differ in case or accents) by `RecipeName.compare`, then by recipe ID
+  so the order is stable. Prep and steps are left out (PLAN-8).
 - `findRecipes` keeps recipes whose name matches (`RecipeName.matches`) and that have every picked tag, sorted by
   `RecipeName.compare` (REC-8). No name and no tags returns every recipe.
 - `tagsInUse` lists each tag on at least one recipe with its count, alphabetically. Tags on no recipe simply don't appear, so

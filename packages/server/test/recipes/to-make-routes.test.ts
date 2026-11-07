@@ -1,7 +1,7 @@
 // "To make" list endpoints (docs/api.md) against the in-memory repository, using the examples table in docs/specs/meal-plan.md.
 // The rules themselves are tested in packages/domain; these tests show each endpoint applies them.
 import { describe, expect, it } from "vitest";
-import { EditorRecipe, EditorRecipeSummary, ToMakeEntry } from "@recipebox/shared";
+import { EditorRecipe, EditorRecipeSummary, ShoppingItem, ToMakeEntry } from "@recipebox/shared";
 import {
   AS_EDITOR,
   change,
@@ -221,4 +221,67 @@ describe("REC-17 trashed recipes can't be changed: the to-make list", () => {
       expect(await toMakeList(app)).toEqual([]);
     });
   }
+});
+
+describe("PLAN-8 shopping list", () => {
+  async function shopping(app: App): Promise<ShoppingItem[]> {
+    const res = await get(app, "/plan/shopping-list", AS_EDITOR);
+    expect(res.statusCode, res.body).toBe(200);
+    return ShoppingItem.array().parse(res.json());
+  }
+
+  it("spec example: every ingredient of every planned recipe, A–Z, duplicates kept and ordered by recipe name", async () => {
+    const { app, repository } = await recipeApp();
+    const shakshuka = await seed(repository, content("Shakshuka", { ingredients: ["6 eggs", "1 can tomatoes"] }), {
+      toMakeAt: "2026-09-01T08:00:00.000Z",
+    });
+    const chili = await seed(repository, content("Chili", { ingredients: ["1 can tomatoes", "500 g beef mince"] }), {
+      toMakeAt: "2026-09-02T08:00:00.000Z",
+    });
+    await seed(repository, content("Not planned", { ingredients: ["2 limes"] }));
+
+    expect(await shopping(app)).toEqual([
+      { text: "1 can tomatoes", recipeId: chili.id.value, recipeName: "Chili" },
+      { text: "1 can tomatoes", recipeId: shakshuka.id.value, recipeName: "Shakshuka" },
+      { text: "500 g beef mince", recipeId: chili.id.value, recipeName: "Chili" },
+      { text: "6 eggs", recipeId: shakshuka.id.value, recipeName: "Shakshuka" },
+    ]);
+  });
+
+  it("leaves out prep entries and steps", async () => {
+    const { app, repository } = await recipeApp();
+    await seed(repository, content("Curry", { ingredients: ["1 onion"], prep: ["Chop the onion"], steps: ["Fry it."] }), {
+      toMakeAt: "2026-09-01T08:00:00.000Z",
+    });
+    expect((await shopping(app)).map((i) => i.text)).toEqual(["1 onion"]);
+  });
+
+  it("leaves out a planned recipe once it is deleted, and follows the list as recipes are added, cooked or removed", async () => {
+    const { app, repository } = await recipeApp();
+    const deleted = await seed(repository, content("Pad Thai", { ingredients: ["rice noodles"] }), {
+      toMakeAt: "2026-09-01T08:00:00.000Z",
+    });
+    const curry = await seed(repository, content("Curry", { ingredients: ["curry paste"] }), {
+      toMakeAt: "2026-09-02T08:00:00.000Z",
+    });
+    const stew = await seed(repository, content("Stew", { ingredients: ["beef"] }));
+
+    await change(app, "DELETE", `/recipes/${deleted.id.value}`);
+    expect((await shopping(app)).map((i) => i.recipeName)).toEqual(["Curry"]);
+
+    await change(app, "POST", `/recipes/${stew.id.value}/add-to-plan`);
+    expect((await shopping(app)).map((i) => i.text)).toEqual(["beef", "curry paste"]);
+
+    await change(app, "POST", `/recipes/${curry.id.value}/cookings`);
+    await change(app, "POST", `/recipes/${stew.id.value}/remove-from-plan`);
+    expect(await shopping(app)).toEqual([]);
+  });
+
+  it("changes nothing that is stored", async () => {
+    const { app, repository } = await recipeApp();
+    await seed(repository, content("Curry"), { toMakeAt: "2026-09-02T08:00:00.000Z" });
+    const before = await storedSnapshots(repository);
+    await shopping(app);
+    expect(await storedSnapshots(repository)).toEqual(before);
+  });
 });

@@ -8,7 +8,7 @@ export type HealthResponse = z.infer<typeof HealthResponse>;
 
 export { Me } from "./account.js";
 export { ErrorItem, ErrorResponse } from "./errors.js";
-export { RediscoverEntry, Tag, TagCount, ToMakeEntry, TrashEntry } from "./lists.js";
+export { RediscoverEntry, ShoppingItem, Tag, TagCount, ToMakeEntry, TrashEntry } from "./lists.js";
 export {
   EditorRecipe,
   EditorRecipeSummary,

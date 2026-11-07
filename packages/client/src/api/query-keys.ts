@@ -38,6 +38,14 @@ export const planKeys = {
   all: ["plan"] as const,
 };
 
+/**
+ * GET /plan/shopping-list (PLAN-8). It changes with the to-make list and with the ingredients and names of the recipes on it, so
+ * every change that updates the plan cache updates it too. Outside `planKeys.all`, whose entries have another shape.
+ */
+export const shoppingListKeys = {
+  all: ["shoppingList"] as const,
+};
+
 /** GET /recommendations, "Haven't made in a while" (COOK-6). Cooking a recipe changes its order. */
 export const rediscoverKeys = {
   all: ["recommendations"] as const,

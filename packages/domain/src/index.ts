@@ -10,5 +10,13 @@ export { RecipeId } from "./recipe-id.js";
 export { RecipeName, MAX_NAME_LENGTH } from "./recipe-name.js";
 export { Tag, MAX_TAG_LENGTH } from "./tag.js";
 export { TextEntry, MAX_ENTRY_LENGTH } from "./text-entry.js";
-export { findRecipes, suggestTags, tagsInUse, toMakeList, trashContents } from "./finding.js";
+export {
+  findRecipes,
+  shoppingList,
+  suggestTags,
+  tagsInUse,
+  toMakeList,
+  trashContents,
+  type ShoppingItem,
+} from "./finding.js";
 export { orderForRediscovery } from "./rediscovery.js";

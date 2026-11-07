@@ -1,7 +1,7 @@
 // Cross-cutting rules on the tag, to-make and cooking endpoints: private data (X-1), who may change (X-6) and whose clock
 // counts (X-12). The same checks as recipe-access.test.ts, for the endpoints added after the core routes.
 import { describe, expect, it } from "vitest";
-import { EditorRecipe, RediscoverEntry, Tag, ToMakeEntry } from "@recipebox/shared";
+import { EditorRecipe, RediscoverEntry, ShoppingItem, Tag, ToMakeEntry } from "@recipebox/shared";
 import {
   AS_EDITOR,
   AS_NON_EDITOR,
@@ -38,6 +38,7 @@ function editorReads(id: string): [string, { parse(v: unknown): unknown }][] {
     ["/tag-suggestions?typed=", Tag.array()],
     [`/tag-suggestions?typed=s&recipeId=${id}`, Tag.array()],
     ["/plan", ToMakeEntry.array()],
+    ["/plan/shopping-list", ShoppingItem.array()],
     ["/recommendations", RediscoverEntry.array()],
   ];
 }
@@ -58,7 +59,7 @@ describe("X-1 recipes are public; the rest is private", () => {
     ["a visitor", AS_VISITOR, 401, "auth.signInRequired"],
     ["a signed-in non-editor", AS_NON_EDITOR, 403, "auth.notEditor"],
   ] as const) {
-    it(`refuses ${who} the to-make list, the recommendations and tag suggestions, revealing nothing`, async () => {
+    it(`refuses ${who} the to-make and shopping lists, the recommendations and tag suggestions, revealing nothing`, async () => {
       const { app, id } = await appWithPrivateData();
       for (const [url] of editorReads(id)) {
         const res = await get(app, url, as);
@@ -93,6 +94,10 @@ describe("X-1 recipes are public; the rest is private", () => {
     }
     expect(ToMakeEntry.array().parse((await get(app, "/plan", AS_EDITOR)).json())).toEqual([
       { id, name: "Pad Thai", tags: ["dinner"], hasPhoto: false, addedAt: "2026-09-20T08:00:00.000Z" },
+    ]);
+    // PLAN-8: only the planned recipe's ingredients, never the trashed one's.
+    expect(ShoppingItem.array().parse((await get(app, "/plan/shopping-list", AS_EDITOR)).json())).toEqual([
+      { text: "1 thing", recipeId: id, recipeName: "Pad Thai" },
     ]);
   });
 

@@ -1,12 +1,13 @@
 // Maps domain recipes to the shared response shapes (docs/api.md, "Shapes"). The only place responses are built, so the
 // public/editor split (X-1) is decided here: the public builders read nothing private, and the editor builders add it.
-import type { Recipe } from "@recipebox/domain";
+import type { Recipe, ShoppingItem as DomainShoppingItem } from "@recipebox/domain";
 import type {
   EditorRecipe,
   EditorRecipeSummary,
   PublicRecipe,
   RecipeSummary,
   RediscoverEntry,
+  ShoppingItem,
   Tag,
   TagCount,
   ToMakeEntry,
@@ -97,4 +98,9 @@ export function toToMakeEntry(recipe: Recipe): ToMakeEntry {
 /** A recipe in the "haven't made in a while" view (COOK-6); no lastCookedAt if never cooked. Editor-only (X-1). */
 export function toRediscoverEntry(recipe: Recipe): RediscoverEntry {
   return { ...toRecipeSummary(recipe), lastCookedAt: recipe.lastCookedAt?.toIso() };
+}
+
+/** One line of the shopping list (PLAN-8): the ingredient as entered and its recipe. Editor-only (X-1). */
+export function toShoppingItem(item: DomainShoppingItem): ShoppingItem {
+  return { text: item.ingredient.value, recipeId: item.recipe.id.value, recipeName: item.recipe.content.name.value };
 }

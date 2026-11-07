@@ -17,6 +17,14 @@ export function compareText(a: string, b: string): number {
   return collator.compare(a, b) || (a < b ? -1 : a > b ? 1 : 0);
 }
 
+/**
+ * Order ignoring case and accents, using English rules (X-13), with no fallback: texts that differ only in case or accents
+ * compare as 0, so the caller's own tie-break decides, such as the recipe name on the shopping list (PLAN-8).
+ */
+export function collateText(a: string, b: string): number {
+  return collator.compare(a, b);
+}
+
 /** Whether `needle` occurs anywhere in `haystack`, ignoring case and accents (X-13). */
 export function containsText(haystack: string, needle: string): boolean {
   return fold(haystack).includes(fold(needle));

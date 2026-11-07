@@ -67,6 +67,8 @@ Tags:
 - `GET /plan` — the list (PLAN-3). Returns `ToMakeEntry[]`.
 - `POST /recipes/{id}/add-to-plan` — add (PLAN-1, PLAN-2). Returns `EditorRecipe`.
 - `POST /recipes/{id}/remove-from-plan` — remove (PLAN-4). Returns `EditorRecipe`.
+- `GET /plan/shopping-list` — the shopping list (PLAN-8): every ingredient of every recipe on the list, sorted by the domain
+  (`shoppingList`). Read-only; ticks are the client's and never sent. Returns `ShoppingItem[]`.
 
 Cooking history:
 - `POST /recipes/{id}/cookings` — "I cooked this today" (COOK-1, PLAN-5). The server records its own time. Returns `EditorRecipe`.
@@ -87,6 +89,7 @@ Trash:
   when the recipe has none (REC-20), so clients from before prep, which refuse unknown fields, can still read the recipe.
 - `EditorRecipe`: `PublicRecipe` plus `toMake?` (`addedAt`), `cookedAt[]` (newest first), `lastCookedAt?`, `timesCooked`.
 - `TagCount`: `tag`, `count`. `Tag`: a string.
+- `ShoppingItem`: `text` (the ingredient as entered), `recipeId`, `recipeName`.
 - `TagRequest`: `{ tag }`, the tag text as typed.
 - `ToMakeEntry`: `RecipeSummary` plus `addedAt`.
 - `RediscoverEntry`: `RecipeSummary` plus `lastCookedAt?`.

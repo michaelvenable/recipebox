@@ -4,6 +4,7 @@ import {
   Instant,
   Recipe,
   RecipeId,
+  shoppingList,
   suggestTags,
   tagsInUse,
   toMakeList,
@@ -271,6 +272,94 @@ describe("PLAN-3 the to-make list", () => {
   it("is empty when no recipe is on the list", () => {
     expect(toMakeList([recipe("Beef Stew")])).toEqual([]);
     expect(toMakeList([])).toEqual([]);
+  });
+});
+
+describe("PLAN-8 shopping list", () => {
+  const planned = (name: string, content: Partial<RecipeContentInput>, iso = "2026-10-01T12:00:00Z"): Recipe => {
+    const r = recipe(name, [], content);
+    valueOf(r.addToMakeList(at(iso)));
+    return r;
+  };
+  const rows = (items: ReturnType<typeof shoppingList>) =>
+    items.map((i) => [i.ingredient.value, i.recipe.content.name.value] as const);
+
+  it("spec example: one A–Z list, the same ingredient twice ordered by recipe name", () => {
+    const shakshuka = planned("Shakshuka", { ingredients: ["6 eggs", "1 can tomatoes"] }, "2026-09-01T12:00:00Z");
+    const chili = planned("Chili", { ingredients: ["1 can tomatoes", "500 g beef mince"] }, "2026-10-01T12:00:00Z");
+    expect(rows(shoppingList([shakshuka, chili]))).toEqual([
+      ["1 can tomatoes", "Chili"],
+      ["1 can tomatoes", "Shakshuka"],
+      ["500 g beef mince", "Chili"],
+      ["6 eggs", "Shakshuka"],
+    ]);
+  });
+
+  it("sorts ignoring case and accents (X-13)", () => {
+    const r = planned("Dessert", { ingredients: ["Zest of 1 lemon", "éclair glaze", "butter", "Apples"] });
+    expect(rows(shoppingList([r])).map(([text]) => text)).toEqual(["Apples", "butter", "éclair glaze", "Zest of 1 lemon"]);
+  });
+
+  it("orders identical ingredients by recipe name ignoring case and accents, then by recipe id for equal names", () => {
+    const second = planned("Pasta", { ingredients: ["salt"] });
+    const first = planned("Pasta", { ingredients: ["salt"] });
+    const eclair = planned("Éclair", { ingredients: ["salt"] });
+    const apple = planned("apple pie", { ingredients: ["salt"] });
+    const items = shoppingList([first, eclair, second, apple]);
+    expect(items.map((i) => i.recipe)).toEqual([apple, eclair, second, first]);
+    expect(second.id.value < first.id.value).toBe(true);
+  });
+
+  it('orders lines differing only in case by recipe name: "eggs" (Chili) before "Eggs" (Shakshuka)', () => {
+    const shakshuka = planned("Shakshuka", { ingredients: ["Eggs"] });
+    const chili = planned("Chili", { ingredients: ["eggs"] });
+    expect(rows(shoppingList([shakshuka, chili]))).toEqual([
+      ["eggs", "Chili"],
+      ["Eggs", "Shakshuka"],
+    ]);
+  });
+
+  it('orders lines differing only in accents by recipe name: "crème" (Apple pie) before "creme" (Zuppa)', () => {
+    const zuppa = planned("Zuppa", { ingredients: ["creme"] });
+    const applePie = planned("Apple pie", { ingredients: ["crème"] });
+    expect(rows(shoppingList([zuppa, applePie]))).toEqual([
+      ["crème", "Apple pie"],
+      ["creme", "Zuppa"],
+    ]);
+  });
+
+  it("keeps ingredients as entered and never combines them", () => {
+    const a = planned("A", { ingredients: ["2 eggs"] });
+    const b = planned("B", { ingredients: ["3 eggs", "2 eggs"] });
+    expect(rows(shoppingList([a, b]))).toEqual([
+      ["2 eggs", "A"],
+      ["2 eggs", "B"],
+      ["3 eggs", "B"],
+    ]);
+  });
+
+  it("leaves out prep entries and steps", () => {
+    const r = planned("Curry", { ingredients: ["1 onion"], prep: ["Chop the onion"], steps: ["Fry it."] });
+    expect(rows(shoppingList([r]))).toEqual([["1 onion", "Curry"]]);
+  });
+
+  it("only uses recipes on the to-make list, leaving out deleted ones (REC-6, PLAN-6)", () => {
+    const kept = planned("Kept", { ingredients: ["rice"] });
+    const gone = deleted(planned("Gone", { ingredients: ["beans"] }));
+    const notPlanned = recipe("Not planned", [], { ingredients: ["corn"] });
+    expect(rows(shoppingList([gone, notPlanned, kept]))).toEqual([["rice", "Kept"]]);
+  });
+
+  it("is empty when the to-make list is empty", () => {
+    expect(shoppingList([recipe("Beef Stew")])).toEqual([]);
+    expect(shoppingList([])).toEqual([]);
+  });
+
+  it("doesn't change its input", () => {
+    const list = [planned("Zebra", { ingredients: ["z"] }), planned("Apple", { ingredients: ["a"] })];
+    const before = [...list];
+    shoppingList(list);
+    expect(list.every((r, i) => r === before[i])).toBe(true);
   });
 });
 

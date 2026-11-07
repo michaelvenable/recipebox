@@ -19,6 +19,14 @@ export const ToMakeEntry = RecipeSummary.extend({
 });
 export type ToMakeEntry = z.infer<typeof ToMakeEntry>;
 
+/** GET /plan/shopping-list returns ShoppingItem[] (PLAN-8): one ingredient as entered, with the recipe it comes from. */
+export const ShoppingItem = z.strictObject({
+  text: z.string(),
+  recipeId: z.string(),
+  recipeName: z.string(),
+});
+export type ShoppingItem = z.infer<typeof ShoppingItem>;
+
 /** GET /recommendations (COOK-6). */
 export const RediscoverEntry = RecipeSummary.extend({
   lastCookedAt: z.string().optional(),

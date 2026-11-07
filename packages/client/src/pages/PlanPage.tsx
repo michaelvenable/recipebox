@@ -77,9 +77,22 @@ export function PlanPage() {
 
   return (
     <div className="plan-page">
-      <header className="list-page-header">
-        <h1>Plan</h1>
-        {visible !== undefined && visible.length > 0 && <p className="muted">{countLabel(visible.length)}</p>}
+      <header className="list-page-header with-action">
+        <div className="list-page-heading">
+          <h1>Plan</h1>
+          {visible !== undefined && visible.length > 0 && <p className="muted">{countLabel(visible.length)}</p>}
+        </div>
+        {/* PLAN-8: with nothing on the list there is no shopping list to open. */}
+        {visible !== undefined && visible.length > 0 && (
+          <Link to="/plan/shopping" className="pill-button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2" />
+              <circle cx="10" cy="20" r="1.4" />
+              <circle cx="17" cy="20" r="1.4" />
+            </svg>
+            Shopping list
+          </Link>
+        )}
       </header>
       {problem !== undefined && (
         <p ref={problemMessage} className="form-error" role="alert" tabIndex={-1}>

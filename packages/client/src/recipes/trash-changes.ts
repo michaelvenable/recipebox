@@ -1,10 +1,10 @@
 // Deleting a recipe (REC-6) and restoring it (REC-15), and what each one makes stale.
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { EditorRecipe, RediscoverEntry, TagCount, ToMakeEntry, TrashEntry } from "@recipebox/shared";
+import type { EditorRecipe, RediscoverEntry, ShoppingItem, TagCount, ToMakeEntry, TrashEntry } from "@recipebox/shared";
 import { ApiError } from "../api/client.js";
-import { planKeys, recipeKeys, rediscoverKeys, tagKeys, trashKeys } from "../api/query-keys.js";
+import { planKeys, recipeKeys, rediscoverKeys, shoppingListKeys, tagKeys, trashKeys } from "../api/query-keys.js";
 import { type ListedRecipe, deleteRecipe, restoreRecipe } from "../api/recipes.js";
-import { showSavedRecipe } from "./recipe-changes.js";
+import { showSavedRecipe, withoutShoppingItems } from "./recipe-changes.js";
 
 /** What the app knows about a recipe being deleted: enough to take it out of what is shown, and to name it. */
 export interface DeletedRecipe {
@@ -19,15 +19,16 @@ function without<T extends { id: string }>(id: string) {
 
 /**
  * REC-6: a deleted recipe disappears at once from everywhere else: the lists and search results, the tag counts, the to-make
- * list (PLAN-6) and "haven't made in a while". Each is then reloaded, so it shows what the server now says. The recipe itself is
- * removed from the cache rather than marked stale, so opening it again asks the server, which answers "not found" (REC-4),
- * instead of showing the cached copy first (REC-17).
+ * list (PLAN-6) and its shopping list (PLAN-8), and "haven't made in a while". Each is then reloaded, so it shows what the
+ * server now says. The recipe itself is removed from the cache rather than marked stale, so opening it again asks the server,
+ * which answers "not found" (REC-4), instead of showing the cached copy first (REC-17).
  */
 export function recipeDeleted(queryClient: QueryClient, recipe: DeletedRecipe): void {
   queryClient.removeQueries({ queryKey: recipeKeys.detail(recipe.id), exact: true });
   queryClient.setQueriesData<ListedRecipe[]>({ queryKey: recipeKeys.lists() }, without(recipe.id));
   queryClient.setQueriesData<ToMakeEntry[]>({ queryKey: planKeys.all }, without(recipe.id));
   queryClient.setQueriesData<RediscoverEntry[]>({ queryKey: rediscoverKeys.all }, without(recipe.id));
+  queryClient.setQueryData<ShoppingItem[]>(shoppingListKeys.all, (items) => items && withoutShoppingItems(items, recipe.id));
   queryClient.setQueryData<TagCount[]>(tagKeys.all, (counts) =>
     counts?.flatMap((count) => {
       if (!recipe.tags.includes(count.tag)) return [count];
@@ -39,6 +40,7 @@ export function recipeDeleted(queryClient: QueryClient, recipe: DeletedRecipe): 
   void queryClient.invalidateQueries({ queryKey: tagKeys.all });
   void queryClient.invalidateQueries({ queryKey: planKeys.all });
   void queryClient.invalidateQueries({ queryKey: rediscoverKeys.all });
+  void queryClient.invalidateQueries({ queryKey: shoppingListKeys.all });
   void queryClient.invalidateQueries({ queryKey: trashKeys.all });
 }
 
