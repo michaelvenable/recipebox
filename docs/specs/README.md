@@ -30,7 +30,7 @@ been cooked in a while.
   to signed-in editors. That includes the "to make" indicator (PLAN-7), last-cooked date and count (COOK-5) and the "haven't made
   in a while" view (COOK-6). The trash (REC-14) is private too, including the photos of recipes in it. The server never sends this
   data to a visitor; hiding it in the app is not enough on its own. The one exception is a shopping list an editor sends
-  (PLAN-9): anyone with its link can see that list, and nothing else, for 7 days.
+  (PLAN-9): for 7 days, anyone with its link can see the current shopping list, and nothing else.
 - **X-2.** All editors see and edit the same single collection. There is no per-user data.
 - **X-3.** Every screen is usable on a phone (≥ 360 px wide) and a tablet, without horizontal scrolling. Desktop browsers are also
   supported.
