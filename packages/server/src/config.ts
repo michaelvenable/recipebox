@@ -4,8 +4,9 @@
  * `APP_ENV` names the environment. Only when it is `development` or `test` may settings be left out or blank; they then default
  * to the Cosmos DB emulator and Azurite from docker-compose.yml, reached with the emulators' fixed keys (`COSMOS_KEY` and
  * `STORAGE_CONNECTION_STRING` may override them), and the Vite dev server's origin. In every other case, including when
- * `APP_ENV` is not set, the app is deployed: it reaches Cosmos DB and Blob Storage only with the user-assigned managed identity
- * (`AZURE_CLIENT_ID`, `COSMOS_ENDPOINT`, `STORAGE_BLOB_ENDPOINT`), every setting it uses is required, and `loadConfig` throws at
+ * `APP_ENV` is not set, the app is deployed: it reaches Cosmos DB, Blob Storage and the import queue only with the user-assigned
+ * managed identity (`AZURE_CLIENT_ID`, `COSMOS_ENDPOINT`, `STORAGE_BLOB_ENDPOINT`, `STORAGE_QUEUE_ENDPOINT`), every setting it
+ * uses is required, and `loadConfig` throws at
  * startup naming the missing ones, so a deployed app never silently uses the emulators. It also throws if `COSMOS_KEY` or
  * `STORAGE_CONNECTION_STRING` is set, so a key can't quietly be used in production (docs/architecture.md, "Access to Cosmos DB
  * and Blob Storage"). `npm run dev`, `npm run cleanup:dev` and the Vitest configs set `APP_ENV` for local use.
@@ -38,6 +39,11 @@ export interface CosmosConfig {
   container: string;
   /** The container of sent shopping lists (PLAN-9), with time to live switched on so each is removed after it expires. */
   shoppingListContainer: string;
+  /**
+   * The container of imports, one document per import, with time to live switched on so each is removed a day after its last
+   * write (IMP-3; docs/architecture.md, "Recipe import").
+   */
+  importContainer: string;
 }
 
 /** Local access to Azurite with a connection string, which also names the endpoint. Only in development and test. */
@@ -46,16 +52,26 @@ export interface StorageConnectionStringAccess {
   connectionString: string;
 }
 
-/** Deployed access to Blob Storage: the managed identity at the account's Blob endpoint (`STORAGE_BLOB_ENDPOINT`). */
+/**
+ * Deployed access to the storage account: the managed identity at the account's Blob endpoint (`STORAGE_BLOB_ENDPOINT`) and
+ * Queue endpoint (`STORAGE_QUEUE_ENDPOINT`).
+ */
 export interface StorageManagedIdentityAccess extends ManagedIdentityAccess {
   blobEndpoint: string;
+  queueEndpoint: string;
 }
 
-/** Blob Storage for photos (docs/architecture.md, "Photos"): a private container, read only through the API (X-1). */
+/**
+ * The storage account: Blob Storage for photos (docs/architecture.md, "Photos"), a private container read only through the
+ * API (X-1), and the Storage queue that starts the import job (docs/architecture.md, "Recipe import").
+ */
 export interface StorageConfig {
   /** A connection string locally, the managed identity when deployed; always exactly one of them. */
   access: StorageConnectionStringAccess | StorageManagedIdentityAccess;
+  /** Recipe photos, and the page photos of imports under `imports/` (IMP-12). */
   photoContainer: string;
+  /** The queue each started import is put on (IMP-1). */
+  importQueue: string;
 }
 
 /** The identity providers Container Apps' built-in authentication is set up with (docs/architecture.md, "Sign-in"). */
@@ -108,7 +124,8 @@ export const COSMOS_EMULATOR_KEY =
 export const AZURITE_CONNECTION_STRING =
   "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;" +
   "AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;" +
-  "BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;";
+  "BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;" +
+  "QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;";
 
 /** The Vite dev server's origin, the default `CLIENT_ORIGIN` in development and test. */
 export const DEV_CLIENT_ORIGIN = "http://localhost:5173";
@@ -191,7 +208,7 @@ function parseOrigin(value: string): string {
 }
 
 /**
- * Checks a deployed Cosmos DB or Blob Storage endpoint: `https://<account>.<domain>` exactly, so a mistyped setting can't send
+ * Checks a deployed Cosmos DB, Blob Storage or Queue Storage endpoint: `https://<account>.<domain>` exactly, so a mistyped setting can't send
  * the managed identity's token to another host (docs/architecture.md, "Access to Cosmos DB and Blob Storage"). The account
  * must be a single DNS label, so look-alikes such as `xdocuments.azure.com` or `documents.azure.com.evil.net` are refused. No
  * port is accepted, not even `:443`: the origin form is what the scripts set, and one exact form leaves nothing to interpret.
@@ -245,9 +262,12 @@ export function loadConfig(env: Env = process.env): Config {
   const cosmosDatabase = setting("COSMOS_DATABASE", "recipebox");
   const cosmosContainer = setting("COSMOS_CONTAINER", "recipes");
   const shoppingListContainer = setting("COSMOS_SHOPPING_LIST_CONTAINER", "shopping-lists");
-  // Read only when deployed; locally the connection string names the endpoint and no identity is used.
+  const importContainer = setting("COSMOS_IMPORT_CONTAINER", "imports");
+  // Read only when deployed; locally the connection string names the endpoints and no identity is used.
   const blobEndpoint = local ? "" : setting("STORAGE_BLOB_ENDPOINT", "");
+  const queueEndpoint = local ? "" : setting("STORAGE_QUEUE_ENDPOINT", "");
   const photoContainer = setting("STORAGE_PHOTO_CONTAINER", "photos");
+  const importQueue = setting("STORAGE_IMPORT_QUEUE", "imports");
   const clientId = local ? "" : setting("AZURE_CLIENT_ID", "");
   const clientOrigin = setting("CLIENT_ORIGIN", DEV_CLIENT_ORIGIN);
   if (missing.length > 0) {
@@ -260,6 +280,7 @@ export function loadConfig(env: Env = process.env): Config {
   if (!local) {
     parseAzureEndpoint("COSMOS_ENDPOINT", cosmosEndpoint, "documents.azure.com");
     parseAzureEndpoint("STORAGE_BLOB_ENDPOINT", blobEndpoint, "blob.core.windows.net");
+    parseAzureEndpoint("STORAGE_QUEUE_ENDPOINT", queueEndpoint, "queue.core.windows.net");
   }
   const cosmos: CosmosConfig = {
     endpoint: cosmosEndpoint,
@@ -269,12 +290,14 @@ export function loadConfig(env: Env = process.env): Config {
     database: cosmosDatabase,
     container: cosmosContainer,
     shoppingListContainer,
+    importContainer,
   };
   const storage: StorageConfig = {
     access: local
       ? { kind: "connectionString", connectionString: setting("STORAGE_CONNECTION_STRING", AZURITE_CONNECTION_STRING) }
-      : { kind: "managedIdentity", clientId, blobEndpoint },
+      : { kind: "managedIdentity", clientId, blobEndpoint, queueEndpoint },
     photoContainer,
+    importQueue,
   };
   return {
     cosmos,

@@ -4,10 +4,16 @@ import { Worker, type WorkerOptions } from "node:worker_threads";
 // Not used on this thread, but loaded here on purpose: sharp's documentation asks for it to be loaded on the main thread before
 // any worker uses it, so its native libraries stay loaded when a worker ends (glibc Linux, which the API runs on).
 import "sharp";
-import { type ConversionResult, type ImageType, STORED_CONTENT_TYPE } from "./photo-conversion.js";
+import {
+  type ConversionPurpose,
+  type ConversionResult,
+  type ImageType,
+  STORED_CONTENT_TYPE,
+} from "./photo-conversion.js";
 
 export {
   type ImageType,
+  IMPORT_PAGE_MAX_SIDE,
   MAX_INPUT_PIXELS,
   PHOTO_MAX_SIDE,
   STORED_CONTENT_TYPE,
@@ -148,6 +154,7 @@ function toBuffer(bytes: Uint8Array): Buffer {
 function convertInWorker(
   bytes: Buffer,
   type: ImageType,
+  purpose: ConversionPurpose,
   { timeoutMs = DECODE_TIMEOUT_MS, workerUrl = defaultWorkerUrl(), createWorker = startWorker }: PhotoProcessingOptions,
 ): Promise<ConversionResult> {
   return new Promise((resolve) => {
@@ -171,7 +178,7 @@ function convertInWorker(
     const fail = (detail: string): void => finish({ ok: false, detail });
 
     try {
-      worker = createWorker(workerUrl, { workerData: { bytes, type } });
+      worker = createWorker(workerUrl, { workerData: { bytes, type, purpose } });
     } catch (error) {
       fail(`could not start the photo worker: ${String(error)}`);
       return;
@@ -183,8 +190,10 @@ function convertInWorker(
     worker.on("exit", (code) => fail(`the photo worker exited with code ${code} without answering`));
     worker.on("message", (message: unknown) => {
       const answer = message as Partial<Record<"ok" | "photo" | "thumbnail" | "detail", unknown>> | null;
-      if (answer?.ok === true && isBytes(answer.photo) && isBytes(answer.thumbnail)) {
-        finish({ ok: true, photo: answer.photo, thumbnail: answer.thumbnail });
+      // A recipe photo needs its thumbnail; an import page photo has none.
+      const thumbnailOk = purpose === "recipe" ? isBytes(answer?.thumbnail) : answer?.thumbnail === undefined;
+      if (answer?.ok === true && isBytes(answer.photo) && thumbnailOk) {
+        finish({ ok: true, photo: answer.photo, ...(isBytes(answer.thumbnail) ? { thumbnail: answer.thumbnail } : {}) });
       } else {
         fail(typeof answer?.detail === "string" ? answer.detail : "malformed answer from the photo worker");
       }
@@ -203,20 +212,58 @@ function convertInWorker(
  * while the upload is read.
  */
 export async function processPhoto(bytes: Buffer, options: PhotoProcessingOptions = {}): Promise<ProcessingResult> {
+  const result = await decodeInQueue(bytes, "recipe", options);
+  if (!result.ok) return result;
+  const { photo, thumbnail } = result.value;
+  if (thumbnail === undefined) throw new Error("The photo worker answered a recipe photo without a thumbnail");
+  return {
+    ok: true,
+    value: { photo: toBuffer(photo), thumbnail: toBuffer(thumbnail), contentType: STORED_CONTENT_TYPE },
+  };
+}
+
+export interface ProcessedImportPage {
+  /** The page photo: at most IMPORT_PAGE_MAX_SIDE on its longer side. */
+  image: Buffer;
+  contentType: typeof STORED_CONTENT_TYPE;
+}
+
+export type ImportPageResult =
+  | { ok: true; value: ProcessedImportPage }
+  | { ok: false; reason: "unsupportedType" | "unreadable" | "busy" };
+
+/**
+ * Checks and converts the page photo of an import (IMP-2; docs/architecture.md, "Recipe import") with the same checks, decode
+ * worker and queue as a recipe photo (processPhoto): the same accepted types, pixel limit, rotation and removal of all
+ * metadata, so no location reaches the reading service. It makes one JPEG of at most IMPORT_PAGE_MAX_SIDE on its longer side
+ * and no thumbnail.
+ */
+export async function processImportPage(bytes: Buffer, options: PhotoProcessingOptions = {}): Promise<ImportPageResult> {
+  const result = await decodeInQueue(bytes, "importPage", options);
+  if (!result.ok) return result;
+  return { ok: true, value: { image: toBuffer(result.value.photo), contentType: STORED_CONTENT_TYPE } };
+}
+
+/** The type check, then one decode through the shared queue, for either purpose. */
+async function decodeInQueue(
+  bytes: Buffer,
+  purpose: ConversionPurpose,
+  options: PhotoProcessingOptions,
+): Promise<
+  | { ok: true; value: { photo: Uint8Array; thumbnail?: Uint8Array } }
+  | { ok: false; reason: "unsupportedType" | "unreadable" | "busy" }
+> {
   const type = detectImageType(bytes);
   if (type === undefined) return { ok: false, reason: "unsupportedType" };
-  const decoding = (options.queue ?? sharedDecodeQueue).run(() => convertInWorker(bytes, type, options));
+  const decoding = (options.queue ?? sharedDecodeQueue).run(() => convertInWorker(bytes, type, purpose, options));
   if (decoding === undefined) {
-    options.log?.warn({ type }, "photo refused: too many uploads are waiting to be decoded");
+    options.log?.warn({ type, purpose }, "photo refused: too many uploads are waiting to be decoded");
     return { ok: false, reason: "busy" };
   }
   const result = await decoding;
   if (!result.ok) {
-    options.log?.warn({ type, detail: result.detail }, "photo refused as unreadable");
+    options.log?.warn({ type, purpose, detail: result.detail }, "photo refused as unreadable");
     return { ok: false, reason: "unreadable" };
   }
-  return {
-    ok: true,
-    value: { photo: toBuffer(result.photo), thumbnail: toBuffer(result.thumbnail), contentType: STORED_CONTENT_TYPE },
-  };
+  return { ok: true, value: result };
 }

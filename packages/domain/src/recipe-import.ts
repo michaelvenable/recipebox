@@ -47,12 +47,12 @@ export class ImportId {
 export type ImportStatus = "reading" | "done" | "failed";
 
 /**
- * The stored Cosmos document (domain-model.md, "Recipe import snapshot"). Its id is always `current`, so there is only ever
- * one import (IMP-3). The failure reason is not stored; the server logs it (IMP-11).
+ * The stored Cosmos document (domain-model.md, "Recipe import snapshot"): one per import, its id the import's id (IMP-3).
+ * The failure reason is not stored; the server logs it (IMP-11).
  */
 export interface RecipeImportSnapshot {
-  id: "current";
-  importId: string;
+  /** The import id. */
+  id: string;
   /** ISO 8601 timestamp. */
   startedAt: string;
   status: ImportStatus;
@@ -73,8 +73,8 @@ export interface ReadRecipe {
 }
 
 /**
- * The collection's one import of a recipe from a photo (IMP-3). It is in progress while it is reading and less than 10
- * minutes have passed since it started, by the server's clock (IMP-11, X-12).
+ * One import of a recipe from a photo; any number can be in progress at once (IMP-3). It is in progress while it is reading
+ * and less than 10 minutes have passed since it started, by the server's clock (IMP-11, X-12).
  */
 export class RecipeImport {
   private constructor(
@@ -103,7 +103,7 @@ export class RecipeImport {
     return this.status;
   }
 
-  /** IMP-3: only one import can be in progress at a time. */
+  /** IMP-5: whether its card is shown, by the server's clock (X-12). */
   isInProgress(now: Instant): boolean {
     return this.statusAt(now) === "reading";
   }
@@ -140,8 +140,7 @@ export class RecipeImport {
 
   toSnapshot(): RecipeImportSnapshot {
     const snapshot: RecipeImportSnapshot = {
-      id: "current",
-      importId: this.importId.value,
+      id: this.importId.value,
       startedAt: this.started.toIso(),
       status: this.status,
     };
@@ -157,20 +156,18 @@ export class RecipeImport {
    * in the database is a bug, not user input (domain-model.md). The stored document must be exactly the snapshot.
    */
   static fromSnapshot(s: RecipeImportSnapshot): RecipeImport {
-    const id: unknown = s.id;
-    if (id !== "current") throw invalidSnapshot(`id is ${JSON.stringify(id)}, not "current"`);
     const status: unknown = s.status;
     if (status !== "reading" && status !== "done" && status !== "failed") {
       throw invalidSnapshot(`unknown status ${JSON.stringify(status)}`);
     }
-    const expected = ["id", "importId", "startedAt", "status", ...(status === "done" ? ["recipeId", "recipeName"] : [])];
+    const expected = ["id", "startedAt", "status", ...(status === "done" ? ["recipeId", "recipeName"] : [])];
     const keys = Object.keys(s).sort();
     if (keys.length !== expected.length || !expected.sort().every((k, i) => keys[i] === k)) {
       throw invalidSnapshot(`unexpected fields ${JSON.stringify(keys)} for status ${status}`);
     }
-    const importId = orThrow("importId", ImportId.create(s.importId));
+    const importId = orThrow("id", ImportId.create(typeof s.id === "string" ? s.id : ""));
     // Parsing would silently canonicalize ids and times, so stored text must already be in canonical form.
-    if (importId.value !== s.importId) throw invalidSnapshot("importId is not in its canonical form");
+    if (importId.value !== s.id) throw invalidSnapshot("id is not in its canonical form");
     const started = orThrow("startedAt", Instant.fromIso(s.startedAt));
     if (started.toIso() !== s.startedAt) throw invalidSnapshot("startedAt is not in its canonical form");
     let result: { id: RecipeId; name: RecipeName } | undefined;

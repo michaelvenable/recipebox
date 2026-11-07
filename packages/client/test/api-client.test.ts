@@ -65,6 +65,8 @@ describe("API client: requests (docs/api.md, Conventions; docs/architecture.md, 
     expect(init.credentials).toBe("include");
     // The browser writes multipart/form-data with its boundary; setting it here would leave the boundary out.
     expect(headersOf(init)["content-type"]).toBeUndefined();
+    // CSRF: every upload carries X-Requested-By (docs/architecture.md, "Sign-in").
+    expect(headersOf(init)["x-requested-by"]).toBe("recipebox");
     expect(init.body).toBeInstanceOf(FormData);
     const parts = [...(init.body as FormData).entries()];
     expect(parts).toHaveLength(1);

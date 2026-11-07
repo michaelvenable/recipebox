@@ -19,7 +19,6 @@ async function appWithTestRoutes(
   });
   app.put("/test/change", async () => ({ ok: true }));
   app.delete("/test/change", async () => ({ ok: true }));
-  app.put("/test/upload", { config: { acceptsMultipartUpload: true } }, async () => ({ ok: true }));
   app.get("/test/boom", async () => {
     throw new Error("connection string AccountKey=secret at CosmosClient.read");
   });
@@ -167,65 +166,86 @@ describe('architecture "Sign-in": CSRF, changes must be JSON', () => {
     expect(res.statusCode).toBe(200);
   });
 
-  it("lets a route opt into multipart/form-data with acceptsMultipartUpload, and only that", async () => {
-    const app = await appWithTestRoutes();
-    app.addContentTypeParser("multipart/form-data", (_request, _payload, done) => done(null, undefined));
-    const multipart = await app.inject({
-      method: "PUT",
-      url: "/test/upload",
-      headers: { "content-type": "multipart/form-data; boundary=x" },
-      payload: "--x--",
-    });
-    expect(multipart.statusCode).toBe(200);
-    const text = await app.inject({
-      method: "PUT",
-      url: "/test/upload",
-      headers: { "content-type": "text/plain" },
-      payload: "{}",
-    });
-    expect(text.statusCode).toBe(415);
-  });
+  describe("uploads: multipart/form-data only on upload routes, and only with X-Requested-By: recipebox", () => {
+    const UPLOAD = { "x-requested-by": "recipebox" };
+    const MULTIPART = { "content-type": "multipart/form-data; boundary=x" };
 
-  it.each(["POST", "DELETE", "PATCH", "GET"] as const)(
-    "refuses to build an app with acceptsMultipartUpload on a %s route",
-    async (method) => {
-      const app = await appWith();
-      await expect(async () => {
-        app.route({ method, url: "/test/upload", config: { acceptsMultipartUpload: true }, handler: async () => ({}) });
-        await app.ready();
-      }).rejects.toThrow("acceptsMultipartUpload is allowed only on PUT routes");
-    },
-  );
+    /** The app with an upload route for each method a change can use. */
+    async function appWithUploads(): Promise<FastifyInstance> {
+      const app = await appWithTestRoutes();
+      for (const method of ["POST", "PUT", "DELETE"] as const) {
+        app.route({ method, url: "/test/any-upload", config: { acceptsMultipartUpload: true }, handler: async () => ({ ok: true }) });
+      }
+      app.addContentTypeParser("multipart/form-data", (_request, _payload, done) => done(null, undefined));
+      return app;
+    }
 
-  it("refuses to build an app with acceptsMultipartUpload on a route that also takes POST", async () => {
-    const app = await appWith();
-    await expect(async () => {
-      app.route({
-        method: ["PUT", "POST"],
-        url: "/test/upload",
-        config: { acceptsMultipartUpload: true },
-        handler: async () => ({}),
-      });
-      await app.ready();
-    }).rejects.toThrow("acceptsMultipartUpload is allowed only on PUT routes");
-  });
+    it.each(["PUT", "POST", "DELETE"] as const)("accepts multipart/form-data with the header on a %s upload route", async (method) => {
+      const app = await appWithUploads();
+      const res = await app.inject({ method, url: "/test/any-upload", headers: { ...MULTIPART, ...UPLOAD }, payload: "--x--" });
+      expect(res.statusCode, res.body).toBe(200);
+    });
 
-  it("refuses multipart/form-data with 415 on a non-PUT route even if it slipped past the build check", async () => {
-    const app = await appWith();
-    // A later onRoute hook sets the flag after the build check has run, as a stand-in for any way around it.
-    app.addHook("onRoute", (route) => {
-      if (route.url === "/test/sneaky") route.config = { ...route.config, acceptsMultipartUpload: true };
+    it.each(["PUT", "POST", "DELETE"] as const)(
+      "refuses a %s upload without the header with 403 request.headerMissing, as a form on another site would send it",
+      async (method) => {
+        const app = await appWithUploads();
+        const res = await app.inject({ method, url: "/test/any-upload", headers: MULTIPART, payload: "--x--" });
+        expect(res.statusCode).toBe(403);
+        expectErrorResponse(res.json(), "request.headerMissing");
+      },
+    );
+
+    it.each([
+      ["another value", { "x-requested-by": "evil" }],
+      ["an empty value", { "x-requested-by": "" }],
+      ["the value in other case", { "x-requested-by": "RecipeBox" }],
+      ["a different header", { "x-requested-with": "recipebox" }],
+    ])("refuses an upload with %s with 403", async (_case, headers) => {
+      const app = await appWithUploads();
+      const res = await app.inject({ method: "POST", url: "/test/any-upload", headers: { ...MULTIPART, ...headers }, payload: "--x--" });
+      expect(res.statusCode).toBe(403);
+      expectErrorResponse(res.json(), "request.headerMissing");
     });
-    app.post("/test/sneaky", async () => ({ ok: true }));
-    app.addContentTypeParser("multipart/form-data", (_request, _payload, done) => done(null, undefined));
-    const res = await app.inject({
-      method: "POST",
-      url: "/test/sneaky",
-      headers: { "content-type": "multipart/form-data; boundary=x" },
-      payload: "--x--",
+
+    it("refuses before the body is read, whatever its content type", async () => {
+      const app = await appWithUploads();
+      for (const type of ["application/json", "text/plain", "application/x-www-form-urlencoded"]) {
+        const res = await app.inject({ method: "POST", url: "/test/any-upload", headers: { "content-type": type }, payload: "{" });
+        expect(res.statusCode, type).toBe(403);
+        expectErrorResponse(res.json(), "request.headerMissing");
+      }
     });
-    expect(res.statusCode).toBe(415);
-    expectErrorResponse(res.json(), "request.unsupportedMediaType");
+
+    it("refuses text/plain and form-urlencoded on an upload route with 415, even with the header", async () => {
+      const app = await appWithUploads();
+      for (const type of ["text/plain", "application/x-www-form-urlencoded"]) {
+        const res = await app.inject({
+          method: "POST",
+          url: "/test/any-upload",
+          headers: { "content-type": type, ...UPLOAD },
+          payload: "x",
+        });
+        expect(res.statusCode, type).toBe(415);
+        expectErrorResponse(res.json(), "request.unsupportedMediaType");
+      }
+    });
+
+    it.each(["POST", "PUT", "DELETE"] as const)(
+      "refuses multipart/form-data with 415 on a %s route that isn't an upload, even with the header",
+      async (method) => {
+        const app = await appWithTestRoutes();
+        const res = await app.inject({ method, url: "/test/change", headers: { ...MULTIPART, ...UPLOAD }, payload: "--x--" });
+        expect(res.statusCode).toBe(415);
+        expectErrorResponse(res.json(), "request.unsupportedMediaType");
+      },
+    );
+
+    it("doesn't ask JSON changes to other routes for the header", async () => {
+      const app = await appWithTestRoutes();
+      const res = await app.inject({ method: "PUT", url: "/test/change", headers: JSON_HEADERS, payload: "{}" });
+      expect(res.statusCode).toBe(200);
+    });
   });
 
   it("does not require a content type for GET", async () => {
@@ -270,6 +290,34 @@ describe('architecture "Sign-in": CORS', () => {
     expect(res.headers["access-control-allow-credentials"]).toBe("true");
     const allowed = String(res.headers["access-control-allow-methods"]).split(",").map((m) => m.trim());
     expect(allowed).toContain(method);
+  });
+
+  it.each(["POST", "PUT"])("allows the client's %s upload preflight the X-Requested-By header", async (method) => {
+    const app = await appWithTestRoutes(env);
+    const res = await app.inject({
+      method: "OPTIONS",
+      url: "/imports",
+      headers: { origin: clientOrigin, "access-control-request-method": method, "access-control-request-headers": "x-requested-by" },
+    });
+    expect(res.statusCode).toBeLessThan(300);
+    expect(res.headers["access-control-allow-origin"]).toBe(clientOrigin);
+    const allowed = String(res.headers["access-control-allow-headers"]).split(",").map((h) => h.trim().toLowerCase());
+    expect(allowed).toContain("x-requested-by");
+  });
+
+  it("gives another origin's upload preflight no CORS allowance, so its script can't send X-Requested-By", async () => {
+    const app = await appWithTestRoutes(env);
+    const res = await app.inject({
+      method: "OPTIONS",
+      url: "/imports",
+      headers: {
+        origin: "https://evil.example.com",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "x-requested-by",
+      },
+    });
+    expect(res.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(res.headers["access-control-allow-headers"]).toBeUndefined();
   });
 
   it.each(["POST", "PUT", "DELETE"])("gives another origin's %s preflight no CORS allowance", async (method) => {

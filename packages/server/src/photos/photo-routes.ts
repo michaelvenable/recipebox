@@ -37,7 +37,7 @@ interface IdParams {
   id: string;
 }
 
-type Upload = { ok: true; bytes: Buffer } | { ok: false; error: ErrorItem };
+export type Upload = { ok: true; bytes: Buffer } | { ok: false; error: ErrorItem };
 
 const TOO_LARGE: ErrorItem = {
   code: "photo.tooLarge",
@@ -49,23 +49,23 @@ const NOT_ONE_FILE: ErrorItem = {
   field: "photo",
   message: "Send exactly one image file as multipart/form-data, with no other fields.",
 };
-const UNSUPPORTED: ErrorItem = {
+export const UNSUPPORTED: ErrorItem = {
   code: "photo.unsupportedType",
   field: "photo",
   message: "This file isn't a JPEG, PNG or WebP image.",
 };
-const UNREADABLE: ErrorItem = {
+export const UNREADABLE: ErrorItem = {
   code: "photo.unreadable",
   field: "photo",
   message: "This image can't be read. It may be damaged or incomplete.",
 };
 
-const BUSY: ErrorItem = {
+export const BUSY: ErrorItem = {
   code: "photo.busy",
   message: "Too many photos are being processed. Try again in a moment.",
 };
 
-function sendError(reply: FastifyReply, status: number, error: ErrorItem): FastifyReply {
+export function sendError(reply: FastifyReply, status: number, error: ErrorItem): FastifyReply {
   return reply.code(status).send({ errors: [error] } satisfies ErrorResponse);
 }
 
@@ -77,7 +77,7 @@ function sendPhotoNotFound(reply: FastifyReply): FastifyReply {
  * Reads the one uploaded file. The 15 MB limit (REC-7) is enforced while reading: once a file passes it, reading stops and the
  * request is refused, so an oversized upload is never held in memory whole.
  */
-async function readUpload(request: FastifyRequest): Promise<Upload> {
+export async function readUpload(request: FastifyRequest): Promise<Upload> {
   let bytes: Buffer | undefined;
   try {
     const parts = request.parts({ limits: { fileSize: MAX_PHOTO_BYTES, files: 1, fields: 0, parts: 1 } });
@@ -98,7 +98,11 @@ async function readUpload(request: FastifyRequest): Promise<Upload> {
  * Deletes images without failing the request: used after the recipe is saved (the change has happened; an image left behind
  * only costs storage) and when cleaning up after a failure (the original error is what the caller should see).
  */
-async function deleteImages(photos: PhotoStore, names: readonly string[], log: FastifyBaseLogger): Promise<void> {
+export async function deleteImages(
+  photos: PhotoStore,
+  names: readonly string[],
+  log: FastifyBaseLogger,
+): Promise<void> {
   await Promise.all(
     names.map(async (name) => {
       try {
@@ -129,7 +133,7 @@ export async function registerPhotoRoutes(
   { recipes, photos, photoProcessing = {} }: PhotoRouteDependencies,
 ): Promise<void> {
   // Parses multipart/form-data for the routes in this scope only. Whether a request may send it at all is decided earlier, by
-  // registerJsonOnlyChanges: only on PUT routes that opt in with acceptsMultipartUpload (docs/architecture.md, "Sign-in").
+  // registerJsonOnlyChanges: only on routes that opt in with acceptsMultipartUpload (docs/architecture.md, "Sign-in").
   await app.register(multipart);
 
   async function load(rawId: string): Promise<Recipe | undefined> {

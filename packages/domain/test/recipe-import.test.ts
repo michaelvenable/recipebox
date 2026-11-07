@@ -38,7 +38,7 @@ function aRecipe(name = "Banana Bread"): Recipe {
   return valueOf(Recipe.create(recipeId(), { name, ingredients: ["Something"], steps: ["Cook it."] }));
 }
 
-describe("IMP-3 import id", () => {
+describe("IMP-1 import id", () => {
   it("accepts a UUID and stores it in lowercase, like a recipe id", () => {
     expect(importId("6F1C2B9E-3D4A-4E5F-8A7B-0C1D2E3F4A5B").value).toBe(IMPORT_ID);
   });
@@ -53,7 +53,7 @@ describe("IMP-3 import id", () => {
   });
 });
 
-describe("IMP-3 one import at a time: an import is in progress while it is reading", () => {
+describe("IMP-5 an import is in progress while it is reading", () => {
   it("is reading as soon as it starts", () => {
     const imp = started();
     expect(imp.id.value).toBe(IMPORT_ID);
@@ -71,7 +71,7 @@ describe("IMP-3 one import at a time: an import is in progress while it is readi
     expect(imp.isInProgress(at("2026-11-07T09:01:00Z"))).toBe(false);
   });
 
-  it("is no longer in progress once it has failed, so a new one can start (IMP-11)", () => {
+  it("is no longer in progress once it has failed (IMP-11)", () => {
     const imp = started();
     imp.fail();
     expect(imp.statusAt(at("2026-11-07T09:01:00Z"))).toBe("failed");
@@ -284,11 +284,10 @@ describe("IMP-8 an imported recipe gets only tags already in use, at most 5", ()
   });
 });
 
-describe("IMP-3 recipe import snapshot", () => {
-  it("has the documented shape while reading: one document with the id current", () => {
+describe("IMP-3 recipe import snapshot: one document per import", () => {
+  it("has the documented shape while reading: its id is the import id", () => {
     expect(started().toSnapshot()).toEqual({
-      id: "current",
-      importId: IMPORT_ID,
+      id: IMPORT_ID,
       startedAt: "2026-11-07T09:00:00.000Z",
       status: "reading",
     });
@@ -304,8 +303,7 @@ describe("IMP-3 recipe import snapshot", () => {
     const imp = started();
     valueOf(imp.succeed(aRecipe("Pad Thai"), at("2026-11-07T09:02:00Z")));
     expect(imp.toSnapshot()).toEqual({
-      id: "current",
-      importId: IMPORT_ID,
+      id: IMPORT_ID,
       startedAt: "2026-11-07T09:00:00.000Z",
       status: "done",
       recipeId: RECIPE_ID,
@@ -317,8 +315,7 @@ describe("IMP-3 recipe import snapshot", () => {
     const imp = started();
     imp.fail();
     expect(imp.toSnapshot()).toEqual({
-      id: "current",
-      importId: IMPORT_ID,
+      id: IMPORT_ID,
       startedAt: "2026-11-07T09:00:00.000Z",
       status: "failed",
     });
@@ -360,9 +357,11 @@ describe("IMP-3 recipe import snapshot", () => {
     const reading = (): RecipeImportSnapshot => started().toSnapshot();
 
     const cases: [string, () => RecipeImportSnapshot, (s: RecipeImportSnapshot) => void][] = [
-      ["an id other than current", reading, (s) => Object.assign(s, { id: IMPORT_ID })],
-      ["an invalid import id", reading, (s) => (s.importId = "nope")],
-      ["an import id not in lowercase", reading, (s) => (s.importId = IMPORT_ID.toUpperCase())],
+      ["an invalid id", reading, (s) => (s.id = "nope")],
+      ["the old fixed id current", reading, (s) => (s.id = "current")],
+      ["an id that isn't text", reading, (s) => Object.assign(s, { id: 42 })],
+      ["an id not in lowercase", reading, (s) => (s.id = IMPORT_ID.toUpperCase())],
+      ["a separate importId field, as in the old shape", reading, (s) => Object.assign(s, { importId: IMPORT_ID })],
       ["an invalid startedAt", reading, (s) => (s.startedAt = "yesterday")],
       ["a startedAt not in canonical form", reading, (s) => (s.startedAt = "2026-11-07T09:00:00Z")],
       ["an unknown status", reading, (s) => Object.assign(s, { status: "timedOut" })],

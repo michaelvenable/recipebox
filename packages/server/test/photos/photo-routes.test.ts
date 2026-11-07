@@ -16,7 +16,14 @@ import {
   seed,
   storedSnapshots,
 } from "../recipes/recipe-route-helpers.js";
-import { multipartBody, photoApp, type PhotoTestApp, uploadBody, uploadPhoto } from "./photo-route-helpers.js";
+import {
+  multipartBody,
+  photoApp,
+  type PhotoTestApp,
+  UPLOAD_HEADERS,
+  uploadBody,
+  uploadPhoto,
+} from "./photo-route-helpers.js";
 import {
   colorAt,
   expectColor,
@@ -240,7 +247,13 @@ describe("REC-7 anything else is rejected and the recipe is unchanged", () => {
 
   it("refuses a JSON body with 415: the photo is sent as multipart/form-data", async () => {
     const setup = await appWithRecipe();
-    const res = await change(setup.app, "PUT", `/recipes/${setup.id}/photo`, { photo: "data:image/jpeg;base64,AAAA" });
+    const res = await change(
+      setup.app,
+      "PUT",
+      `/recipes/${setup.id}/photo`,
+      { photo: "data:image/jpeg;base64,AAAA" },
+      { ...AS_EDITOR, ...UPLOAD_HEADERS },
+    );
     expectErrors(res, 415, ["request.unsupportedMediaType"]);
   });
 });

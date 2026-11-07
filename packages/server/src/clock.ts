@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { Instant, RecipeId, ShareToken } from "@recipebox/domain";
+import { ImportId, Instant, RecipeId, ShareToken } from "@recipebox/domain";
 
 /**
  * The server's clock (X-12): the only source of every stored time. Passed into the app so tests can set the time; the domain
@@ -32,4 +32,13 @@ export const randomShareToken: ShareTokenGenerator = () => {
   const token = ShareToken.create(randomBytes(SHARE_TOKEN_BYTES).toString("base64url"));
   if (!token.ok) throw new Error("crypto.randomBytes gave a link code the domain refuses");
   return token.value;
+};
+
+/** Creates the id of a new import (IMP-1). Passed into the app so tests can control ids. */
+export type ImportIdGenerator = () => ImportId;
+
+export const randomImportId: ImportIdGenerator = () => {
+  const id = ImportId.create(randomUUID());
+  if (!id.ok) throw new Error("crypto.randomUUID returned something that is not a UUID");
+  return id.value;
 };

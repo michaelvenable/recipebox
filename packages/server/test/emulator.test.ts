@@ -3,6 +3,7 @@ import { AZURITE_CONNECTION_STRING, COSMOS_EMULATOR_ENDPOINT, COSMOS_EMULATOR_KE
 import {
   assertLocalConnectionString,
   assertLocalEndpoint,
+  assertLocalQueueConnectionString,
   emulatorCosmosConfig,
   emulatorStorageConfig,
 } from "./emulator.js";
@@ -56,6 +57,22 @@ describe("integration tests never touch Azure", () => {
     expect(() => assertLocalConnectionString(connectionString)).toThrow(/Refusing to run tests/);
     try {
       assertLocalConnectionString(connectionString);
+    } catch (error) {
+      expect(String(error)).not.toContain("c2VjcmV0");
+    }
+  });
+
+  it("accepts Azurite's Queue endpoint, for the import queue (IMP-1)", () => {
+    expect(() => assertLocalQueueConnectionString(AZURITE_CONNECTION_STRING)).not.toThrow();
+  });
+
+  it.each([
+    ["no Queue endpoint, which would mean Azure's", "AccountName=x;AccountKey=c2VjcmV0;BlobEndpoint=http://127.0.0.1:10000/x"],
+    ["an Azure Queue endpoint", "AccountName=x;AccountKey=c2VjcmV0;QueueEndpoint=https://recipebox.queue.core.windows.net/"],
+  ])("refuses a storage connection string with %s, without showing its key", (_name, connectionString) => {
+    expect(() => assertLocalQueueConnectionString(connectionString)).toThrow(/Refusing to run tests/);
+    try {
+      assertLocalQueueConnectionString(connectionString);
     } catch (error) {
       expect(String(error)).not.toContain("c2VjcmV0");
     }

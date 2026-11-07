@@ -73,7 +73,7 @@ describe("X-6 only editors change photos", () => {
   }
 });
 
-describe('architecture "Sign-in": multipart/form-data only on PUT /recipes/{id}/photo', () => {
+describe('architecture "Sign-in": multipart/form-data only on upload routes, with X-Requested-By', () => {
   it.each([
     ["DELETE", "/recipes/{id}/photo"],
     ["POST", "/recipes"],
@@ -97,6 +97,26 @@ describe('architecture "Sign-in": multipart/form-data only on PUT /recipes/{id}/
     });
 
     expectErrors(res, 415, ["request.unsupportedMediaType"]);
+    expect(await stateOf(setup)).toEqual(before);
+  });
+
+  it.each([
+    ["no X-Requested-By, as a form on another site sends it", {}],
+    ["another X-Requested-By value", { "x-requested-by": "other" }],
+  ])("refuses an upload with %s with 403 request.headerMissing, before looking up the recipe", async (_case, headers) => {
+    const setup = await appWithPhotos();
+    const before = await stateOf(setup);
+    const { payload, contentType } = multipartBody([{ bytes: await jpeg() }]);
+
+    const res = await setup.app.inject({
+      method: "PUT",
+      url: `/recipes/${setup.id}/photo`,
+      headers: { ...AS_EDITOR, ...headers, "content-type": contentType },
+      payload,
+    });
+
+    expectErrors(res, 403, ["request.headerMissing"]);
+    expect(setup.repository.lookups).toBe(0);
     expect(await stateOf(setup)).toEqual(before);
   });
 

@@ -14,6 +14,12 @@ export const PHOTO_MAX_SIDE = 2000;
 export const THUMBNAIL_MAX_SIDE = 400;
 
 /**
+ * The longest side of a stored import page photo (docs/architecture.md, "Recipe import"): enough to read a recipe card, small
+ * enough to keep the call to the reading service small. Smaller images are not enlarged.
+ */
+export const IMPORT_PAGE_MAX_SIDE = 2048;
+
+/**
  * Both stored images are JPEG, whatever was uploaded: every browser can show it (docs/architecture.md, "Photos").
  * Transparent areas of PNG and WebP uploads become white.
  */
@@ -23,14 +29,24 @@ const JPEG_QUALITY = 82;
 /** REC-7: the accepted types. */
 export type ImageType = "jpeg" | "png" | "webp";
 
-/** What a worker is given. */
+/**
+ * What the image is for: a recipe photo, stored as a display image and a thumbnail (REC-7), or the page photo of an import,
+ * stored as one image for the reading service (IMP-1, IMP-12).
+ */
+export type ConversionPurpose = "recipe" | "importPage";
+
+/** What a worker is given. Without `purpose`, a recipe photo. */
 export interface ConversionRequest {
   bytes: Uint8Array;
   type: ImageType;
+  purpose?: ConversionPurpose;
 }
 
-/** What a worker answers. `detail` says why the image was refused, for the log. */
-export type ConversionResult = { ok: true; photo: Uint8Array; thumbnail: Uint8Array } | { ok: false; detail: string };
+/**
+ * What a worker answers. `detail` says why the image was refused, for the log. A recipe photo has a thumbnail; an import page
+ * photo has none.
+ */
+export type ConversionResult = { ok: true; photo: Uint8Array; thumbnail?: Uint8Array } | { ok: false; detail: string };
 
 /**
  * Decodes the upload once and makes both stored images from that one decode:
@@ -38,10 +54,11 @@ export type ConversionResult = { ok: true; photo: Uint8Array; thumbnail: Uint8Ar
  * - all metadata is dropped: EXIF (including GPS location), XMP, IPTC, comments and ICC profiles. Recipes are public (X-1) and
  *   phone photos record where they were taken. Colors are converted to sRGB first, so dropping the profile doesn't shift them.
  */
-export async function convertPhoto({ bytes, type }: ConversionRequest): Promise<ConversionResult> {
+export async function convertPhoto({ bytes, type, purpose = "recipe" }: ConversionRequest): Promise<ConversionResult> {
   try {
     const source = await decode(bytes, type);
     if (!source.ok) return source;
+    if (purpose === "importPage") return await convertImportPage(source.image);
     // The one decode: the source at display size, flattened onto white and in sRGB, as raw pixels without any metadata. JPEG
     // sources are shrunk while they are decoded, so a large photo never exists at full size here.
     const { data, info } = await source.image
@@ -64,6 +81,21 @@ export async function convertPhoto({ bytes, type }: ConversionRequest): Promise<
     // sharp throws for corrupt or truncated files; the file was the problem, not the server.
     return { ok: false, detail: error instanceof Error ? error.message : String(error) };
   }
+}
+
+/**
+ * The page photo of an import (docs/architecture.md, "Recipe import"): oriented, at most IMPORT_PAGE_MAX_SIDE on its longer
+ * side, flattened onto white, in sRGB and without any metadata, the same way as a recipe photo, so no location reaches the
+ * reading service.
+ */
+async function convertImportPage(image: Sharp): Promise<ConversionResult> {
+  const photo = await image
+    .resize({ width: IMPORT_PAGE_MAX_SIDE, height: IMPORT_PAGE_MAX_SIDE, fit: "inside", withoutEnlargement: true })
+    .flatten({ background: "#ffffff" })
+    .toColourspace("srgb")
+    .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
+    .toBuffer();
+  return { ok: true, photo };
 }
 
 /** A sharp pipeline reading the upload, already in display orientation, or why it can't be read as `type`. */

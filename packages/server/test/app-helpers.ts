@@ -1,8 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { Instant } from "@recipebox/domain";
 import { type AppDependencies, buildApp } from "../src/app.js";
-import { randomRecipeId, randomShareToken } from "../src/clock.js";
+import { randomImportId, randomRecipeId, randomShareToken } from "../src/clock.js";
 import { type Config, loadConfig } from "../src/config.js";
+import { InMemoryImportQueue } from "../src/imports/in-memory-import-queue.js";
+import { InMemoryImportRepository } from "../src/imports/in-memory-import-repository.js";
 import { InMemoryPhotoStore } from "../src/photos/in-memory-photo-store.js";
 import { InMemoryRecipeRepository } from "../src/recipes/in-memory-recipe-repository.js";
 import { InMemorySharedListRepository } from "../src/shopping-lists/in-memory-shared-list-repository.js";
@@ -13,8 +15,11 @@ export const DEPLOYED_SETTINGS = {
   COSMOS_DATABASE: "db",
   COSMOS_CONTAINER: "recipes-prod",
   COSMOS_SHOPPING_LIST_CONTAINER: "shopping-lists-prod",
+  COSMOS_IMPORT_CONTAINER: "imports-prod",
   STORAGE_BLOB_ENDPOINT: "https://recipebox.blob.core.windows.net",
+  STORAGE_QUEUE_ENDPOINT: "https://recipebox.queue.core.windows.net",
   STORAGE_PHOTO_CONTAINER: "photos-prod",
+  STORAGE_IMPORT_QUEUE: "imports-prod",
   AZURE_CLIENT_ID: "00000000-0000-0000-0000-000000000001",
   CLIENT_ORIGIN: "https://recipes.example.net",
 };
@@ -40,17 +45,34 @@ export function instant(iso: string): Instant {
 export async function appWith(
   env: Record<string, string | undefined> = {},
   logger: AppDependencies["logger"] = false,
-  deps: Partial<Pick<AppDependencies, "recipes" | "sharedLists" | "photos" | "clock" | "newRecipeId" | "newShareToken" | "photoProcessing">> = {},
+  deps: Partial<
+    Pick<
+      AppDependencies,
+      | "recipes"
+      | "sharedLists"
+      | "imports"
+      | "importQueue"
+      | "photos"
+      | "clock"
+      | "newRecipeId"
+      | "newShareToken"
+      | "newImportId"
+      | "photoProcessing"
+    >
+  > = {},
 ): Promise<FastifyInstance> {
   return buildApp({
     config: configFrom(env),
     logger,
     recipes: deps.recipes ?? new InMemoryRecipeRepository(),
     sharedLists: deps.sharedLists ?? new InMemorySharedListRepository(),
+    imports: deps.imports ?? new InMemoryImportRepository(),
+    importQueue: deps.importQueue ?? new InMemoryImportQueue(),
     photos: deps.photos ?? new InMemoryPhotoStore(),
     clock: deps.clock ?? (() => instant(TEST_TIME)),
     newRecipeId: deps.newRecipeId ?? randomRecipeId,
     newShareToken: deps.newShareToken ?? randomShareToken,
+    newImportId: deps.newImportId ?? randomImportId,
     ...(deps.photoProcessing === undefined ? {} : { photoProcessing: deps.photoProcessing }),
   });
 }

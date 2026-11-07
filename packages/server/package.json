@@ -15,6 +15,7 @@
     "@azure/cosmos": "^4.10.1",
     "@azure/identity": "^4.14.1",
     "@azure/storage-blob": "^12.34.0",
+    "@azure/storage-queue": "^12.32.0",
     "@fastify/cors": "^11.3.1",
     "@fastify/multipart": "^10.1.6",
     "@recipebox/domain": "^0.0.0",

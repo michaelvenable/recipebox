@@ -18,19 +18,21 @@ export function emulatorCosmosConfig(): CosmosConfig {
     database: "recipebox",
     container: "recipes",
     shoppingListContainer: "shopping-lists",
+    importContainer: "imports",
   };
   assertLocalEndpoint(config.endpoint);
   return config;
 }
 
 /**
- * Blob Storage settings for integration tests: always Azurite, whatever STORAGE_* in the environment says, for the same reason
+ * Blob and Queue Storage settings for integration tests: always Azurite, whatever STORAGE_* in the environment says, for the same reason
  * as emulatorCosmosConfig.
  */
 export function emulatorStorageConfig(): StorageConfig {
   const connectionString = AZURITE_CONNECTION_STRING;
   assertLocalConnectionString(connectionString);
-  return { access: { kind: "connectionString", connectionString }, photoContainer: "photos" };
+  assertLocalQueueConnectionString(connectionString);
+  return { access: { kind: "connectionString", connectionString }, photoContainer: "photos", importQueue: "imports" };
 }
 
 const LOCAL_HOSTS: readonly string[] = ["localhost", "127.0.0.1"];
@@ -54,13 +56,23 @@ export function assertLocalEndpoint(endpoint: string): void {
  * the string itself may hold a real account key.
  */
 export function assertLocalConnectionString(connectionString: string): void {
-  const blobEndpoint = connectionString
+  assertLocalServiceEndpoint(connectionString, "BlobEndpoint");
+}
+
+/** The same for the Queue endpoint, which the import queue uses (IMP-1). */
+export function assertLocalQueueConnectionString(connectionString: string): void {
+  assertLocalServiceEndpoint(connectionString, "QueueEndpoint");
+}
+
+function assertLocalServiceEndpoint(connectionString: string, name: "BlobEndpoint" | "QueueEndpoint"): void {
+  const prefix = `${name.toLowerCase()}=`;
+  const endpoint = connectionString
     .split(";")
     .map((part) => part.trim())
-    .find((part) => part.toLowerCase().startsWith("blobendpoint="))
-    ?.slice("blobendpoint=".length);
-  if (blobEndpoint === undefined || blobEndpoint === "") {
-    throw new Error("Refusing to run tests against a storage account without a local BlobEndpoint: tests only use Azurite.");
+    .find((part) => part.toLowerCase().startsWith(prefix))
+    ?.slice(prefix.length);
+  if (endpoint === undefined || endpoint === "") {
+    throw new Error(`Refusing to run tests against a storage account without a local ${name}: tests only use Azurite.`);
   }
-  assertLocalEndpoint(blobEndpoint);
+  assertLocalEndpoint(endpoint);
 }

@@ -100,7 +100,10 @@ export function uploadBody(
   return app.inject({
     method: "PUT",
     url: `/recipes/${id}/photo`,
-    headers: { ...as, "content-type": contentType },
+    headers: { ...as, ...UPLOAD_HEADERS, "content-type": contentType },
     payload,
   });
 }
+
+/** The header the client sends with every upload (CSRF; docs/architecture.md, "Sign-in"). */
+export const UPLOAD_HEADERS = { "x-requested-by": "recipebox" };

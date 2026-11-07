@@ -6,6 +6,7 @@ import {
   EmptyRequest,
   ErrorResponse,
   HealthResponse,
+  ImportStatus,
   Me,
   PublicRecipe,
   RecipeContentInput,
@@ -314,6 +315,33 @@ describe("api.md Shapes: ShoppingListLink and SharedShoppingList (PLAN-9)", () =
     for (const [field, value] of Object.entries({ ...PRIVATE_FIELDS, createdAt: T2, token: "x" })) {
       expect(SharedShoppingList.safeParse({ ...shared, [field]: value }).success, field).toBe(false);
       expect(SharedShoppingList.safeParse({ ...shared, items: [{ ...item, [field]: value }] }).success, field).toBe(false);
+    }
+  });
+});
+
+describe("api.md Shapes: ImportStatus (IMP-5, IMP-10, IMP-11)", () => {
+  const IMPORT_ID = "0b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d";
+  const done = { importId: IMPORT_ID, status: "done", recipeId: ID, recipeName: "Banana Bread" };
+
+  it("parses reading, failed and done", () => {
+    expect(ImportStatus.parse({ importId: IMPORT_ID, status: "reading" })).toEqual({ importId: IMPORT_ID, status: "reading" });
+    expect(ImportStatus.parse({ importId: IMPORT_ID, status: "failed" })).toEqual({ importId: IMPORT_ID, status: "failed" });
+    expect(ImportStatus.parse(done)).toEqual(done);
+  });
+  it("requires importId and status, and recipeId and recipeName when done", () => {
+    expectRequired(ImportStatus, done, ["importId", "status", "recipeId", "recipeName"]);
+    expect(ImportStatus.safeParse({ importId: IMPORT_ID, status: "pending" }).success).toBe(false);
+  });
+  it("has recipeId and recipeName only when done", () => {
+    for (const status of ["reading", "failed"]) {
+      expect(ImportStatus.safeParse({ importId: IMPORT_ID, status, recipeId: ID }).success, status).toBe(false);
+      expect(ImportStatus.safeParse({ importId: IMPORT_ID, status, recipeName: "Banana Bread" }).success, status).toBe(false);
+    }
+  });
+  it("has no start time, failure reason or photo (IMP-11)", () => {
+    for (const [field, value] of Object.entries({ startedAt: T1, reason: "timed-out", photo: "imports/x.jpg", id: "current" })) {
+      expect(ImportStatus.safeParse({ ...done, [field]: value }).success, field).toBe(false);
+      expect(ImportStatus.safeParse({ importId: IMPORT_ID, status: "failed", [field]: value }).success, field).toBe(false);
     }
   });
 });

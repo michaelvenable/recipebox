@@ -30,6 +30,13 @@ const DEVELOPMENT_API_URL = "http://localhost:3000";
 /** Must match DEV_IDENTITY_HEADER in packages/server/src/http/caller.ts. */
 export const DEV_IDENTITY_HEADER = "x-dev-identity";
 
+/**
+ * Every upload carries this header (CSRF; docs/architecture.md, "Sign-in"): a form on another site can't add it. Must match
+ * UPLOAD_HEADER and UPLOAD_HEADER_VALUE in packages/server/src/http/content-type.ts.
+ */
+export const UPLOAD_HEADER = "x-requested-by";
+export const UPLOAD_HEADER_VALUE = "recipebox";
+
 /** The API's address without a trailing slash. Read on each call, so tests can change the environment. */
 export function apiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_URL;
@@ -71,6 +78,7 @@ async function send(method: string, path: string, init: SendOptions): Promise<Re
   const request: RequestInit = { method, headers, credentials: "include" };
   if (init.form !== undefined) {
     // No content type here: the browser writes multipart/form-data with the boundary it chose.
+    headers[UPLOAD_HEADER] = UPLOAD_HEADER_VALUE;
     request.body = init.form;
   } else if (init.body !== undefined) {
     // CSRF protection: every change is JSON (docs/architecture.md, "Sign-in").
@@ -98,8 +106,8 @@ export async function apiChange<T>(method: ChangeMethod, path: string, schema: S
 }
 
 /**
- * `PUT path` with one file as `multipart/form-data`, the one exception to the JSON rule (docs/api.md, PUT /recipes/{id}/photo).
- * The server accepts it only on that route, and only with exactly one file part and nothing else.
+ * `PUT path` with one file as `multipart/form-data`, an upload, the exception to the JSON rule (docs/api.md, Conventions), with
+ * the `X-Requested-By` header every upload needs. The server accepts it only with exactly one file part and nothing else.
  */
 export async function apiUpload<T>(path: string, schema: Schema<T>, file: File): Promise<T> {
   const form = new FormData();

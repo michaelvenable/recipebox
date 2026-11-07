@@ -14,8 +14,11 @@ const allSettings = {
   COSMOS_DATABASE: "db",
   COSMOS_CONTAINER: "recipes-prod",
   COSMOS_SHOPPING_LIST_CONTAINER: "shopping-lists-prod",
+  COSMOS_IMPORT_CONTAINER: "imports-prod",
   STORAGE_BLOB_ENDPOINT: "https://recipebox.blob.core.windows.net",
+  STORAGE_QUEUE_ENDPOINT: "https://recipebox.queue.core.windows.net",
   STORAGE_PHOTO_CONTAINER: "photos-prod",
+  STORAGE_IMPORT_QUEUE: "imports-prod",
   AZURE_CLIENT_ID: "11111111-2222-3333-4444-555555555555",
   CLIENT_ORIGIN: "https://recipes.example.net",
 };
@@ -37,10 +40,12 @@ describe("loadConfig", () => {
       database: "recipebox",
       container: "recipes",
       shoppingListContainer: "shopping-lists",
+      importContainer: "imports",
     });
     expect(config.storage).toEqual({
       access: { kind: "connectionString", connectionString: AZURITE_CONNECTION_STRING },
       photoContainer: "photos",
+      importQueue: "imports",
     });
     expect(config.clientOrigin).toBe(DEV_CLIENT_ORIGIN);
     expect(config.local).toBe(true);
@@ -56,6 +61,8 @@ describe("loadConfig", () => {
     expect(deployed.cosmos).toMatchObject({ endpoint: allSettings.COSMOS_ENDPOINT, database: "db", container: "recipes-prod" });
     expect(deployed.cosmos.shoppingListContainer).toBe("shopping-lists-prod");
     expect(deployed.storage.photoContainer).toBe("photos-prod");
+    expect(deployed.cosmos.importContainer).toBe("imports-prod");
+    expect(deployed.storage.importQueue).toBe("imports-prod");
     expect(deployed.clientOrigin).toBe("https://recipes.example.net");
     expect(deployed.local).toBe(false);
   });
@@ -65,7 +72,8 @@ describe("loadConfig", () => {
     (appEnv) => {
       expect(() => loadConfig({ APP_ENV: appEnv })).toThrow(
         "Missing required settings: COSMOS_ENDPOINT, COSMOS_DATABASE, COSMOS_CONTAINER, COSMOS_SHOPPING_LIST_CONTAINER, " +
-          "STORAGE_BLOB_ENDPOINT, STORAGE_PHOTO_CONTAINER, AZURE_CLIENT_ID, CLIENT_ORIGIN.",
+          "COSMOS_IMPORT_CONTAINER, STORAGE_BLOB_ENDPOINT, STORAGE_QUEUE_ENDPOINT, STORAGE_PHOTO_CONTAINER, " +
+          "STORAGE_IMPORT_QUEUE, AZURE_CLIENT_ID, CLIENT_ORIGIN.",
       );
     },
   );
@@ -145,10 +153,11 @@ describe("docs/architecture.md, Access to Cosmos DB and Blob Storage", () => {
       kind: "managedIdentity",
       clientId: allSettings.AZURE_CLIENT_ID,
       blobEndpoint: allSettings.STORAGE_BLOB_ENDPOINT,
+      queueEndpoint: allSettings.STORAGE_QUEUE_ENDPOINT,
     });
   });
 
-  it.each(["COSMOS_ENDPOINT", "STORAGE_BLOB_ENDPOINT", "AZURE_CLIENT_ID"] as const)(
+  it.each(["COSMOS_ENDPOINT", "STORAGE_BLOB_ENDPOINT", "STORAGE_QUEUE_ENDPOINT", "AZURE_CLIENT_ID"] as const)(
     "requires %s when deployed, even on Container Apps",
     (name) => {
       for (const extra of [{}, { CONTAINER_APP_NAME: "recipebox-api" }, { CONTAINER_APP_JOB_NAME: "recipebox-cleanup" }]) {
@@ -258,8 +267,42 @@ describe("docs/architecture.md, Access to Cosmos DB and Blob Storage", () => {
     );
   });
 
+  it.each(["https://recipebox.queue.core.windows.net", "https://recipebox-secondary.queue.core.windows.net"])(
+    "accepts the Queue Storage endpoint %s when deployed",
+    (endpoint) => {
+      expect(loadConfig({ ...allSettings, STORAGE_QUEUE_ENDPOINT: endpoint }).storage.access).toMatchObject({
+        queueEndpoint: endpoint,
+      });
+    },
+  );
+
+  const badQueueEndpoints = [
+    ["http", "http://recipebox.queue.core.windows.net"],
+    ["a Blob Storage host", "https://recipebox.blob.core.windows.net"],
+    ["a look-alike with the domain inside another host", "https://evil-queue.core.windows.net.attacker.net"],
+    ["the domain followed by another domain", "https://queue.core.windows.net.evil.net"],
+    ["a host merely ending in the domain's text", "https://xqueue.core.windows.net"],
+    ["the bare domain", "https://queue.core.windows.net"],
+    ["a nested subdomain", "https://a.recipebox.queue.core.windows.net"],
+    ["a trailing slash", "https://recipebox.queue.core.windows.net/"],
+    ["a path", "https://recipebox.queue.core.windows.net/imports"],
+    ["a query", "https://recipebox.queue.core.windows.net?sv=1"],
+    ["credentials", "https://user@recipebox.queue.core.windows.net"],
+    ["an explicit :443 port", "https://recipebox.queue.core.windows.net:443"],
+    ["Azurite", "http://127.0.0.1:10001/devstoreaccount1"],
+  ] as const;
+
+  it.each(badQueueEndpoints)("refuses a STORAGE_QUEUE_ENDPOINT with %s when deployed", (_case, endpoint) => {
+    expect(() => loadConfig({ ...allSettings, STORAGE_QUEUE_ENDPOINT: endpoint })).toThrow(
+      `STORAGE_QUEUE_ENDPOINT must be an https origin on queue.core.windows.net, such as https://<account>.queue.core.windows.net`,
+    );
+  });
+
   it("checks endpoints on Container Apps too", () => {
     const onContainerApps = { ...allSettings, CONTAINER_APP_JOB_NAME: "recipebox-cleanup" };
+    expect(() => loadConfig({ ...onContainerApps, STORAGE_QUEUE_ENDPOINT: "https://queue.core.windows.net.evil.net" })).toThrow(
+      "STORAGE_QUEUE_ENDPOINT must be an https origin",
+    );
     expect(() => loadConfig({ ...onContainerApps, COSMOS_ENDPOINT: "https://documents.azure.com.evil.net" })).toThrow(
       "COSMOS_ENDPOINT must be an https origin",
     );
