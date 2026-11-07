@@ -245,8 +245,8 @@ storage code itself is tested against the emulators with `npm run test:int`.
 
 ## Open items
 
-1. Microsoft issuer: confirm the issuer setting that lets personal Microsoft accounts sign in; it differs from the work-account
-   default.
+1. Microsoft issuer: editors sign in with personal Microsoft accounts only, so the issuer is the consumers tenant,
+   `https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0` (owner decision). Confirm with a real sign-in.
 2. Session length (X-9): confirm how the built-in auth's session cookie expires and whether active use extends it. If not, the
    client calls `/.auth/refresh` periodically, or the API issues its own sliding session.
 3. Microsoft account IDs: confirm which identifier the built-in auth passes for personal Microsoft accounts and that it stays the
