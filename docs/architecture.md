@@ -174,12 +174,13 @@ act as a visitor, an editor or a non-editor. The server refuses to start in deve
 In Azure, the API and the trash cleanup job use one user-assigned managed identity; no keys or connection strings exist.
 - Key access is switched off on both accounts (`disableLocalAuth` on Cosmos DB, `allowSharedKeyAccess: false` on Storage).
 - The identity has data roles only, granted by the infrastructure script: Cosmos DB Built-in Data Contributor on the account,
-  and Storage Blob Data Contributor on the photo container. It cannot create or delete databases, containers or accounts,
-  which matches the rule that only local development creates them.
+  and a custom role on the photo container that can read it and read, write and delete its blobs, but not delete it. It
+  cannot create or delete databases, containers or accounts, which matches the rule that only local development creates them.
 - One user-assigned identity, rather than one per app and job, so its roles exist before either is first deployed.
 - Settings: `COSMOS_ENDPOINT`, `STORAGE_BLOB_ENDPOINT` (e.g. `https://<account>.blob.core.windows.net`) and `AZURE_CLIENT_ID`
   (the identity). The server refuses to start if `COSMOS_KEY` or `STORAGE_CONNECTION_STRING` is set outside development and
-  test, so a key can't quietly be used in production.
+  test, so a key can't quietly be used in production. The server refuses to start unless each endpoint is an https origin on
+  `documents.azure.com` or `blob.core.windows.net`, so a mistyped setting can't send the identity's token to another host.
 
 Locally, the Cosmos DB emulator and Azurite accept only their fixed, public keys, so development and test keep using them.
 
