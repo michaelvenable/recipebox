@@ -49,8 +49,9 @@ az deployment sub create --name recipebox-bootstrap --location southcentralus --
 It creates:
 - `rg-recipebox-prod`, the app's resource group.
 - `rg-recipebox-deploy` with `id-recipebox-github`, the identity GitHub Actions signs in as. It accepts only GitHub tokens for
-  `repo:michaelvenable/recipebox:ref:refs/heads/master`, so only workflow runs on `master` can deploy. It sits in its own resource
-  group so it can't change its own sign-in rule.
+  `repo:michaelvenable@1676614/recipebox@1448964827:ref:refs/heads/master`, so only workflow runs on `master` can deploy. GitHub
+  includes the owner's and repository's numeric IDs in the subject, so a repository recreated under the same name can't deploy.
+  It sits in its own resource group so it can't change its own sign-in rule.
 - The custom role "RecipeBox Photo Container Data", assignable only within `rg-recipebox-prod`.
 - The deploy identity's roles on `rg-recipebox-prod`: Contributor, and Role Based Access Control Administrator limited to
   assigning or removing only the photo role and Key Vault Secrets User, only to managed identities or other service principals.

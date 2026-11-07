@@ -4,7 +4,7 @@
 param name string
 param location string
 
-@description('The GitHub OIDC subject allowed to sign in, e.g. repo:owner/repo:ref:refs/heads/master.')
+@description('The GitHub OIDC subject allowed to sign in, e.g. repo:owner@<id>/repo@<id>:ref:refs/heads/master.')
 param subject string
 
 resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {

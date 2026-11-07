@@ -25,6 +25,18 @@ param githubRepository string = 'michaelvenable/recipebox'
 @description('The only branch whose workflow runs may deploy.')
 param githubBranch string = 'master'
 
+// GitHub puts the owner's and repository's numeric IDs in the token's subject (use_immutable_subject, see
+// `gh api repos/<owner>/<repo>/actions/oidc/customization/sub`), so a repository deleted and recreated under the same name
+// can't deploy. Read them with `gh api repos/<owner>/<repo> --jq '{id, owner_id: .owner.id}'`.
+@description('The GitHub numeric ID of the repository owner.')
+param githubOwnerId string = '1676614'
+
+@description('The GitHub numeric ID of the repository.')
+param githubRepositoryId string = '1448964827'
+
+var githubOwner = split(githubRepository, '/')[0]
+var githubRepositoryName = split(githubRepository, '/')[1]
+
 resource appResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: appResourceGroupName
   location: location
@@ -76,7 +88,7 @@ module deployIdentity 'modules/deploy-identity.bicep' = {
   params: {
     name: 'id-recipebox-github'
     location: location
-    subject: 'repo:${githubRepository}:ref:refs/heads/${githubBranch}'
+    subject: 'repo:${githubOwner}@${githubOwnerId}/${githubRepositoryName}@${githubRepositoryId}:ref:refs/heads/${githubBranch}'
   }
 }
 
