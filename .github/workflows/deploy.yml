@@ -1,0 +1,265 @@
+# Tests, builds and deploys RecipeBox on every push to master (docs/architecture.md; owner steps in infra/README.md).
+#
+# Azure sign-in is OpenID Connect with the deploy identity from infra/bootstrap.bicep: no stored Azure secret. Repository
+# variables (Settings > Secrets and variables > Actions > Variables):
+#   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID   required; outputs of bootstrap.bicep
+#   BIND_CUSTOM_DOMAINS     "true" once the DNS records exist (infra/README.md, step 5); keep it on afterwards
+#   EDITORS                 the editor list (X-7), e.g. "google:1098,aad:9f3c"; empty means nobody can edit
+#   ENABLE_AUTH             "true" to turn on built-in sign-in with TRUST_AUTH_HEADERS (infra/README.md, step 6)
+#   MICROSOFT_CLIENT_ID, GOOGLE_CLIENT_ID   required when ENABLE_AUTH is "true"
+#   MICROSOFT_OPENID_ISSUER optional; overrides the consumers-tenant issuer in infra/main.bicep
+#
+# Integration tests (npm run test:int) are not run here: they need the Cosmos DB emulator and Azurite.
+
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions: {}
+
+# One run per branch at a time; a newer push waits for the running one instead of cancelling it halfway. The group includes
+# the branch, so a manual run on another branch (which only tests; see the jobs' "if") never joins master's queue.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/michaelvenable/recipebox-server
+  API_URL: https://api.recipes.mikevenable.net
+  RESOURCE_GROUP: rg-recipebox-prod
+  # Names from infra/main.bicep.
+  CONTAINER_APPS_ENVIRONMENT: cae-recipebox
+  API_APP: ca-recipebox-api
+  API_CERTIFICATE: cert-api-recipebox
+  STATIC_WEB_APP: swa-recipebox
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    name: Test and build the client
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      # Compiles and lints the templates before anything is pushed or deployed. No Azure sign-in is needed for this.
+      - name: Build the infrastructure templates
+        run: |
+          az bicep build --file infra/main.bicep --stdout > /dev/null
+          az bicep build --file infra/bootstrap.bicep --stdout > /dev/null
+      - name: Build the client
+        run: npm run build -w @recipebox/client
+        env:
+          VITE_API_URL: ${{ env.API_URL }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: client
+          path: packages/client/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  image:
+    name: Build and push the server image
+    needs: test
+    # Only master pushes images and deploys; the deploy identity also accepts only master's sign-in.
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          # Links the package to this repository.
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # Container Apps pulls without credentials, so the package must be public. GitHub creates it private on the first push;
+      # the owner makes it public once (infra/README.md, step 3).
+      - name: Check the image can be pulled anonymously
+        run: |
+          repository="${IMAGE#ghcr.io/}"
+          # No credentials: the same anonymous token Container Apps gets.
+          token="$(curl -fsS "https://ghcr.io/token?scope=repository:${repository}:pull" | jq -r '.token // empty' || true)"
+          accept="application/vnd.oci.image.index.v1+json,application/vnd.oci.image.manifest.v1+json"
+          accept+=",application/vnd.docker.distribution.manifest.list.v2+json"
+          accept+=",application/vnd.docker.distribution.manifest.v2+json"
+          status="$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${token}" -H "Accept: ${accept}" \
+            "https://ghcr.io/v2/${repository}/manifests/${GITHUB_SHA}")"
+          if [ "$status" != "200" ]; then
+            settings="https://github.com/users/${GITHUB_REPOSITORY_OWNER}/packages/container/package/${IMAGE##*/}/settings"
+            message="Anonymous pull of ${IMAGE}:${GITHUB_SHA} returned HTTP ${status}."
+            message+=" Make the package public once (${settings}, Change visibility), then re-run this workflow."
+            echo "::error title=GHCR package is not public::${message}"
+            exit 1
+          fi
+
+  deploy:
+    name: Deploy to Azure
+    needs: [test, image]
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      BIND_CUSTOM_DOMAINS: ${{ vars.BIND_CUSTOM_DOMAINS }}
+      EDITORS: ${{ vars.EDITORS }}
+      ENABLE_AUTH: ${{ vars.ENABLE_AUTH }}
+      MICROSOFT_CLIENT_ID: ${{ vars.MICROSOFT_CLIENT_ID }}
+      MICROSOFT_OPENID_ISSUER: ${{ vars.MICROSOFT_OPENID_ISSUER }}
+      GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+    steps:
+      - name: Check the repository variables
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+        run: |
+          missing=()
+          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ "$ENABLE_AUTH" = "true" ]; then
+            for name in MICROSOFT_CLIENT_ID GOOGLE_CLIENT_ID; do
+              [ -n "${!name}" ] || missing+=("$name")
+            done
+          fi
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error title=Missing repository variables::Set ${missing[*]} (infra/README.md)."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      # infra/main.bicep needs to know whether the API's managed certificate is issued and whether sign-in is already on, to
+      # change them in a safe order. Any failure to read reads as "no", which only repeats the safe first-time steps.
+      - name: Read the current certificate and sign-in state
+        id: state
+        run: |
+          base="https://management.azure.com/subscriptions/${AZURE_SUBSCRIPTION_ID}"
+          base+="/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App"
+          version="api-version=2025-01-01"
+          certificate="$(az rest --method get --only-show-errors \
+            --url "${base}/managedEnvironments/${CONTAINER_APPS_ENVIRONMENT}/managedCertificates/${API_CERTIFICATE}?${version}" \
+            --query properties.provisioningState -o tsv 2>/dev/null || true)"
+          auth="$(az rest --method get --only-show-errors \
+            --url "${base}/containerApps/${API_APP}/authConfigs/current?${version}" \
+            --query properties.platform.enabled -o tsv 2>/dev/null || true)"
+          issued=false
+          if [ "$certificate" = "Succeeded" ]; then issued=true; fi
+          enabled=false
+          if [ "${auth,,}" = "true" ]; then enabled=true; fi
+          echo "API certificate issued: ${issued}; sign-in already on: ${enabled}"
+          echo "certificate-issued=${issued}" >> "$GITHUB_OUTPUT"
+          echo "auth-enabled=${enabled}" >> "$GITHUB_OUTPUT"
+      - name: Deploy the infrastructure and the server image
+        env:
+          CERTIFICATE_ISSUED: ${{ steps.state.outputs.certificate-issued }}
+          AUTH_ENABLED: ${{ steps.state.outputs.auth-enabled }}
+        run: |
+          flag() { [ "$1" = "true" ] && echo true || echo false; }
+          parameters="${RUNNER_TEMP}/main.parameters.json"
+          jq -n \
+            --arg imageTag "$GITHUB_SHA" \
+            --argjson bindCustomDomains "$(flag "$BIND_CUSTOM_DOMAINS")" \
+            --argjson apiCertificateIssued "$(flag "$CERTIFICATE_ISSUED")" \
+            --arg editors "$EDITORS" \
+            --argjson enableAuth "$(flag "$ENABLE_AUTH")" \
+            --argjson authAlreadyEnabled "$(flag "$AUTH_ENABLED")" \
+            --arg microsoftClientId "$MICROSOFT_CLIENT_ID" \
+            --arg microsoftOpenIdIssuer "$MICROSOFT_OPENID_ISSUER" \
+            --arg googleClientId "$GOOGLE_CLIENT_ID" \
+            '{
+              "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+              contentVersion: "1.0.0.0",
+              parameters: {
+                imageTag: {value: $imageTag},
+                bindCustomDomains: {value: $bindCustomDomains},
+                apiCertificateIssued: {value: $apiCertificateIssued},
+                editors: {value: $editors},
+                enableAuth: {value: $enableAuth},
+                authAlreadyEnabled: {value: $authAlreadyEnabled},
+                microsoftClientId: {value: $microsoftClientId},
+                googleClientId: {value: $googleClientId}
+              }
+            }
+            # Passed only when set; otherwise the default issuer in main.bicep applies.
+            | if $microsoftOpenIdIssuer != "" then .parameters.microsoftOpenIdIssuer = {value: $microsoftOpenIdIssuer} else . end
+            ' > "$parameters"
+          az deployment group create \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "recipebox-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --template-file infra/main.bicep \
+            --parameters "@${parameters}" \
+            --query properties.outputs -o json > "${RUNNER_TEMP}/outputs.json"
+          {
+            echo "### DNS records (Route 53)"
+            echo
+            echo "| Type | Name | Value |"
+            echo "| ---- | ---- | ----- |"
+            jq -r '.dnsRecords.value[] | "| \(.type) | \(.name) | \(.value) |"' "${RUNNER_TEMP}/outputs.json"
+            echo
+            echo "API default URL: $(jq -r '.apiDefaultUrl.value' "${RUNNER_TEMP}/outputs.json")"
+            echo "Client default URL: $(jq -r '.staticWebAppDefaultUrl.value' "${RUNNER_TEMP}/outputs.json")"
+          } >> "$GITHUB_STEP_SUMMARY"
+      # Fetched at run time with the deploy identity, so no Static Web Apps token is stored in GitHub.
+      - name: Get the Static Web Apps deployment token
+        id: swa
+        run: |
+          token="$(az staticwebapp secrets list --name "$STATIC_WEB_APP" --resource-group "$RESOURCE_GROUP" \
+            --query properties.apiKey -o tsv)"
+          if [ -z "$token" ]; then
+            echo "::error::No deployment token for ${STATIC_WEB_APP}."
+            exit 1
+          fi
+          echo "::add-mask::${token}"
+          echo "token=${token}" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: client
+          path: client-dist
+      - name: Deploy the client
+        uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.swa.outputs.token }}
+          action: upload
+          app_location: client-dist
+          api_location: ""
+          output_location: ""
+          skip_app_build: true
+          skip_api_build: true

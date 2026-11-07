@@ -1,0 +1,8 @@
+# Update PRs for the actions pinned by commit SHA in .github/workflows. A PR can't deploy: the deploy workflow's image and
+# deploy jobs run only on master, and Azure accepts only master's sign-in (infra/bootstrap.bicep).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
