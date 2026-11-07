@@ -38,9 +38,9 @@ only signed-in editors can see or change it (X-1, X-6), except for a shopping li
     nothing to shop for. They can tick items as in PLAN-8; ticks are never saved, and a tick stays on its item while that
     item is still on the list.
   - The shared list shows nothing else that is private (X-1), such as when recipes were added to the "to make" list.
-  - A link works for 7 days after it was made, measured by the server's clock (X-12). After that, opening it shows "This link
-    has expired", the same page as for a link that never existed. Only the link's code and when it was made are stored, and
-    they are permanently removed within one day after the link stops working.
+  - A link works for 7 days after it was made, measured by the server's clock (X-12). After that, opening it, or coming back to
+    a page that was already open, shows "This link has expired", the same page as for a link that never existed. Only the
+    link's code and when it was made are stored, and they are permanently removed within one day after the link stops working.
   - Each Send makes a new link. Earlier links keep working until their 7 days are up; all of them show the same current list.
 
   Example: a link made 2026-11-07 at 09:00 works until 2026-11-14 at 09:00. Opened at 09:01 that day, it shows "This link has
