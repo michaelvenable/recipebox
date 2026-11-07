@@ -78,6 +78,8 @@ been cooked in a while.
   It also says that nothing is sold or shared with anyone else, and that questions go to the household member who shared the
   app. It shows no personal contact details. The Account page links to it (X-11), and it is not indexed (X-10).
 
+## Out of scope (for now)
+
 - Importing a recipe from a photo (planned; will get its own spec).
 - Serving-size scaling, nutrition data. (The shopping list from the "to make" list is in scope: PLAN-8.)
 - Sharing features such as share links for recipes or per-recipe privacy. Every recipe is viewable by anyone with the address
