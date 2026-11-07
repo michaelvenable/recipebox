@@ -3,7 +3,7 @@
 ## Goal
 
 Keep a simple list of recipes the household intends to make soon. There are no dates, days or meal slots. The list is private:
-only signed-in editors can see or change it (X-1, X-6).
+only signed-in editors can see or change it (X-1, X-6). In the app, the "to make" list is called "Meal Plan".
 
 ## Requirements
 
@@ -12,7 +12,7 @@ only signed-in editors can see or change it (X-1, X-6).
 - **PLAN-2. No duplicates.** A recipe appears on the list at most once. Adding a recipe that is already on the list leaves the
   list unchanged and does not show an error.
 - **PLAN-3. View.** A user can see the list, ordered by when each recipe was added (oldest first), each showing name, thumbnail
-  and the date it was added (X-12). An empty list shows a short message explaining how to add recipes.
+  and the date it was added (X-12). An empty list shows a short message saying so.
 - **PLAN-4. Remove.** A user can remove a recipe from the list without affecting the recipe itself or its cooking history.
 - **PLAN-5. Cooked recipes leave the list.** When a recipe on the list is marked as cooked (COOK-1), it is removed from the list.
 - **PLAN-6. Deleted recipes leave the list.** When a recipe is deleted (REC-6), it is taken off the list. Restoring it from the

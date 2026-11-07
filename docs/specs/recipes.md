@@ -11,6 +11,7 @@ tag.
 | ----------- | -------- | -------------------------------------------------------------------------- |
 | Name        | Yes      | 1–200 characters after trimming whitespace                                 |
 | Ingredients | Yes      | Ordered list of free-text entries, at least 1, each up to 1,000 characters |
+| Prep        | No       | Ordered list of free-text entries, optional, each up to 1,000 characters   |
 | Steps       | Yes      | Ordered list of free-text entries, at least 1, each up to 1,000 characters |
 | Photo       | No       | One image (see REC-7)                                                      |
 | Total time  | No       | Whole minutes, 1–1440, covering preparation and cooking                    |
@@ -20,12 +21,12 @@ tag.
 
 - **REC-1. Create.** A user can create a recipe. It is saved only if every field passes the rules above; otherwise nothing is
   saved and the user sees which fields are invalid and why.
-- **REC-2. Entry cleanup.** Leading/trailing whitespace is trimmed from the name and from every ingredient and step. Ingredient
-  and step entries that are empty after trimming are discarded before the "at least 1" rule is checked.
-- **REC-3. Order is preserved.** Ingredients and steps are always displayed in the order the user entered them.
-- **REC-4. View.** A user can open a recipe and see all of its contents. Steps are numbered starting at 1. Opening a recipe that
-  does not exist shows a "not found" message, not an error page. Visitors see the same page without editing controls or private
-  information (X-1, X-8).
+- **REC-2. Entry cleanup.** Leading/trailing whitespace is trimmed from the name and from every ingredient, prep entry and step.
+  Entries that are empty after trimming are discarded before the "at least 1" rule is checked.
+- **REC-3. Order is preserved.** Ingredients, prep entries and steps are always displayed in the order the user entered them.
+- **REC-4. View.** A user can open a recipe and see all of its contents. Prep entries and steps are numbered starting at 1.
+  Opening a recipe that does not exist shows a "not found" message, not an error page. Visitors see the same page without
+  editing controls or private information (X-1, X-8).
 - **REC-5. Edit.** A user can change any field of an existing recipe, including adding and removing ingredients and steps. The
   same rules as REC-1 and REC-2 apply. Entries can't be reordered: steps are written in order, and the order of ingredients
   matters little.
@@ -50,27 +51,31 @@ tag.
   - An empty term shows all recipes.
   - Results keep the REC-8 sort order.
   - When nothing matches, the user sees "No recipes match" with the term.
-- **REC-10. Tags.** An editor can attach one or more tags to a recipe and remove any of them, both while creating or editing the
-  recipe and directly from the recipe view. Tags are free-form labels such as "dinner", "vegetarian" or "quick"; a new tag is
+- **REC-10. Tags.** An editor can attach one or more tags to a recipe and remove any of them while creating or editing the recipe.
+  In the form, tags are typed as one comma-separated list, such as "dinner, quick". The recipe view shows the tags but can't
+  change them. Tags are free-form labels such as "dinner", "vegetarian" or "quick"; a new tag is
   created simply by typing it.
 - **REC-11. Tag rules.**
   - A tag is trimmed and lowercased, then must be 1–30 characters (X-13).
-  - A tag can't contain a comma, so "dinner, quick" typed as one tag is refused with a message rather than becoming one odd tag.
+  - A tag can't contain a comma. In the form a comma separates two tags, so "dinner, quick" becomes "dinner" and "quick". Empty
+    items, as in "dinner,, quick", are ignored.
   - Tags are stored and shown in lowercase, so "Dinner" and "dinner" are the same tag.
   - A recipe never has the same tag twice; attaching a tag it already has changes nothing and shows no error, even when the recipe
     already has 20 tags.
   - A recipe has at most 20 tags.
   - A recipe's tags are shown in alphabetical order (X-13).
-- **REC-12. Tag suggestions.** While typing a tag, the editor is offered tags already used on other recipes that contain the typed
-  text, ignoring case and accents (X-13), so the collection doesn't drift into near-duplicates like "dessert" and "desserts". Tags
-  the recipe already has are not offered. Before anything is typed, all tags in use on other recipes are offered, the way an empty
-  search shows every recipe.
+- **REC-12. Tag suggestions.** While typing a tag (the text after the last comma), the editor is offered tags already used on
+  other recipes that contain the typed text, ignoring case and accents (X-13), so the collection doesn't drift into
+  near-duplicates like "dessert" and "desserts". Tags the recipe already has are not offered. Before anything is typed, all tags
+  in use on other recipes are offered, the way an empty search shows every recipe.
 - **REC-13. Filter by tags.** On the recipe list, a user can pick one or more tags to filter by.
   - The user picks from every tag currently in use, shown in alphabetical order (X-13) with the number of recipes that have each
     one.
   - With several tags picked, only recipes that have all of them are shown.
   - The tag filter and name search (REC-9) can be used together; a recipe must match both.
   - Results keep the REC-8 sort order. Clearing all picked tags shows the unfiltered list.
+  - When tags are picked and no search term is typed, the list shows no summary of the results, unless nothing matches: then it
+    says so ("No recipes tagged dinner and quick").
   - A tag that is removed from its last recipe no longer appears in the list of tags. There is no separate list of tags to manage.
   - Filtering by tags is public, like the recipes themselves (X-1).
 - **REC-14. Trash.** An editor can open the trash to see deleted recipes, most recently deleted first, each showing its name,
@@ -87,8 +92,15 @@ tag.
   after it was deleted.) The exception is deleting it again: that changes nothing and shows no error.
 - **REC-18. Screen stays on.** While a recipe is open, the device's screen doesn't turn off on its own, on devices and browsers
   that allow it. It may turn off again once the recipe is closed.
-- **REC-19. Tick off while cooking.** Anyone viewing a recipe can tick off ingredients and steps as they go, and untick them.
+- **REC-19. Tick off while cooking.** Anyone viewing a recipe can tick off ingredients, prep entries and steps as they go, and
+  untick them.
   Ticks are never saved, on the device or the server; they are cleared when the person leaves the recipe.
+- **REC-20. Prep.** A recipe can list prep: things to do before cooking, such as chopping vegetables. The recipe view shows them
+  in a "Prep" section before the steps. A recipe with no prep entries shows no Prep section.
+- **REC-21. One entry per line.** In the create and edit form, ingredients, prep and steps are each typed in one text box, one
+  entry per line. One or more line breaks start the next entry, so blank lines are ignored. Numbering isn't needed; the text is
+  kept as typed. Editing a recipe shows its entries one per line; a line break inside an entry saved earlier is shown as a space,
+  so the entry stays one entry. How a recipe is viewed doesn't change.
 
 ## Examples
 
@@ -98,6 +110,9 @@ tag.
 | Ingredients `["2 eggs", "  ", ""]`                                           | Saved as `["2 eggs"]`                       |
 | Ingredients `["   "]`                                                        | Rejected: at least 1 ingredient required    |
 | Total time `0` or `2.5`                                                      | Rejected                                    |
+| Steps typed as "Boil water", two blank lines, "Add pasta"                    | Saved as `["Boil water", "Add pasta"]`      |
+| No prep entries                                                              | No Prep section on the recipe view          |
+| Tags typed as `"Dinner, quick,, "`                                           | Tags "dinner" and "quick"                   |
 | Search `"chick"` with recipes "Chicken Tikka", "Chickpea Curry", "Beef Stew" | Chicken Tikka, Chickpea Curry               |
 | Search `"TIKKA "`                                                            | Chicken Tikka                               |
 | Search `"creme"` with a recipe "Crème Brûlée"                                | Crème Brûlée                                |
