@@ -16,8 +16,9 @@ interface EntriesFieldProps {
 
 /**
  * Ingredients, prep or steps typed in one box, one entry per line (REC-21). Enter starts a new line, so a new entry. The box
- * grows with its text: by `field-sizing: content` (styles.css) where the browser has it, and by rows otherwise. The length of
- * each entry is the server's to check: a browser's maxlength counts UTF-16 units, not characters as a person sees them (X-13).
+ * gains a row per entry, and the editor can drag it taller or shorter (styles.css); once dragged, the dragged height stays. The
+ * length of each entry is the server's to check: a browser's maxlength counts UTF-16 units, not characters as a person sees them
+ * (X-13).
  */
 export function EntriesField({ field, value, onChange, errors }: EntriesFieldProps) {
   const id = useId();

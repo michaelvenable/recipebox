@@ -21,6 +21,14 @@ describe("X-10 not in search engines", () => {
   });
 });
 
+describe("REC-21 entry boxes", () => {
+  it("can be dragged taller or shorter, which sizing the box to its text would prevent", () => {
+    const textArea = styles.slice(styles.indexOf(".text-area {"), styles.indexOf("}", styles.indexOf(".text-area {")));
+    expect(textArea).toContain("resize: vertical;");
+    expect(styles).not.toMatch(/^\s*field-sizing:/m);
+  });
+});
+
 describe("X-14 dark theme follows the device", () => {
   it("redefines the palette when the device prefers dark", () => {
     const dark = styles.slice(styles.indexOf("@media (prefers-color-scheme: dark)"));
