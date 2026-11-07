@@ -15,16 +15,16 @@ Screens: `docs/mockups/Import*.dc.html`, from the "Importing a recipe from a pho
   import option.
 - **IMP-2. Accepted photos.** The photo follows the same rules as a recipe photo (REC-7): JPEG, PNG or WebP, up to 15 MB. Any
   other file is refused at once with the same message as REC-7, and no import starts.
-- **IMP-3. One import at a time.** Only one import can be in progress for the whole collection (X-2), whichever editor or device
-  started it. While one is in progress, the import option on the New recipe form says so and can't be used, and the server
-  refuses to start a second one. Typing a recipe in the form still works.
+- **IMP-3. One photo per upload, any number at once.** Each upload is one photo and starts one import. There is no way to pick
+  several photos in one upload. Once an upload has finished, the editor can start another straight away, so several imports can
+  be in progress at the same time, from one or more editors and devices. Each one ends on its own.
 - **IMP-4. Back to the Catalog.** Once the photo has been uploaded, the editor is taken to the Catalog, where a message says the
   recipe will be added to the Catalog in a minute or two. If the upload itself fails, the editor stays on the form with a message
   saying the photo wasn't uploaded, and no import is in progress.
-- **IMP-5. Import in progress.** While an import is in progress, every editor sees a "Reading your photo…" card at the top of the
-  Catalog, above the recipes, on any device. The editor can leave the page, use the rest of the app or close it; the import
-  carries on. The card goes away when the import ends. Imports are private: visitors never see the card or anything else about
-  an import (X-1).
+- **IMP-5. Imports in progress.** For each import in progress, every editor sees a "Reading your photo…" card at the top of the
+  Catalog, above the recipes, on any device, newest first. The editor can leave the page, use the rest of the app or close it;
+  the imports carry on. Each card goes away when its import ends. Imports are private: visitors never see the cards or anything
+  else about an import (X-1).
 - **IMP-6. What is read.** The recipe's name, ingredients, prep, steps and total time are read from the photo.
   - Text is kept as written on the page: not reworded, shortened, translated or converted to other units. A name written in
     capitals only is given ordinary capitalization.
@@ -44,15 +44,16 @@ Screens: `docs/mockups/Import*.dc.html`, from the "Importing a recipe from a pho
 - **IMP-9. Photo.** If the page shows a picture of the finished dish, that part of the photo becomes the recipe's photo, handled
   as any recipe photo (REC-7): correctly oriented and with the camera's saved details removed. Otherwise the recipe has no photo.
   The editor can replace or remove it later (REC-7).
-- **IMP-10. Done.** When the recipe has been added, the card goes away and the editor who started the import, if the app is
-  open on that device, sees a "‹name› imported" message with an Open option, on whatever page they are on. A recipe whose name
+- **IMP-10. Done.** When the recipe has been added, its card goes away and the editor who started the import, if the app is
+  open on that device, sees a "‹name› imported" message with an Open option, on whatever page they are on. When several finish
+  close together, each gets its own message, one after another, so none is missed. A recipe whose name
   matches one already in the collection is added anyway, like a typed recipe.
 - **IMP-11. Failure.** An import fails when the photo shows no recipe that can be read, when what was read breaks the rules in
   IMP-7, when the reading service fails, or when it hasn't finished within 10 minutes of the upload, measured by the server's
   clock (X-12). Then nothing is added and the card goes away. The app shows no message about the failure (owner decision,
   2026-11-07). The server logs one error line with the import's ID and the reason: `no-recipe-found`, `invalid-recipe`,
   `service-error` or `timed-out`, plus the reading service's own error message for `service-error`. The line has no photo, no
-  recipe text and nothing about who started the import. A new import can be started as soon as one fails.
+  recipe text and nothing about who started the import. Other imports in progress carry on.
 - **IMP-12. The uploaded photo isn't kept.** The photo of the page is used only to read the recipe. It is never shown in the app,
   and it is deleted when the import ends, whether it succeeds or fails. A photo left behind by an import that was interrupted is
   deleted within one day. The recipe's photo (IMP-9) is a separate image cut from it.
@@ -72,7 +73,7 @@ Screens: `docs/mockups/Import*.dc.html`, from the "Importing a recipe from a pho
 | A photo of a shopping receipt                                   | Nothing added; logged `no-recipe-found`      |
 | A card with a name and ingredients but no steps                 | Nothing added; logged `invalid-recipe`       |
 | An import unfinished 10 minutes after the upload                | Nothing added; logged `timed-out`            |
-| Import in progress; another editor opens New recipe             | Import option unavailable, says why          |
+| Two photos uploaded one after the other; both read fine         | Two cards, then both recipes added           |
 | A HEIC file chosen from Files                                   | Refused at once (REC-7); no import           |
 | "Pad Thai" exists; a Pad Thai card is imported                  | A second "Pad Thai" is added                 |
 | A visitor opens the Catalog during an import                    | No card; nothing about the import            |
@@ -81,7 +82,7 @@ Screens: `docs/mockups/Import*.dc.html`, from the "Importing a recipe from a pho
 ## Out of scope
 
 - Checking or correcting the recipe before it is added. The editor edits it afterwards if needed.
-- Importing several photos at once, or one recipe from several photos (such as a recipe over two pages).
+- Picking several photos in one upload, or making one recipe from several photos (such as a recipe over two pages).
 - Cancelling an import in progress.
 - Telling anyone about a failed import, in the app, by email or by an alert. Failures are found in the server logs.
 - Retrying a failed import automatically.

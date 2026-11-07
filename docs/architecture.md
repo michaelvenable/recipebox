@@ -123,10 +123,12 @@ really comes from the RecipeBox app:
 - CORS allows only `https://recipes.mikevenable.net`.
 - Every change is a `POST`, `PUT` or `DELETE` with a JSON body (`Content-Type: application/json`); the API rejects anything else.
   A form on another site cannot send such a request without the browser first asking the API's permission, which CORS refuses.
-- The one exception is the photo upload, `PUT /recipes/{id}/photo`, which is sent as `multipart/form-data`. That is safe only
-  because it is a `PUT`: a cross-site form can only `POST`, and a cross-site `PUT` needs the API's permission first. The server
-  refuses to start if the upload exception is put on any other method.
-- CORS allows the methods the client actually uses: `GET`, `POST`, `PUT` and `DELETE`.
+- The exceptions are the uploads, `PUT /recipes/{id}/photo` and `POST /imports`, which are sent as `multipart/form-data`. A
+  form on another site can send a multipart `POST` without asking, so every upload must also carry the header
+  `X-Requested-By: recipebox`, whatever its method. A form can't add a header, and a script on another site can only send one
+  after the browser asks the API, which CORS refuses. An upload without the header gets 403 `request.headerMissing` before its
+  body is read. The upload exception is declared per route, and the check is part of it, so no upload route can skip it.
+- CORS allows the methods the client actually uses (`GET`, `POST`, `PUT` and `DELETE`) and the `X-Requested-By` header.
 - `GET` requests never change anything.
 
 Provider setup (done once, by hand):
@@ -259,7 +261,7 @@ longer than a request should stay open, and the API scales to zero, so the work 
 queue message, not in the API.
 
 ```
-client --POST /imports (photo)--> API --> Blob imports/{importId}, Cosmos import record, Storage queue message
+client --POST /imports (photo)--> API --> Blob imports/{importId}.jpg, Cosmos import record, Storage queue message
                                                    |
 Container Apps job (started by the queue) <--------+
   read photo -> AI model (JSON) -> domain -> save recipe and its photo -> end the import, delete the page photo
@@ -268,13 +270,19 @@ Container Apps job (started by the queue) <--------+
 - Starting (`POST /imports`): editor check (X-6), then the same type and size checks as a recipe photo (IMP-2, REC-7). The
   image goes through the existing decode worker, which removes all metadata and scales it to at most 2048 px on the long side,
   so no location reaches the AI service and the call stays small. It is stored as `imports/{importId}.jpg` in the photo
-  container. The photo route serves only recipe photos by recipe ID, so these are never served (IMP-12).
-- One at a time (IMP-3): the import record is a single document with the fixed ID `current` in a new `imports` container:
-  the `RecipeImport` snapshot (domain-model.md). Starting replaces it only if `isInProgress` is false by the server's clock
-  (X-12, IMP-11), using a replace conditional on its version (or `create` when there is none); otherwise the API answers 409
-  `import.busy`. Each import replaces the last, so there is never more than one record.
+  container. The photo route serves only recipe photos by recipe ID, so these are never served (IMP-12). Like every upload, it
+  must carry the `X-Requested-By` header (see "Sign-in").
+- Records (IMP-3): each import is one document in a new `imports` container, partitioned by `/id` (the import ID): the
+  `RecipeImport` snapshot (domain-model.md), written with `create`. Any number can be in progress at once. Each document also
+  carries `ttl` (one day, with Cosmos DB time to live switched on and no default, as for shopping list links), so finished
+  imports disappear on their own; `GET /imports` lists what is left.
+- Order when starting: the photo, then the record, then the queue message. If the photo or record can't be stored, nothing is
+  left behind and the API answers with an error, so the editor stays on the form (IMP-4). If the message can't be queued, the
+  record is marked failed, the photo is deleted, and the API answers 500, with the same result for the editor. That is logged
+  as an ordinary server error with the import ID, not as `recipe-import-failed`, since nothing was read (IMP-11).
 - The job (`caj-recipebox-import`) is event-driven: a KEDA Azure Queue scaler on the `imports` queue, signed in with the
-  managed identity, one execution at a time, a 10-minute replica timeout and no retries (IMP-11, retrying is out of scope).
+  managed identity, one execution per message, at most 5 at a time, a 10-minute replica timeout and no retries (IMP-11,
+  retrying is out of scope).
   It reads the record and the photo, calls the model, and turns the answer into a recipe:
   - The answer is untrusted input, like a request body: it is parsed against the expected shape, then the recipe is made with
     the same domain method as `POST /recipes`, with the server's time. Tags are filtered by a domain function to tags already in
@@ -294,10 +302,10 @@ Container Apps job (started by the queue) <--------+
   key), with structured output so the answer always has the expected shape. The schema is built for each call, and its tags
   field allows only the tags in use, as an enum. The prompt and schema live in one server file; the model is behind an
   interface, so tests use a fake and never call Azure. Which model to deploy is chosen by trying a few on real recipe cards.
-- The client: `GET /imports/current` (editor-only, X-1) returns the record or 404. While the record is `reading`, the Catalog
-  shows the card (IMP-5) and the client checks again every 5 seconds. The device that started the import knows its
-  `importId`; when that record turns `done`, it shows "‹name› imported" with Open (IMP-10). A `failed` record just removes
-  the card.
+- The client: `GET /imports` (editor-only, X-1) lists the imports of the last day. The Catalog shows one card per import that
+  is `reading` (IMP-5) and, while there is one, checks again every 5 seconds. The device that started an import keeps its
+  `importId`; when that import turns `done`, it shows "‹name› imported" with Open (IMP-10). A `failed` import's card just goes
+  away.
 - Access: the identity also needs Storage Queue Data Message Sender and Processor on the `imports` queue and a role that can
   call the model deployment. The deploy identity may assign only the roles listed in `bootstrap.bicep`, so the owner reruns
   the bootstrap once to allow these.

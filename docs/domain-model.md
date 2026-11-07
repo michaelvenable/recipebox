@@ -203,7 +203,7 @@ class RecipeImport {
   get id(): ImportId;
   get startedAt(): Instant;
   statusAt(now: Instant): "reading" | "done" | "failed";          // "reading" past its deadline reads as "failed" (IMP-11)
-  isInProgress(now: Instant): boolean;                            // IMP-3: statusAt(now) === "reading"
+  isInProgress(now: Instant): boolean;                            // IMP-5: statusAt(now) === "reading"
   succeed(recipe: Recipe, at: Instant): Result<void>;             // IMP-10; keeps the recipe's id and name
   fail(): void;                                                   // IMP-11
   get recipeId(): RecipeId | undefined;
@@ -236,6 +236,8 @@ function importedRecipe(id: RecipeId, read: ReadRecipe, tagsInUse: readonly Tag[
   read (IMP-8). Dropped tags are never an error.
 - `ImportId` is a UUID made by the server, like `RecipeId`. The recipe's id is also made by the server, from the import's id,
   so the same import always makes the same recipe id.
+- Each import is its own `RecipeImport`; any number can be in progress at once (IMP-3), so the domain has no rule across
+  imports.
 - The failure reason (IMP-11) is not stored; it is logged by the server. The page photo, the AI service and the dish picture
   are not in the domain.
 
@@ -297,12 +299,12 @@ by their fields.
 
 ### Recipe import snapshot
 
-Stored as one Cosmos document with the fixed id `current`, in the `imports` container, so there is only ever one (IMP-3).
+Stored as its own Cosmos document per import, in the `imports` container. Removing old ones is the infrastructure's job
+(docs/architecture.md, "Recipe import").
 
 ```ts
 interface RecipeImportSnapshot {
-  id: "current";
-  importId: string;
+  id: string;                     // the import id
   startedAt: string;              // ISO 8601 timestamp
   status: "reading" | "done" | "failed";
   recipeId?: string;              // only when done
