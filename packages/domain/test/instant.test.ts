@@ -67,6 +67,16 @@ describe("X-12 Instant", () => {
     expect(() => iso("2026-10-01T09:30:00Z").plusDays(1.5)).toThrow(RangeError);
   });
 
+  it("adds whole minutes", () => {
+    expect(iso("2026-11-07T09:00:00Z").plusMinutes(10).toIso()).toBe("2026-11-07T09:10:00.000Z");
+    expect(iso("2026-11-07T23:55:00Z").plusMinutes(10).toIso()).toBe("2026-11-08T00:05:00.000Z");
+    expect(iso("2026-11-07T09:00:00Z").plusMinutes(-1).toIso()).toBe("2026-11-07T08:59:00.000Z");
+  });
+
+  it("plusMinutes with a fractional number of minutes is a programmer error", () => {
+    expect(() => iso("2026-11-07T09:00:00Z").plusMinutes(0.5)).toThrow(RangeError);
+  });
+
   it("has no way to read the clock", () => {
     expect("now" in Instant).toBe(false);
   });

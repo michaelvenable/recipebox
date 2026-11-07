@@ -1,7 +1,8 @@
 import { domainError } from "./errors.js";
 import { fail, ok, type Result } from "./result.js";
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MS_PER_MINUTE = 60 * 1000;
+const MS_PER_DAY = 24 * 60 * MS_PER_MINUTE;
 // The range a JavaScript Date can represent.
 const MAX_EPOCH_MS = 8.64e15;
 
@@ -94,6 +95,18 @@ export class Instant {
     const result = Instant.fromEpochMillis(this.epochMs + days * MS_PER_DAY);
     if (!result.ok) {
       throw new RangeError(`plusDays(${days}) is outside the representable range`);
+    }
+    return result.value;
+  }
+
+  /** Adds whole minutes. */
+  plusMinutes(minutes: number): Instant {
+    if (!Number.isInteger(minutes)) {
+      throw new RangeError(`plusMinutes needs a whole number of minutes, got ${minutes}`);
+    }
+    const result = Instant.fromEpochMillis(this.epochMs + minutes * MS_PER_MINUTE);
+    if (!result.ok) {
+      throw new RangeError(`plusMinutes(${minutes}) is outside the representable range`);
     }
     return result.value;
   }
