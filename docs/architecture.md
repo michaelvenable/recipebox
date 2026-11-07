@@ -135,7 +135,7 @@ Provider setup (done once, by hand):
 | 2    | Microsoft Entra                | Add the Microsoft redirect URI (below).                                               |
 | 3    | Google Cloud Console (later)   | OAuth consent screen (External, testing mode); add each Google editor as a test user. |
 | 4    | Google Cloud Console (later)   | Web OAuth client with the Google redirect URI (below).                                |
-| 5    | Container app, Authentication  | Add both providers (client IDs and secrets); allow unauthenticated access.            |
+| 5    | Container app, Authentication  | Add the providers (client IDs and secrets); allow unauthenticated access.             |
 | 6    | Container app, Authentication  | Allow `https://recipes.mikevenable.net` as a post-sign-in redirect target.            |
 
 Redirect URIs:
