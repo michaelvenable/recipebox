@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Want to make list</title>
+<title>Plan</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -25,9 +25,15 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{acctFg}}" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg>
     </a>
   </nav>
-  <header style="padding: 18px 20px 12px">
-    <h1 style="margin: 0; font-size: 26px; font-weight: 700">Want to make</h1>
-    <p style="margin: 6px 0 0; font-size: 15px; color: #59615C">4 recipes · oldest first</p>
+  <header style="padding: 18px 20px 12px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px">
+    <div style="min-width: 0">
+      <h1 style="margin: 0; font-size: 26px; font-weight: 700">Plan</h1>
+      <p style="margin: 6px 0 0; font-size: 15px; color: #59615C">4 recipes</p>
+    </div>
+    <a href="ShoppingList.dc.html" style="flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid #C9CEC8; border-radius: 22px; background: #FFFFFF; color: #1D2420; font-size: 15px; font-weight: 700; text-decoration: none">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1D2420" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2"></path><circle cx="10" cy="20" r="1.4"></circle><circle cx="17" cy="20" r="1.4"></circle></svg>
+      Shopping list
+    </a>
   </header>
   <ul style="flex: 1; list-style: none; margin: 0; padding: 0 20px; display: flex; flex-direction: column; gap: 10px; overflow: hidden">
     <sc-for list="{{items}}" as="r" hint-placeholder-count="4">
@@ -39,7 +45,7 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
             <span style="font-size: 14px; color: #59615C">Added {{r.added}}</span>
           </div>
         </a>
-        <button type="button" aria-label="Remove {{r.name}} from the Want to make list" style="flex: none; width: 44px; height: 44px; border: 1px solid #DCDFDA; border-radius: 22px; background: #FFFFFF; display: flex; align-items: center; justify-content: center">
+        <button type="button" aria-label="Remove {{r.name}} from the plan" style="flex: none; width: 44px; height: 44px; border: 1px solid #DCDFDA; border-radius: 22px; background: #FFFFFF; display: flex; align-items: center; justify-content: center">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#59615C" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
         </button>
       </li>
@@ -50,7 +56,7 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   navItems(cur) {
-    const pages = [['Recipes', 'ListEditor.dc.html'], ['Want to make', 'ToMake.dc.html'], ['Rediscover', 'Rediscover.dc.html'], ['Trash', 'Trash.dc.html']];
+    const pages = [['Catalog', 'ListEditor.dc.html'], ['Plan', 'ToMake.dc.html'], ['Recommendations', 'Rediscover.dc.html'], ['Trash', 'Trash.dc.html']];
     return pages.map(([label, href]) => {
       const on = label === cur;
       return { label, href, current: on ? 'page' : 'false', bg: on ? '#2E6A4F' : 'transparent', fg: on ? '#FFFFFF' : '#1D2420', fw: on ? '700' : '400' };
@@ -58,7 +64,7 @@ class Component extends DCLogic {
   }
   renderVals() {
     return {
-      nav: this.navItems('Want to make'), acctBg: '#F0F2EE', acctFg: '#1D2420',
+      nav: this.navItems('Plan'), acctBg: '#F0F2EE', acctFg: '#1D2420',
       items: [
         { name: 'Lemon Risotto', added: 'Oct 12', tint: '#E9E2B8' },
         { name: 'Chicken Tikka Masala', added: 'Oct 20', tint: '#E6C3A8' },

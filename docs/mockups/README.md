@@ -30,3 +30,9 @@ Decisions made while building the client, confirmed by the owner on 2026-11-04 (
   images.
 - Offline: the app shell opens without a connection and a "You're offline" banner explains that loading and saving need one.
   Nothing is stored for offline reading or editing (offline use stays out of scope).
+
+Updated 2026-11-07 (owner request): `ToMake.dc.html` and the new `ShoppingList.dc.html` were saved again from the canvas.
+- The Plan artboard uses the app's current names (Catalog, Plan, Recommendations) and shows a "Shopping list" button.
+- Shopping list: every ingredient of every recipe on the Plan, in one list sorted A–Z (X-13), each with its recipe's name.
+  Ingredients are free text, so duplicates stay as typed. Ticks are never saved; leaving the page clears them. The other
+  artboards still show the older names.
