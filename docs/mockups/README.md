@@ -43,6 +43,6 @@ Updated 2026-11-07 (owner request): every artboard was saved again from the canv
 - Shopping list: every ingredient of every recipe on the Plan, in one list sorted A–Z (X-13), each with its recipe's name.
   Ingredients are free text, so duplicates stay as typed. Ticks are never saved; leaving the page clears them.
 - Send (decided, PLAN-9): the Shopping list has a Send button. It makes a link with a random, unguessable code
-  and opens the phone's share sheet with it (the link is copied where there is no share sheet). Anyone with the link sees a
-  copy of the list as sent, without signing in, for 7 days (`SharedList.dc.html`); after that, and for unknown links, the
-  page says the link has expired (`SharedListExpired.dc.html`).
+  and opens the phone's share sheet with it (the link is copied where there is no share sheet). Anyone with the link sees the
+  current shopping list, live, without signing in, for 7 days (`SharedList.dc.html`); after that, and for unknown links, the
+  page says the link has expired (`SharedListExpired.dc.html`). The panel after Send also has a Share button.
