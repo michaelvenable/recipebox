@@ -106,7 +106,9 @@ module deployAccess 'modules/deploy-access.bicep' = {
 
 // Azure Resource Manager tracks Static Web Apps operations, such as adding a custom domain, through a subscription-level status
 // endpoint, and polls it with the deploying identity's rights. Without this read, the deployment retries for hours after the
-// domain is ready. The role grants only that read; it can't change anything.
+// domain is ready. That action (Microsoft.Web/locations/staticSitesOperationStatuses/read) isn't in the provider's published
+// list, so a role can't name it exactly; the wildcard below grants reads under Microsoft.Web/locations only, such as operation
+// results and runtime stack lists. It can't change anything.
 resource deployStatusRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
   name: guid(subscription().subscriptionId, 'recipebox-deploy-status-reader')
   properties: {
@@ -116,7 +118,7 @@ resource deployStatusRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' =
     permissions: [
       {
         actions: [
-          'Microsoft.Web/locations/staticSitesOperationStatuses/read'
+          'Microsoft.Web/locations/*/read'
         ]
         notActions: []
         dataActions: []
