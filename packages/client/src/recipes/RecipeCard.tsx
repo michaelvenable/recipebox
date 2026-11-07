@@ -24,14 +24,14 @@ export function Thumbnail({ recipe }: { recipe: Pick<ListedRecipe, "id" | "name"
   );
 }
 
-/** The "Meal Plan" mark (PLAN-7). Editors only (X-1). */
+/** The "Plan" mark (PLAN-7). Editors only (X-1). */
 export function ToMakeBadge() {
   return (
     <span className="to-make-badge">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" aria-hidden="true">
         <path d="M6 3h12v18l-6-4-6 4z" />
       </svg>
-      Meal Plan
+      Plan
     </span>
   );
 }

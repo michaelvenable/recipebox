@@ -362,16 +362,16 @@ describe("PLAN-7, X-1 to-make indicator", () => {
   it("marks recipes on the to-make list for editors", async () => {
     mockListApi({ me: EDITOR, recipes: () => [asEditor(BEEF_STEW), asEditor(PAD_THAI, true), asEditor(TOAST)] });
     renderAt("/");
-    expect(await screen.findByRole("link", { name: /Pad Thai/ })).toHaveTextContent("Meal Plan");
-    expect(screen.getByRole("link", { name: /Beef Stew/ })).not.toHaveTextContent("Meal Plan");
-    expect(screen.getAllByText("Meal Plan", { selector: ".to-make-badge" })).toHaveLength(1);
+    expect(await screen.findByRole("link", { name: /Pad Thai/ })).toHaveTextContent("Plan");
+    expect(screen.getByRole("link", { name: /Beef Stew/ })).not.toHaveTextContent("Plan");
+    expect(screen.getAllByText("Plan", { selector: ".to-make-badge" })).toHaveLength(1);
   });
 
   it("shows visitors no indicator; their list has no to-make field", async () => {
     mockListApi({ me: VISITOR });
     renderAt("/");
     await screen.findByText("Pad Thai");
-    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
   });
 
   it("shows no indicator when the app knows the person is a visitor, even if the list has the editor shape", async () => {
@@ -380,7 +380,7 @@ describe("PLAN-7, X-1 to-make indicator", () => {
     renderAt("/");
     await screen.findByText("Pad Thai");
     await screen.findByRole("link", { name: "Sign in" });
-    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
   });
 
   it("refuses a list mixing visitor and editor shapes as a contract error", async () => {

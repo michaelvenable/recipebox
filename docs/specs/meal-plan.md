@@ -3,7 +3,7 @@
 ## Goal
 
 Keep a simple list of recipes the household intends to make soon. There are no dates, days or meal slots. The list is private:
-only signed-in editors can see or change it (X-1, X-6). In the app, the "to make" list is called "Meal Plan".
+only signed-in editors can see or change it (X-1, X-6). In the app, the "to make" list is called "Plan".
 
 ## Requirements
 

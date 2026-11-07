@@ -67,7 +67,7 @@ export function RecipeActions({ recipe, busy, error, markCooked, addToPlan, remo
       )}
       {recipe.toMake !== undefined ? (
         <div className="on-plan">
-          <span>On your meal plan ✓</span>
+          <span>On your plan ✓</span>
           <button
             ref={removeButton}
             type="button"

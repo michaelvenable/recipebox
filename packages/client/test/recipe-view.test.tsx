@@ -218,7 +218,7 @@ describe("X-1, X-8 visitors and editors", () => {
   ])("shows %s the recipe without editing controls, to-make mark or cooking history", async (_who, me) => {
     await openRecipe({ me, recipes: { [ID]: () => PAD_THAI } });
     expect(editorControlsShown()).toEqual([]);
-    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
     expect(screen.queryByText(/cooked/i)).not.toBeInTheDocument();
     // What everyone may do: tick (REC-19).
     expect(step(1)).toBeEnabled();
@@ -235,7 +235,7 @@ describe("X-1, X-8 visitors and editors", () => {
     await openRecipe({ me: VISITOR, recipes: { [ID]: () => asEditor(PAD_THAI, { toMake: { addedAt: at(2026, 10, 1) } }) } });
     await screen.findByRole("link", { name: "Sign in" });
     expect(editorControlsShown()).toEqual([]);
-    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
   });
 
   it("refuses a public recipe carrying a private field, as a contract error", async () => {
@@ -544,11 +544,11 @@ describe("PLAN-1, PLAN-4, PLAN-7 the to-make list from the recipe", () => {
       recipes: { [ID]: () => asEditor(PAD_THAI) },
       change: () => asEditor(PAD_THAI, { toMake: { addedAt: new Date().toISOString() } }),
     });
-    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "I want to cook this" }));
 
-    expect(await screen.findByText("On your meal plan ✓")).toBeInTheDocument();
-    expect(screen.getByText("Meal Plan", { selector: ".to-make-badge" })).toBeInTheDocument();
+    expect(await screen.findByText("On your plan ✓")).toBeInTheDocument();
+    expect(screen.getByText("Plan", { selector: ".to-make-badge" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "I want to cook this" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove" })).toHaveFocus();
     expect(changes(fetchMock)).toEqual([
@@ -562,13 +562,13 @@ describe("PLAN-1, PLAN-4, PLAN-7 the to-make list from the recipe", () => {
       recipes: { [ID]: () => asEditor(PAD_THAI, { ...history, toMake: { addedAt: at(2026, 10, 1) } }) },
       change: () => asEditor(PAD_THAI, history),
     });
-    expect(screen.getByText("Meal Plan", { selector: ".to-make-badge" })).toBeInTheDocument();
+    expect(screen.getByText("Plan", { selector: ".to-make-badge" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(await screen.findByRole("button", { name: "I want to cook this" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "I want to cook this" })).toHaveFocus();
-    expect(screen.queryByText("On your meal plan ✓")).not.toBeInTheDocument();
-    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("On your plan ✓")).not.toBeInTheDocument();
+    expect(screen.queryByText("Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
     expect(screen.getByText(/Last cooked Aug 2 · cooked once/)).toBeInTheDocument();
     expect(changes(fetchMock)).toEqual([
       { method: "POST", path: `/recipes/${ID}/remove-from-plan`, body: "{}", contentType: "application/json" },
@@ -584,7 +584,7 @@ describe("PLAN-1, PLAN-4, PLAN-7 the to-make list from the recipe", () => {
     queryClient.setQueryData(planKeys.all, []);
     queryClient.setQueryData(tagKeys.all, []);
     await userEvent.click(screen.getByRole("button", { name: "I want to cook this" }));
-    await screen.findByText("On your meal plan ✓");
+    await screen.findByText("On your plan ✓");
 
     expect(queryClient.getQueryState(recipeKeys.list({ name: "", tags: [] }))?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(planKeys.all)?.isInvalidated).toBe(true);
@@ -601,12 +601,12 @@ describe("PLAN-5 cooked recipes leave the list", () => {
     });
     queryClient.setQueryData(planKeys.all, []);
     queryClient.setQueryData(rediscoverKeys.all, []);
-    expect(screen.getByText("On your meal plan ✓")).toBeInTheDocument();
+    expect(screen.getByText("On your plan ✓")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "I cooked this today" }));
     expect(await screen.findByRole("button", { name: "Cooked today ✓" })).toBeInTheDocument();
-    expect(screen.queryByText("On your meal plan ✓")).not.toBeInTheDocument();
-    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("On your plan ✓")).not.toBeInTheDocument();
+    expect(screen.queryByText("Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "I want to cook this" })).toBeInTheDocument();
     expect(queryClient.getQueryState(planKeys.all)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(rediscoverKeys.all)?.isInvalidated).toBe(true);
@@ -700,7 +700,7 @@ describe("REC-17, X-12 failed changes", () => {
     await userEvent.click(screen.getByRole("button", { name: "I want to cook this" }));
     await screen.findByRole("alert");
     await userEvent.click(screen.getByRole("button", { name: "I want to cook this" }));
-    expect(await screen.findByText("On your meal plan ✓")).toBeInTheDocument();
+    expect(await screen.findByText("On your plan ✓")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 

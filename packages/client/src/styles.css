@@ -535,7 +535,7 @@ code {
   overflow-wrap: anywhere;
 }
 
-/* The "Meal Plan" mark (PLAN-7). */
+/* The "Plan" mark (PLAN-7). */
 .to-make-badge {
   flex: none;
   display: inline-flex;
@@ -1019,7 +1019,7 @@ code {
   color: var(--link-hover);
 }
 
-/* Meal Plan (PLAN-3, docs/mockups/ToMake.dc.html) and Haven't made in a while (COOK-6, docs/mockups/Rediscover.dc.html). */
+/* Plan (PLAN-3, docs/mockups/ToMake.dc.html) and Haven't made in a while (COOK-6, docs/mockups/Rediscover.dc.html). */
 
 .plan-page,
 .rediscover-page {

@@ -5,7 +5,7 @@ import { API, APP, EDITOR, NON_EDITOR, VISITOR, jsonResponse, mockApi, mockApiAs
 const ID = "8d3f2a4e-1b2c-4d5e-8f90-1234567890ab";
 
 const EDITOR_ONLY: [path: string, heading: string][] = [
-  ["/plan", "Meal Plan"],
+  ["/plan", "Plan"],
   ["/recommendations", "Recommendations"],
   ["/trash", "Trash"],
   ["/recipes/new", "New recipe"],

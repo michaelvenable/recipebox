@@ -23,12 +23,12 @@ describe("X-8 navigation row", () => {
     expect(linkNames(await mainNav())).toEqual(["Catalog", "Sign in"]);
   });
 
-  it("shows editors Catalog, Meal Plan, Recommendations, Trash and an Account button", async () => {
+  it("shows editors Catalog, Plan, Recommendations, Trash and an Account button", async () => {
     mockApiAs(EDITOR);
     renderAt("/");
     const nav = await mainNav();
-    expect(linkNames(nav)).toEqual(["Catalog", "Meal Plan", "Recommendations", "Trash", "Account"]);
-    expect(within(nav).getByRole("link", { name: "Meal Plan" })).toHaveAttribute("href", "/plan");
+    expect(linkNames(nav)).toEqual(["Catalog", "Plan", "Recommendations", "Trash", "Account"]);
+    expect(within(nav).getByRole("link", { name: "Plan" })).toHaveAttribute("href", "/plan");
     expect(within(nav).getByRole("link", { name: "Recommendations" })).toHaveAttribute("href", "/recommendations");
     expect(within(nav).getByRole("link", { name: "Trash" })).toHaveAttribute("href", "/trash");
     expect(within(nav).getByRole("link", { name: "Account" })).toHaveAttribute("href", "/account");
@@ -52,7 +52,7 @@ describe("X-8 current page", () => {
     ["/", "Catalog"],
     ["/recipes/8d3f2a4e-1b2c-4d5e-8f90-1234567890ab", "Catalog"],
     ["/recipes/new", "Catalog"],
-    ["/plan", "Meal Plan"],
+    ["/plan", "Plan"],
     ["/recommendations", "Recommendations"],
     ["/trash", "Trash"],
     ["/account", "Account"],

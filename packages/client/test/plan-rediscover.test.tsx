@@ -177,12 +177,12 @@ function never(): Promise<Response> {
 async function openPlan(server: FakeServer = {}) {
   const fake = mockServer(server);
   const rendered = renderAt("/plan");
-  await screen.findByRole("heading", { level: 1, name: "Meal Plan" });
+  await screen.findByRole("heading", { level: 1, name: "Plan" });
   return { ...fake, ...rendered };
 }
 
 function planList(): HTMLElement {
-  return screen.getByRole("list", { name: "Meal Plan" });
+  return screen.getByRole("list", { name: "Plan" });
 }
 
 function planLines(): string[] {
@@ -192,14 +192,14 @@ function planLines(): string[] {
 }
 
 function removeButton(name: string): HTMLElement {
-  return screen.getByRole("button", { name: `Remove ${name} from the meal plan` });
+  return screen.getByRole("button", { name: `Remove ${name} from the plan` });
 }
 
-describe("PLAN-3 the Meal Plan", () => {
+describe("PLAN-3 the Plan", () => {
   it("shows the entries in the server's order, oldest first, with the date each was added", async () => {
     setClock(OCT_30_NOON);
     await openPlan();
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     expect(screen.getByText("4 recipes · oldest first")).toBeInTheDocument();
     // Not alphabetical: the order is the server's.
     expect(planLines()).toEqual([
@@ -212,15 +212,15 @@ describe("PLAN-3 the Meal Plan", () => {
 
   it("links each entry to its recipe, with its thumbnail or a placeholder, and a 44px round remove button per entry", async () => {
     await openPlan();
-    const list = await screen.findByRole("list", { name: "Meal Plan" });
+    const list = await screen.findByRole("list", { name: "Plan" });
     expect(within(list).getByRole("link", { name: /Lemon Risotto/ })).toHaveAttribute("href", `/recipes/${LEMON_ID}`);
     expect(within(list).getByRole("img", { name: "Lemon Risotto photo" })).toHaveAttribute("src", `${API}/recipes/${LEMON_ID}/thumbnail`);
     expect(list.querySelectorAll(".thumb-placeholder")).toHaveLength(3);
     expect(within(list).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
-      "Remove Lemon Risotto from the meal plan",
-      "Remove Chicken Tikka Masala from the meal plan",
-      "Remove Shakshuka from the meal plan",
-      "Remove Fish Tacos from the meal plan",
+      "Remove Lemon Risotto from the plan",
+      "Remove Chicken Tikka Masala from the plan",
+      "Remove Shakshuka from the plan",
+      "Remove Fish Tacos from the plan",
     ]);
     // The button sits beside the link, not inside it.
     expect(removeButton("Lemon Risotto").closest("a")).toBeNull();
@@ -238,14 +238,14 @@ describe("PLAN-3 the Meal Plan", () => {
         recipe(FISH_ID, "Fish Tacos", { toMake: { addedAt: at(2026, 9, 30, 0, 5) } }),
       ],
     });
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     expect(planLines()).toEqual(["Beef StewAdded Dec 30, 2025", "Lemon RisottoAdded Oct 12", "Fish TacosAdded today"]);
   });
 
   it("says today until local midnight, then the date, on the open page", async () => {
     setClock(new Date(2026, 9, 30, 23, 58));
     await openPlan({ recipes: [recipe(FISH_ID, "Fish Tacos", { toMake: { addedAt: at(2026, 9, 30, 20, 0) } })] });
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     expect(planLines()).toEqual(["Fish TacosAdded today"]);
     act(() => vi.advanceTimersByTime(3 * 60_000));
     expect(planLines()).toEqual(["Fish TacosAdded Oct 30"]);
@@ -275,10 +275,10 @@ describe("PLAN-3 the Meal Plan", () => {
     let attempt = 0;
     await openPlan({ plan: () => (++attempt === 1 ? jsonResponse(500, { errors: [] }) : undefined) });
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Couldn't load the meal plan.");
+    expect(alert).toHaveTextContent("Couldn't load the plan.");
     expect(screen.queryByText("Nothing planned yet")).not.toBeInTheDocument();
     await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
-    expect(await screen.findByRole("list", { name: "Meal Plan" })).toBeInTheDocument();
+    expect(await screen.findByRole("list", { name: "Plan" })).toBeInTheDocument();
   });
 
   it.each([
@@ -296,7 +296,7 @@ describe("PLAN-3 the Meal Plan", () => {
 describe("PLAN-4 remove from the list", () => {
   it("sends an empty body and no time (X-12), and takes the entry out at once, before the server answers", async () => {
     const { fetchMock, holdChanges } = await openPlan();
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     const release = holdChanges();
     await userEvent.click(removeButton("Shakshuka"));
 
@@ -313,7 +313,7 @@ describe("PLAN-4 remove from the list", () => {
   it("keeps the entry out once the server answers, without waiting for the list to reload", async () => {
     let holdList = false;
     const { fetchMock, queryClient } = await openPlan({ plan: () => (holdList ? never() : undefined) });
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     holdList = true;
     await userEvent.click(removeButton("Shakshuka"));
     // The list was asked for again and hasn't answered: what shows is the cache, with the saved recipe in it.
@@ -329,7 +329,7 @@ describe("PLAN-4 remove from the list", () => {
     await act(() => router.navigate("/"));
     await screen.findByRole("link", { name: /Shakshuka/ });
     await act(() => router.navigate("/plan"));
-    await userEvent.click(await screen.findByRole("button", { name: "Remove Shakshuka from the meal plan" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Remove Shakshuka from the plan" }));
     await waitFor(() =>
       expect(
         queryClient
@@ -341,21 +341,21 @@ describe("PLAN-4 remove from the list", () => {
 
   it("moves focus to the next entry's remove button", async () => {
     await openPlan();
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     await userEvent.click(removeButton("Chicken Tikka Masala"));
     expect(removeButton("Shakshuka")).toHaveFocus();
   });
 
   it("moves focus to the entry before when the last one is removed", async () => {
     await openPlan();
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     await userEvent.click(removeButton("Fish Tacos"));
     expect(removeButton("Shakshuka")).toHaveFocus();
   });
 
   it("moves focus to Browse recipes when the list is now empty", async () => {
     await openPlan({ recipes: [FISH] });
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     await userEvent.click(removeButton("Fish Tacos"));
     expect(await screen.findByRole("heading", { name: "Nothing planned yet" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Browse recipes" })).toHaveFocus();
@@ -363,7 +363,7 @@ describe("PLAN-4 remove from the list", () => {
 
   it("leaves focus alone if it is elsewhere when the remove button is tapped", async () => {
     await openPlan();
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     const elsewhere = screen.getByRole("link", { name: "Catalog" });
     act(() => elsewhere.focus());
     fireEvent.click(removeButton("Chicken Tikka Masala"));
@@ -373,7 +373,7 @@ describe("PLAN-4 remove from the list", () => {
 
   it("brings the entry back and says why when the removal fails", async () => {
     await openPlan({ change: () => jsonResponse(500, { errors: [] }) });
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     await userEvent.click(removeButton("Shakshuka"));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Couldn't remove Shakshuka from the list. The server couldn't make the change. Try again.",
@@ -386,7 +386,7 @@ describe("PLAN-4 remove from the list", () => {
 
   it("puts focus on the message when the only entry comes back", async () => {
     await openPlan({ recipes: [FISH], change: () => Promise.reject(new TypeError("Failed to fetch")) });
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     await userEvent.click(removeButton("Fish Tacos"));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Couldn't remove Fish Tacos from the list. Couldn't reach the server.");
@@ -401,7 +401,7 @@ describe("PLAN-4 remove from the list", () => {
     await userEvent.click(await screen.findByRole("button", { name: "I cooked this today" }));
     await act(() => router.navigate("/plan"));
 
-    const remove = await screen.findByRole("button", { name: "Remove Shakshuka from the meal plan" });
+    const remove = await screen.findByRole("button", { name: "Remove Shakshuka from the plan" });
     expect(remove).toBeDisabled();
     fireEvent.click(remove);
     expect(changes(fetchMock).map((c) => c.path)).toEqual([`/recipes/${SHAKSHUKA_ID}/cookings`]);
@@ -413,7 +413,7 @@ describe("PLAN-4 remove from the list", () => {
 
   it("makes the recipe view wait for a removal still being saved, and shows it off the list there", async () => {
     const { fetchMock, router, holdChanges } = await openPlan();
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     const release = holdChanges();
     await userEvent.click(removeButton("Shakshuka"));
     await act(() => router.navigate(`/recipes/${SHAKSHUKA_ID}`));
@@ -430,12 +430,12 @@ describe("PLAN-4 remove from the list", () => {
 
   it("keeps the entry out when coming back while the removal is still being saved", async () => {
     const { router, holdChanges } = await openPlan();
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     const release = holdChanges();
     await userEvent.click(removeButton("Shakshuka"));
     await act(() => router.navigate("/"));
     await act(() => router.navigate("/plan"));
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     expect(screen.queryByText("Shakshuka")).not.toBeInTheDocument();
     release();
   });
@@ -443,7 +443,7 @@ describe("PLAN-4 remove from the list", () => {
   it("doesn't report a failure on another page after leaving the list", async () => {
     let fail: (response: Response) => void = () => {};
     const { router } = await openPlan({ change: () => new Promise<Response>((resolve) => (fail = resolve)) });
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     await userEvent.click(removeButton("Shakshuka"));
     await act(() => router.navigate("/account"));
     await act(async () => fail(jsonResponse(500, { errors: [] })));
@@ -454,11 +454,11 @@ describe("PLAN-4 remove from the list", () => {
   it("says why when a removal fails after leaving the list and coming back while it was being saved", async () => {
     let fail: (response: Response) => void = () => {};
     const { router } = await openPlan({ change: () => new Promise<Response>((resolve) => (fail = resolve)) });
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     await userEvent.click(removeButton("Shakshuka"));
     await act(() => router.navigate("/account"));
     await act(() => router.navigate("/plan"));
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     expect(screen.queryByText("Shakshuka")).not.toBeInTheDocument();
 
     await act(async () => fail(jsonResponse(500, { errors: [] })));
@@ -471,7 +471,7 @@ describe("PLAN-4 remove from the list", () => {
   it("clears the message when the next removal starts", async () => {
     let attempt = 0;
     await openPlan({ change: () => (++attempt === 1 ? jsonResponse(500, { errors: [] }) : undefined) });
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     await userEvent.click(removeButton("Shakshuka"));
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't remove Shakshuka from the list.");
     await userEvent.click(removeButton("Fish Tacos"));
@@ -483,7 +483,7 @@ describe("PLAN-4 remove from the list", () => {
   it("updates a renamed entry in place, before the list reloads (REC-5)", async () => {
     let holdList = false;
     const { queryClient, fetchMock } = await openPlan({ plan: () => (holdList ? never() : undefined) });
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     holdList = true;
     // As the edit form does after saving (RecipeForm.tsx).
     act(() => showSavedRecipe(queryClient, { ...SHAKSHUKA, name: "Green Shakshuka" }, { tagsChanged: true }));
@@ -504,7 +504,7 @@ describe("PLAN-1, PLAN-5, PLAN-6 coming back to the list after a change on the r
   async function fromPlanToRecipe(id: string, server: FakeServer = {}) {
     let holdList = false;
     const opened = await openPlan({ ...server, plan: () => (holdList ? never() : undefined) });
-    await screen.findByRole("list", { name: "Meal Plan" });
+    await screen.findByRole("list", { name: "Plan" });
     await act(() => opened.router.navigate(`/recipes/${id}`));
     await screen.findByRole("button", { name: "I cooked this today" });
     holdList = true;
@@ -522,7 +522,7 @@ describe("PLAN-1, PLAN-5, PLAN-6 coming back to the list after a change on the r
   it("shows a recipe just added at the end, added today, at once (PLAN-1)", async () => {
     const { router } = await fromPlanToRecipe(PAD_THAI_ID);
     await userEvent.click(screen.getByRole("button", { name: "I want to cook this" }));
-    await screen.findByText("On your meal plan ✓");
+    await screen.findByText("On your plan ✓");
     await act(() => router.navigate("/plan"));
     expect(planLines().at(-1)).toBe("Pad ThaiAdded today");
     expect(screen.getByText("5 recipes · oldest first")).toBeInTheDocument();
@@ -684,7 +684,7 @@ describe("COOK-6 Haven't made in a while, called Recommendations", () => {
     const { router, before } = await rediscoverHeld();
     await act(() => router.navigate(`/recipes/${STEW_ID}`));
     await userEvent.click(await screen.findByRole("button", { name: "I want to cook this" }));
-    await screen.findByText("On your meal plan ✓");
+    await screen.findByText("On your plan ✓");
     await act(() => router.navigate("/recommendations"));
     expect(rediscoverLines()).toEqual(before);
   });

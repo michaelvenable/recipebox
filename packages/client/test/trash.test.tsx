@@ -343,7 +343,7 @@ describe("REC-6 the Undo message", () => {
     setClock(at(2026, 10, 4, 18, 0));
     const { router } = await deleteFromView();
     await act(() => router.navigate("/plan"));
-    expect(screen.getByRole("heading", { level: 1, name: "Meal Plan" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Plan" })).toBeInTheDocument();
     expect(screen.getByText("Pad Thai moved to trash")).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(NOTICE_MS + 100));
     expect(screen.queryByText("Pad Thai moved to trash")).not.toBeInTheDocument();
@@ -409,7 +409,7 @@ describe("REC-6 the Undo message", () => {
     expect(tags.getByText("noodles")).toBeInTheDocument();
     expect(screen.getByText(/cooked once/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "I want to cook this" })).toBeInTheDocument();
-    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
     // Opening it closes the message.
     expect(screen.queryByText("Pad Thai restored")).not.toBeInTheDocument();
   });

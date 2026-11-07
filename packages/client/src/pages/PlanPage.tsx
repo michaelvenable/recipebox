@@ -78,7 +78,7 @@ export function PlanPage() {
   return (
     <div className="plan-page">
       <header className="list-page-header">
-        <h1>Meal Plan</h1>
+        <h1>Plan</h1>
         {visible !== undefined && visible.length > 0 && <p className="muted">{countLabel(visible.length)} · oldest first</p>}
       </header>
       {problem !== undefined && (
@@ -124,7 +124,7 @@ function PlanContents({ entries, visible, failed, retry, today, removal, removeB
     if (failed) {
       return (
         <div className="card stack" role="alert">
-          <p>Couldn't load the meal plan. Check the connection and try again.</p>
+          <p>Couldn't load the plan. Check the connection and try again.</p>
           <button type="button" className="button" onClick={retry}>
             Try again
           </button>
@@ -135,7 +135,7 @@ function PlanContents({ entries, visible, failed, retry, today, removal, removeB
   }
   if (visible.length === 0) return <EmptyPlan browseLink={browseLink} />;
   return (
-    <ul className="entry-cards" aria-label="Meal Plan">
+    <ul className="entry-cards" aria-label="Plan">
       {visible.map((entry) => (
         <PlanRow
           key={entry.id}
@@ -202,7 +202,7 @@ function PlanRow({ entry, today, removal, buttonRef }: PlanRowProps) {
         ref={buttonRef}
         type="button"
         className="round-button"
-        aria-label={`Remove ${entry.name} from the meal plan`}
+        aria-label={`Remove ${entry.name} from the plan`}
         disabled={busy}
         onClick={onRemove}
       >

@@ -15,7 +15,7 @@ const RECIPES: NavItem = { label: "Catalog", to: "/", isCurrent: (p) => p === "/
 
 const EDITOR_ITEMS: readonly NavItem[] = [
   RECIPES,
-  { label: "Meal Plan", to: "/plan", isCurrent: under("/plan") },
+  { label: "Plan", to: "/plan", isCurrent: under("/plan") },
   { label: "Recommendations", to: "/recommendations", isCurrent: under("/recommendations") },
   { label: "Trash", to: "/trash", isCurrent: under("/trash") },
 ];
