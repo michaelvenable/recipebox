@@ -10,16 +10,19 @@ export const MAX_TAGS = 20;
 export interface RecipeContentInput {
   name: string;
   ingredients: readonly string[];
+  /** Optional (REC-20); missing means none, so older clients and stored documents keep working. */
+  prep?: readonly string[] | undefined;
   steps: readonly string[];
   totalTimeMinutes?: number | undefined;
   tags?: readonly string[] | undefined;
 }
 
-/** The user-editable part of a recipe, validated as a unit (REC-1, REC-2, REC-3, REC-11). */
+/** The user-editable part of a recipe, validated as a unit (REC-1, REC-2, REC-3, REC-11, REC-20). */
 export class RecipeContent {
   private constructor(
     private readonly recipeName: RecipeName,
     private readonly ingredientList: readonly TextEntry[],
+    private readonly prepList: readonly TextEntry[],
     private readonly stepList: readonly TextEntry[],
     private readonly time: Minutes | undefined,
     private readonly tagList: readonly Tag[],
@@ -38,6 +41,9 @@ export class RecipeContent {
     if (!hasEntry(input.ingredients)) {
       errors.push(domainError("ingredients.required", "At least 1 ingredient is required.", "ingredients"));
     }
+
+    // Same entry rules as steps, but prep is optional: no "at least 1" (REC-20, REC-2).
+    const prep = entries(input.prep ?? [], "prep", errors);
 
     const steps = entries(input.steps, "steps", errors);
     if (!hasEntry(input.steps)) {
@@ -66,7 +72,14 @@ export class RecipeContent {
     }
     const sortedTags = [...tags.values()].sort(Tag.compare);
     return ok(
-      new RecipeContent(name.value, Object.freeze(ingredients), Object.freeze(steps), time, Object.freeze(sortedTags)),
+      new RecipeContent(
+        name.value,
+        Object.freeze(ingredients),
+        Object.freeze(prep),
+        Object.freeze(steps),
+        time,
+        Object.freeze(sortedTags),
+      ),
     );
   }
 
@@ -77,6 +90,11 @@ export class RecipeContent {
   /** In the order entered (REC-3). */
   get ingredients(): readonly TextEntry[] {
     return this.ingredientList;
+  }
+
+  /** In the order entered; may be empty (REC-3, REC-20). */
+  get prep(): readonly TextEntry[] {
+    return this.prepList;
   }
 
   /** In the order entered (REC-3). */

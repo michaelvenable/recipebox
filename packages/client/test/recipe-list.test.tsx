@@ -143,6 +143,14 @@ describe("REC-8 list", () => {
 });
 
 describe("REC-9 search by name", () => {
+  it("labels the search for screen readers only, with Find a recipe as its placeholder", async () => {
+    mockListApi();
+    renderAt("/");
+    await screen.findByText("Pad Thai");
+    expect(searchField()).toHaveAttribute("placeholder", "Find a recipe");
+    expect(screen.getByText("Search by name")).toHaveClass("visually-hidden");
+  });
+
   it("searches once typing pauses, and keeps the term in the address", async () => {
     const fetchMock = mockListApi({ recipes: (url) => (url.searchParams.get("name") === "chick" ? [] : ALL) });
     const { router } = renderAt("/");
@@ -279,13 +287,21 @@ describe("REC-13 filter by tags", () => {
 
     await userEvent.click(await chip("dinner · 2"));
     expect(await chip("dinner · 2")).toHaveAttribute("aria-pressed", "true");
-    expect(await screen.findByText("2 recipes tagged dinner")).toBeInTheDocument();
+    await waitFor(() => expect(recipeLinks()).toHaveLength(2));
 
     await userEvent.click(await chip("quick · 1"));
-    expect(await screen.findByText("1 recipe tagged dinner and quick")).toBeInTheDocument();
-    expect(recipeLinks()).toHaveLength(1);
+    await waitFor(() => expect(recipeLinks()).toHaveLength(1));
     expect(router.state.location.search).toBe("?tags=dinner,quick");
     expect(listQueries(fetchMock)).toEqual(["", "?tags=dinner", "?tags=dinner,quick"]);
+  });
+
+  it("shows no summary and no Show all recipes when only tags are picked and some recipes match", async () => {
+    mockListApi({ recipes: (url) => (url.search === "" ? ALL : [BEEF_STEW, PAD_THAI]) });
+    renderAt("/?tags=dinner");
+    await waitFor(() => expect(recipeLinks()).toHaveLength(2));
+    expect(within(screen.getByRole("main")).getByRole("status")).toHaveTextContent("");
+    expect(screen.queryByText(/tagged/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show all recipes" })).not.toBeInTheDocument();
   });
 
   it("shows the unfiltered list once every picked tag is unpicked", async () => {
@@ -346,16 +362,16 @@ describe("PLAN-7, X-1 to-make indicator", () => {
   it("marks recipes on the to-make list for editors", async () => {
     mockListApi({ me: EDITOR, recipes: () => [asEditor(BEEF_STEW), asEditor(PAD_THAI, true), asEditor(TOAST)] });
     renderAt("/");
-    expect(await screen.findByRole("link", { name: /Pad Thai/ })).toHaveTextContent("Want to make");
-    expect(screen.getByRole("link", { name: /Beef Stew/ })).not.toHaveTextContent("Want to make");
-    expect(screen.getAllByText("Want to make", { selector: ".to-make-badge" })).toHaveLength(1);
+    expect(await screen.findByRole("link", { name: /Pad Thai/ })).toHaveTextContent("Meal Plan");
+    expect(screen.getByRole("link", { name: /Beef Stew/ })).not.toHaveTextContent("Meal Plan");
+    expect(screen.getAllByText("Meal Plan", { selector: ".to-make-badge" })).toHaveLength(1);
   });
 
   it("shows visitors no indicator; their list has no to-make field", async () => {
     mockListApi({ me: VISITOR });
     renderAt("/");
     await screen.findByText("Pad Thai");
-    expect(screen.queryByText("Want to make", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
   });
 
   it("shows no indicator when the app knows the person is a visitor, even if the list has the editor shape", async () => {
@@ -364,7 +380,7 @@ describe("PLAN-7, X-1 to-make indicator", () => {
     renderAt("/");
     await screen.findByText("Pad Thai");
     await screen.findByRole("link", { name: "Sign in" });
-    expect(screen.queryByText("Want to make", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
   });
 
   it("refuses a list mixing visitor and editor shapes as a contract error", async () => {
@@ -375,21 +391,21 @@ describe("PLAN-7, X-1 to-make indicator", () => {
 });
 
 describe("X-8 editing controls on the list", () => {
-  it("gives editors the Recipes heading and an Add recipe link", async () => {
+  it("gives editors the Catalog heading and an Add recipe link", async () => {
     mockListApi({ me: EDITOR, recipes: () => ALL.map((r) => asEditor(r)) });
     renderAt("/");
-    expect(await screen.findByRole("heading", { level: 1, name: "Recipes" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Catalog" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Add recipe" })).toHaveAttribute("href", "/recipes/new");
   });
 
   it.each([
     ["visitors", VISITOR],
     ["signed-in non-editors", NON_EDITOR],
-  ])("gives %s the RecipeBox heading and no Add recipe link", async (_who, me) => {
+  ])("gives %s the Recipe Box heading and no Add recipe link", async (_who, me) => {
     mockListApi({ me });
     renderAt("/");
     await screen.findByText("Pad Thai");
-    expect(screen.getByRole("heading", { level: 1, name: "RecipeBox" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Recipe Box" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Add/ })).not.toBeInTheDocument();
   });
 });

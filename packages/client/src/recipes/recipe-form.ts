@@ -1,47 +1,77 @@
 // The create and edit form's values, and turning them into a RecipeContentInput and the server's errors back into fields.
 //
-// The domain's rules (REC-1, REC-2, REC-11, X-13) are checked by the server. The form sends what was typed: entries untrimmed and
-// blank ones included, so an error's position, such as "ingredients[2]", is the row the editor sees. The only checks here are the
-// obvious ones that the server would refuse anyway, so the editor hears about them without a round trip.
+// The domain's rules (REC-1, REC-2, REC-11, X-13) are checked by the server. The form sends what was typed: each line of an
+// entry box as one entry, untrimmed and blank lines included, so an error's position, such as "ingredients[2]", is line 3 of the
+// box (REC-21). The only checks here are the obvious ones that the server would refuse anyway, so the editor hears about them
+// without a round trip.
 import type { ErrorItem, PublicRecipe, RecipeContentInput } from "@recipebox/shared";
 
-/**
- * An ingredient or step row. The key stays with the row when a row above it is removed, so its text field, focus and error stay
- * with it rather than with whatever row now has its position.
- */
-export interface Entry {
-  key: number;
-  text: string;
-}
-
-export type EntryField = "ingredients" | "steps";
+/** The lists typed one entry per line (REC-21). */
+export type EntryField = "ingredients" | "prep" | "steps";
 
 export interface FormValues {
   name: string;
-  ingredients: Entry[];
-  steps: Entry[];
-  /** Total time as typed: hours:minutes such as "1:30", or minutes such as "45"; blank means no total time. */
+  /** Ingredients, prep and steps as typed, one entry per line (REC-21). */
+  ingredients: string;
+  prep: string;
+  steps: string;
+  /** Total time as typed: hours:minutes such as "1:30" or ":45", or minutes such as "45"; blank means no total time. */
   totalTime: string;
-  tags: string[];
+  /** Tags as typed, separated by commas, such as "dinner, quick" (REC-10). */
+  tags: string;
 }
 
-let lastKey = 0;
-
-export function newEntry(text = ""): Entry {
-  lastKey += 1;
-  return { key: lastKey, text };
-}
-
-/** The form for an existing recipe, or an empty one with one ingredient row and one step row to type into. */
+/** The form for an existing recipe, its entries one per line and its tags separated by commas, or an empty form. */
 export function formFrom(recipe: PublicRecipe | undefined): FormValues {
-  if (recipe === undefined) return { name: "", ingredients: [newEntry()], steps: [newEntry()], totalTime: "", tags: [] };
+  if (recipe === undefined) return { name: "", ingredients: "", prep: "", steps: "", totalTime: "", tags: "" };
   return {
     name: recipe.name,
-    ingredients: recipe.ingredients.map((text) => newEntry(text)),
-    steps: recipe.steps.map((text) => newEntry(text)),
+    ingredients: oneEntryPerLine(recipe.ingredients),
+    // A recipe from before prep, or from a server that leaves out an empty list, has none (REC-20).
+    prep: oneEntryPerLine(recipe.prep ?? []),
+    steps: oneEntryPerLine(recipe.steps),
     totalTime: formatTotalTime(recipe.totalTimeMinutes),
-    tags: [...recipe.tags],
+    tags: recipe.tags.join(", "),
   };
+}
+
+/**
+ * Entries one per line (REC-21). An entry saved before REC-21 may have line breaks of its own; each run of them is shown as a
+ * space, so the entry stays one entry when the form is saved.
+ */
+function oneEntryPerLine(entries: readonly string[]): string {
+  return entries.map((entry) => entry.replace(/(?:\r\n|\r|\n)+/g, " ")).join("\n");
+}
+
+/**
+ * The entries typed in one box: each line is one entry (REC-21), and an empty box has none. Blank lines are kept, so entry i is
+ * line i + 1 for the server's errors; the server trims entries and discards blank ones, so they never become entries (REC-2).
+ */
+export function entryLines(typed: string): string[] {
+  return typed === "" ? [] : typed.split(/\r\n|\r|\n/);
+}
+
+/**
+ * The tags typed in the tag field: a comma separates two tags, and empty items, as in "dinner,, quick", are ignored (REC-11).
+ * Trimmed so a refused tag's message shows it as typed; lowercasing, merging and every other tag rule are the server's.
+ */
+export function tagItems(typed: string): string[] {
+  return typed
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter((tag) => tag !== "");
+}
+
+/** The tag field split at its last comma: the tags before it, and the text after it, which is the tag being typed (REC-12). */
+export function tagBeingTyped(typed: string): { before: string; current: string } {
+  const comma = typed.lastIndexOf(",");
+  return { before: typed.slice(0, comma + 1), current: typed.slice(comma + 1) };
+}
+
+/** The tag field after choosing a suggestion: it replaces the tag being typed, and a comma follows for the next one (REC-12). */
+export function withSuggestion(typed: string, tag: string): string {
+  const { before } = tagBeingTyped(typed);
+  return `${before}${before === "" ? "" : " "}${tag}, `;
 }
 
 /** A total time as the form shows it, hours:minutes: 90 as "1:30", 45 as "0:45", 120 as "2:00", and none as "". */
@@ -51,9 +81,9 @@ export function formatTotalTime(total: number | undefined): string {
   return `${Math.floor(total / 60)}:${minutes < 10 ? "0" : ""}${minutes}`;
 }
 
-// Hours, a colon and two digits of minutes ("1:30", "0:45"), or a number of minutes ("45"). Only ASCII digits: no sign, no
-// decimal point. "1:5" is refused rather than guessed at, since it could mean 1:05 or 1:50.
-const HOURS_MINUTES = /^([0-9]+):([0-5][0-9])$/;
+// Hours, a colon and two digits of minutes ("1:30", "0:45", or ":45" with no hours), or a number of minutes ("45"). Only ASCII
+// digits: no sign, no decimal point. "1:5" is refused rather than guessed at, since it could mean 1:05 or 1:50.
+const HOURS_MINUTES = /^([0-9]*):([0-5][0-9])$/;
 const MINUTES = /^[0-9]+$/;
 
 /**
@@ -76,18 +106,19 @@ export function totalMinutes(typed: string): number | undefined | null {
 export function contentInput(form: FormValues): RecipeContentInput {
   const input: RecipeContentInput = {
     name: form.name,
-    ingredients: form.ingredients.map((e) => e.text),
-    steps: form.steps.map((e) => e.text),
-    tags: [...form.tags],
+    ingredients: entryLines(form.ingredients),
+    prep: entryLines(form.prep),
+    steps: entryLines(form.steps),
+    tags: tagItems(form.tags),
   };
   const minutes = totalMinutes(form.totalTime);
   if (typeof minutes === "number") input.totalTimeMinutes = minutes;
   return input;
 }
 
-/** The content as typed, without row keys, to tell whether it has changed since it was loaded or saved. */
+/** The content as typed, to tell whether it has changed since it was loaded or saved. */
 export function contentSnapshot(form: FormValues): string {
-  return JSON.stringify([form.name, form.ingredients.map((e) => e.text), form.steps.map((e) => e.text), form.totalTime, form.tags]);
+  return JSON.stringify([form.name, form.ingredients, form.prep, form.steps, form.totalTime, form.tags]);
 }
 
 /**
@@ -97,36 +128,27 @@ export function contentSnapshot(form: FormValues): string {
 export function obviousErrors(form: FormValues): ErrorItem[] {
   const errors: ErrorItem[] = [];
   if (form.name.trim() === "") errors.push({ code: "name.required", field: "name", message: "Enter a name (up to 200 characters)." });
-  if (form.ingredients.every((e) => e.text.trim() === "")) {
-    errors.push({ code: "ingredients.required", field: "ingredients", message: "Add at least one ingredient. Blank ones are ignored." });
+  if (form.ingredients.trim() === "") {
+    errors.push({ code: "ingredients.required", field: "ingredients", message: "Add at least one ingredient. Blank lines are ignored." });
   }
-  if (form.steps.every((e) => e.text.trim() === "")) {
-    errors.push({ code: "steps.required", field: "steps", message: "Add at least one step. Blank steps are ignored." });
+  if (form.steps.trim() === "") {
+    errors.push({ code: "steps.required", field: "steps", message: "Add at least one step. Blank lines are ignored." });
   }
   if (totalMinutes(form.totalTime) === null) {
     errors.push({
       code: "totalTime.format",
       field: "totalTimeMinutes",
-      message: "Enter the time as hours:minutes, like 1:30, or as minutes, like 45.",
+      message: "Enter the time as hours:minutes, like 1:30 or :45, or as minutes, like 45.",
     });
   }
   return errors;
 }
 
-/**
- * The form with `typed` added as a tag (REC-10). Trimmed so the chip shows what will be saved, and not added twice when the very
- * same text is there already; lowercasing, merging and every other tag rule are the server's on Save (REC-11).
- */
-export function withTag(form: FormValues, typed: string): FormValues {
-  const tag = typed.trim();
-  return tag === "" || form.tags.includes(tag) ? form : { ...form, tags: [...form.tags, tag] };
-}
-
 /** Where an error is shown: a field of the form, or only in the summary at the top. */
 export interface FormErrors {
   /**
-   * Messages by field: "name", "photo", "totalTimeMinutes", "ingredients" and "steps" (the list as a whole), "ingredients#<key>"
-   * and "steps#<key>" (one row, by its key, so the message stays with the row when one above it is removed), "tags", and "tag:<text>" (one tag).
+   * Messages by field: "name", "photo", "totalTimeMinutes", "ingredients", "prep", "steps" and "tags". An error about one entry
+   * names its line ("Line 3: …", REC-21), and one about one tag names the tag.
    */
   fields: ReadonlyMap<string, readonly string[]>;
   /** Messages that belong to no field shown in the form, such as "This recipe is in the trash." (REC-17). */
@@ -135,31 +157,26 @@ export interface FormErrors {
 
 export const NO_ERRORS: FormErrors = { fields: new Map(), general: [] };
 
-export function entryField(field: EntryField, entry: Entry): string {
-  return `${field}#${entry.key}`;
-}
+const SIMPLE_FIELDS = new Set(["name", "photo", "totalTimeMinutes", "ingredients", "prep", "steps", "tags"]);
 
-export function tagField(tag: string): string {
-  return `tag:${tag}`;
-}
-
-const SIMPLE_FIELDS = new Set(["name", "photo", "totalTimeMinutes", "ingredients", "steps", "tags"]);
-
-/** The form field of a server error path such as "ingredients[2]" or "tags[0]", given the form as it was sent. */
-function formField(path: string | undefined, sent: FormValues): string | undefined {
+/**
+ * The form field of a server error path such as "ingredients[2]" or "tags[0]", given the form as it was sent, and what to put
+ * before the message to say which line or tag it is about.
+ */
+function formField(path: string | undefined, sent: FormValues): { field: string; about: string } | undefined {
   if (path === undefined) return undefined;
-  if (SIMPLE_FIELDS.has(path)) return path;
-  const match = /^(ingredients|steps|tags)\[(\d+)\]$/.exec(path);
+  if (SIMPLE_FIELDS.has(path)) return { field: path, about: "" };
+  const match = /^(ingredients|prep|steps|tags)\[(\d+)\]$/.exec(path);
   if (match === null) return undefined;
-  const [, list, position] = match;
+  const [, list = "", position] = match;
   const index = Number(position);
   if (list === "tags") {
-    const tag = sent.tags[index];
-    return tag === undefined ? "tags" : tagField(tag);
+    const tag = tagItems(sent.tags)[index];
+    return { field: "tags", about: tag === undefined ? "" : `“${tag}”: ` };
   }
-  const field = list as EntryField;
-  const entry = sent[field][index];
-  return entry === undefined ? field : entryField(field, entry);
+  // The lines are sent as typed, blank ones included, so entry i is line i + 1 (entryLines).
+  const lines = entryLines(sent[list as EntryField]);
+  return { field: list, about: index < lines.length ? `Line ${index + 1}: ` : "" };
 }
 
 /** Sorts the server's (or the obvious) errors into the fields of the form that was sent. */
@@ -167,14 +184,15 @@ export function formErrors(errors: readonly ErrorItem[], sent: FormValues): Form
   const fields = new Map<string, string[]>();
   const general: string[] = [];
   for (const error of errors) {
-    const field = formField(error.field, sent);
-    if (field === undefined) {
+    const place = formField(error.field, sent);
+    if (place === undefined) {
       general.push(error.message);
       continue;
     }
-    const messages = fields.get(field) ?? [];
-    if (!messages.includes(error.message)) messages.push(error.message);
-    fields.set(field, messages);
+    const message = `${place.about}${error.message}`;
+    const messages = fields.get(place.field) ?? [];
+    if (!messages.includes(message)) messages.push(message);
+    fields.set(place.field, messages);
   }
   return { fields, general };
 }

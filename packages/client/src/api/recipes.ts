@@ -9,7 +9,6 @@ import {
   RediscoverEntry,
   Tag,
   TagCount,
-  type TagRequest,
   ToMakeEntry,
   TrashEntry,
 } from "@recipebox/shared";
@@ -127,16 +126,6 @@ export function fetchPlan(signal?: AbortSignal): Promise<ToMakeEntry[]> {
 /** GET /recommendations: never cooked first by name, then least recently cooked first (COOK-6). Editors only (X-1). */
 export function fetchRecommendations(signal?: AbortSignal): Promise<RediscoverEntry[]> {
   return apiGet("/recommendations", RediscoverEntry.array(), signal);
-}
-
-/** POST /recipes/{id}/tags: the tag as typed; the server reads and checks it (REC-10, REC-11). */
-export function attachTag(id: string, tag: string): Promise<EditorRecipe> {
-  return apiChange("POST", `${recipePath(id)}/tags`, EditorRecipe, { tag } satisfies TagRequest);
-}
-
-/** DELETE /recipes/{id}/tags (REC-10). */
-export function removeTag(id: string, tag: string): Promise<EditorRecipe> {
-  return apiChange("DELETE", `${recipePath(id)}/tags`, EditorRecipe, { tag } satisfies TagRequest);
 }
 
 /**

@@ -10,13 +10,13 @@ interface NavItem {
 
 const under = (path: string) => (pathname: string) => pathname === path || pathname.startsWith(`${path}/`);
 
-/** The recipe list and everything about single recipes (view, new, edit) are the "Recipes" section. */
-const RECIPES: NavItem = { label: "Recipes", to: "/", isCurrent: (p) => p === "/" || under("/recipes")(p) };
+/** The recipe list and everything about single recipes (view, new, edit) are the "Catalog" section. */
+const RECIPES: NavItem = { label: "Catalog", to: "/", isCurrent: (p) => p === "/" || under("/recipes")(p) };
 
 const EDITOR_ITEMS: readonly NavItem[] = [
   RECIPES,
-  { label: "Want to make", to: "/plan", isCurrent: under("/plan") },
-  { label: "Rediscover", to: "/recommendations", isCurrent: under("/recommendations") },
+  { label: "Meal Plan", to: "/plan", isCurrent: under("/plan") },
+  { label: "Recommendations", to: "/recommendations", isCurrent: under("/recommendations") },
   { label: "Trash", to: "/trash", isCurrent: under("/trash") },
 ];
 

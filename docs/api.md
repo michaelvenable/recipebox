@@ -79,10 +79,12 @@ Trash:
 
 ## Shapes
 
-- `RecipeContentInput`: `name`, `ingredients[]`, `steps[]`, `totalTimeMinutes?`, `tags[]?`.
+- `RecipeContentInput`: `name`, `ingredients[]`, `prep[]?`, `steps[]`, `totalTimeMinutes?`, `tags[]?`. A missing `prep` means none
+  (REC-20), so clients from before prep keep working.
 - `RecipeSummary`: `id`, `name`, `tags[]`, `totalTimeMinutes?`, `hasPhoto`.
 - `EditorRecipeSummary`: `RecipeSummary` plus `onToMakeList`.
-- `PublicRecipe`: `id`, `name`, `ingredients[]`, `steps[]`, `totalTimeMinutes?`, `tags[]`, `hasPhoto`.
+- `PublicRecipe`: `id`, `name`, `ingredients[]`, `prep[]?`, `steps[]`, `totalTimeMinutes?`, `tags[]`, `hasPhoto`. `prep` is left out
+  when the recipe has none (REC-20), so clients from before prep, which refuse unknown fields, can still read the recipe.
 - `EditorRecipe`: `PublicRecipe` plus `toMake?` (`addedAt`), `cookedAt[]` (newest first), `lastCookedAt?`, `timesCooked`.
 - `TagCount`: `tag`, `count`. `Tag`: a string.
 - `TagRequest`: `{ tag }`, the tag text as typed.

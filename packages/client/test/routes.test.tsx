@@ -5,8 +5,8 @@ import { API, APP, EDITOR, NON_EDITOR, VISITOR, jsonResponse, mockApi, mockApiAs
 const ID = "8d3f2a4e-1b2c-4d5e-8f90-1234567890ab";
 
 const EDITOR_ONLY: [path: string, heading: string][] = [
-  ["/plan", "Want to make"],
-  ["/recommendations", "Haven't made in a while"],
+  ["/plan", "Meal Plan"],
+  ["/recommendations", "Recommendations"],
   ["/trash", "Trash"],
   ["/recipes/new", "New recipe"],
   [`/recipes/${ID}/edit`, "Edit recipe"],
@@ -42,7 +42,7 @@ describe("X-1, X-6 editor-only pages", () => {
 
 describe("X-1 public pages", () => {
   it.each([
-    ["/", "RecipeBox"],
+    ["/", "Recipe Box"],
     [`/recipes/${ID}`, "Toast"],
   ])("shows visitors %s", async (path, heading) => {
     mockApi(VISITOR, (url) => {

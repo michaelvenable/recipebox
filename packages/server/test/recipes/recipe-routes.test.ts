@@ -38,6 +38,7 @@ describe("REC-1 create", () => {
     const created = await createRecipe(app, {
       name: "Pad Thai",
       ingredients: ["rice noodles"],
+      prep: [" Soak the noodles. ", ""],
       steps: ["Soak.", "Fry."],
       totalTimeMinutes: 30,
       tags: ["dinner"],
@@ -47,6 +48,7 @@ describe("REC-1 create", () => {
       id: "00000000-0000-4000-8000-000000000001",
       name: "Pad Thai",
       ingredients: ["rice noodles"],
+      prep: ["Soak the noodles."],
       steps: ["Soak.", "Fry."],
       totalTimeMinutes: 30,
       tags: ["dinner"],
@@ -200,6 +202,61 @@ describe("REC-4 view", () => {
     const { app } = await recipeApp();
     expectErrors(await get(app, `/recipes/${id}`), 404, ["recipe.notFound"]);
     expectErrors(await get(app, `/recipes/${id}`, AS_EDITOR), 404, ["recipe.notFound"]);
+  });
+});
+
+describe("REC-21 one entry per line", () => {
+  it('saves steps sent as "Boil water", two blank lines, "Add pasta" as ["Boil water", "Add pasta"]', async () => {
+    const { app } = await recipeApp();
+    const created = await createRecipe(app, content("Pasta", { steps: ["Boil water", "", "", "Add pasta"] }));
+    expect(created.steps).toEqual(["Boil water", "Add pasta"]);
+  });
+});
+
+describe("REC-11 tags typed as a comma-separated list", () => {
+  it('saves tags sent as "Dinner" and "quick", from "Dinner, quick,, " in the form, as "dinner" and "quick"', async () => {
+    const { app } = await recipeApp();
+    const created = await createRecipe(app, content("Pasta", { tags: ["Dinner", "quick"] }));
+    expect(created.tags).toEqual(["dinner", "quick"]);
+  });
+});
+
+describe("REC-20 prep", () => {
+  it("saves prep trimmed, without blank entries, in order, and shows it to visitors like steps", async () => {
+    const { app } = await recipeApp();
+    const created = await createRecipe(app, content("Curry", { prep: [" Chop the onions. ", "", "  ", "Grind spices."] }));
+    expect(created.prep).toEqual(["Chop the onions.", "Grind spices."]);
+    const viewed = PublicRecipe.parse((await get(app, `/recipes/${created.id}`)).json());
+    expect(viewed.prep).toEqual(["Chop the onions.", "Grind spices."]);
+  });
+
+  it("accepts content without prep, from clients that don't send it, as no prep", async () => {
+    const { app, repository } = await recipeApp();
+    const created = await createRecipe(app, content("Curry"));
+    expect(created.prep).toBeUndefined();
+    expect((await storedSnapshots(repository))[created.id]).not.toHaveProperty("prep");
+
+    const recipe = await seed(repository, content("Dal", { prep: ["Rinse the lentils."] }));
+    const res = await change(app, "PUT", `/recipes/${recipe.id.value}/content`, content("Dal"));
+    expect(res.json()).not.toHaveProperty("prep");
+  });
+
+  it("sends a recipe without prep with no prep key, to visitors and editors, so older clients can read it", async () => {
+    const { app, repository } = await recipeApp();
+    const recipe = await seed(repository, content("Toast"));
+    for (const as of [AS_VISITOR, AS_EDITOR]) {
+      const res = await get(app, `/recipes/${recipe.id.value}`, as);
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).not.toHaveProperty("prep");
+    }
+  });
+
+  it("refuses a prep entry of 1,001 characters with its position, and saves nothing", async () => {
+    const { app, repository } = await recipeApp();
+    const res = await change(app, "POST", "/recipes", content("Curry", { prep: ["Chop.", "x".repeat(1001)] }));
+    const body = expectErrors(res, 400, ["entry.tooLong"]);
+    expect(body.errors[0]?.field).toBe("prep[1]");
+    expect(await storedSnapshots(repository)).toEqual({});
   });
 });
 

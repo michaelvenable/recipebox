@@ -343,7 +343,7 @@ describe("REC-6 the Undo message", () => {
     setClock(at(2026, 10, 4, 18, 0));
     const { router } = await deleteFromView();
     await act(() => router.navigate("/plan"));
-    expect(screen.getByRole("heading", { level: 1, name: "Want to make" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Meal Plan" })).toBeInTheDocument();
     expect(screen.getByText("Pad Thai moved to trash")).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(NOTICE_MS + 100));
     expect(screen.queryByText("Pad Thai moved to trash")).not.toBeInTheDocument();
@@ -409,7 +409,7 @@ describe("REC-6 the Undo message", () => {
     expect(tags.getByText("noodles")).toBeInTheDocument();
     expect(screen.getByText(/cooked once/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "I want to cook this" })).toBeInTheDocument();
-    expect(screen.queryByText("Want to make", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
     // Opening it closes the message.
     expect(screen.queryByText("Pad Thai restored")).not.toBeInTheDocument();
   });
@@ -488,7 +488,7 @@ describe("REC-14 trash", () => {
   it("lists deleted recipes in the server's order with the date deleted and days left, as in the mockup", async () => {
     setClock(OCT_30_NOON);
     await openTrash({ trash: () => MOCKUP_TRASH });
-    expect(screen.getByText("Deleted recipes stay here for 30 days, then they're removed for good.")).toBeInTheDocument();
+    expect(screen.queryByText(/Deleted recipes stay here for 30 days/)).not.toBeInTheDocument();
     await screen.findByRole("list", { name: "Deleted recipes" });
     expect(entryLines()).toEqual([
       "Pad ThaiDeleted today · 30 days left",

@@ -10,8 +10,8 @@ import { useNotices } from "../layout/notices.js";
 import { formatTotalTime } from "../recipes/format.js";
 import { RecipeActions } from "../recipes/RecipeActions.js";
 import { ToMakeBadge } from "../recipes/RecipeCard.js";
-import { type RecipeChange, changeErrorMessage, isTagChange, useRecipeChange } from "../recipes/recipe-changes.js";
-import { RecipeTags, type TagEditing } from "../recipes/RecipeTags.js";
+import { type RecipeChange, changeErrorMessage, useRecipeChange } from "../recipes/recipe-changes.js";
+import { RecipeTags } from "../recipes/RecipeTags.js";
 import { usePhotoVersion } from "../recipes/photo-version.js";
 import { useDeleteRecipe } from "../recipes/trash-changes.js";
 import { useWakeLock } from "../recipes/use-wake-lock.js";
@@ -55,7 +55,7 @@ export function RecipeNotFound() {
   );
 }
 
-/** Which ingredients or steps are ticked, by position. */
+/** Which ingredients, prep entries or steps are ticked, by position. */
 type Ticks = ReadonlySet<number>;
 const NONE: Ticks = new Set();
 
@@ -70,13 +70,14 @@ function RecipeContent({ recipe }: { recipe: ViewedRecipe }) {
   // Both checks, as on the list: private parts come only in the editor shape (X-1), and a recipe loaded before the session
   // ended (X-9) shouldn't keep offering changes once the app knows it is a visitor (X-8).
   const editorRecipe = viewer === "editor" && isEditorRecipe(recipe) ? recipe : undefined;
-  // One change at a time across tags and actions: the server applies each to the stored recipe, so two at once could race.
+  // One change at a time: the server applies each to the stored recipe, so two at once could race.
   const change = useRecipeChange(recipe.id);
 
   // REC-19: ticks live only here, never saved or sent; they go when the page does.
   const [ingredientTicks, setIngredientTicks] = useState(NONE);
+  const [prepTicks, setPrepTicks] = useState(NONE);
   const [stepTicks, setStepTicks] = useState(NONE);
-  const screenOn = useWakeLock(true);
+  useWakeLock(true);
 
   return (
     <article className="recipe-view">
@@ -94,38 +95,15 @@ function RecipeContent({ recipe }: { recipe: ViewedRecipe }) {
               {formatTotalTime(recipe.totalTimeMinutes)} total
             </p>
           )}
-          {editorRecipe !== undefined ? (
-            <EditorTags recipe={editorRecipe} change={change} />
-          ) : (
-            <RecipeTags recipeId={recipe.id} tags={recipe.tags} />
-          )}
+          {/* REC-10: the view shows the tags but can't change them, for editors too. */}
+          <RecipeTags tags={recipe.tags} />
         </header>
 
         {editorRecipe !== undefined && <EditorActions recipe={editorRecipe} change={change} />}
 
-        {screenOn && (
-          <p className="screen-on-note" role="status">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="4" />
-              <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-            </svg>
-            Screen stays on while this recipe is open
-          </p>
-        )}
-
         <section className="recipe-section" aria-labelledby="ingredients-heading">
           <div className="section-header">
             <h2 id="ingredients-heading">Ingredients</h2>
-            <button
-              type="button"
-              className="link-button"
-              onClick={() => {
-                setIngredientTicks(NONE);
-                setStepTicks(NONE);
-              }}
-            >
-              Clear ticks
-            </button>
           </div>
           {/* REC-3: in the order entered. */}
           <ul className="ingredients">
@@ -146,44 +124,63 @@ function RecipeContent({ recipe }: { recipe: ViewedRecipe }) {
       </div>
 
       <div className="recipe-main">
-        <section className="recipe-section" aria-labelledby="steps-heading">
-          <div className="section-header">
-            <h2 id="steps-heading">Steps</h2>
-            <span className="muted">Tap a number when done</span>
-          </div>
-          {/* REC-4: numbered from 1. */}
-          <ol className="steps">
-            {recipe.steps.map((step, index) => {
-              const done = stepTicks.has(index);
-              return (
-                <li key={index} className={done ? "step ticked" : "step"}>
-                  <button
-                    type="button"
-                    className="step-number"
-                    aria-pressed={done}
-                    aria-label={`Step ${index + 1} done`}
-                    onClick={() => setStepTicks((ticks) => toggled(ticks, index))}
-                  >
-                    <span aria-hidden="true">
-                      {done ? (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M5 12l5 5 9-10" />
-                        </svg>
-                      ) : (
-                        index + 1
-                      )}
-                    </span>
-                  </button>
-                  <span className="step-text">{step}</span>
-                </li>
-              );
-            })}
-          </ol>
-        </section>
+        {/* REC-20: before the steps, and no section at all without prep. */}
+        {recipe.prep !== undefined && recipe.prep.length > 0 && (
+          <NumberedSection id="prep" title="Prep" noun="Prep" entries={recipe.prep} ticks={prepTicks} setTicks={setPrepTicks} />
+        )}
+        <NumberedSection id="steps" title="Steps" noun="Step" entries={recipe.steps} ticks={stepTicks} setTicks={setStepTicks} />
 
         {editorRecipe !== undefined && <BottomActions recipe={editorRecipe} busy={change.busy} />}
       </div>
     </article>
+  );
+}
+
+interface NumberedSectionProps {
+  id: string;
+  title: string;
+  /** What each entry is called in its tick button's label, as in "Step 2 done". */
+  noun: string;
+  entries: readonly string[];
+  ticks: Ticks;
+  setTicks: (update: (ticks: Ticks) => Ticks) => void;
+}
+
+/** Prep or steps: in the order entered (REC-3), numbered from 1 (REC-4), each number ticked off when done (REC-19). */
+function NumberedSection({ id, title, noun, entries, ticks, setTicks }: NumberedSectionProps) {
+  return (
+    <section className="recipe-section" aria-labelledby={`${id}-heading`}>
+      <div className="section-header">
+        <h2 id={`${id}-heading`}>{title}</h2>
+      </div>
+      <ol className="steps">
+        {entries.map((entry, index) => {
+          const done = ticks.has(index);
+          return (
+            <li key={index} className={done ? "step ticked" : "step"}>
+              <button
+                type="button"
+                className="step-number"
+                aria-pressed={done}
+                aria-label={`${noun} ${index + 1} done`}
+                onClick={() => setTicks((current) => toggled(current, index))}
+              >
+                <span aria-hidden="true">
+                  {done ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12l5 5 9-10" />
+                    </svg>
+                  ) : (
+                    index + 1
+                  )}
+                </span>
+              </button>
+              <span className="step-text">{entry}</span>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 
@@ -235,30 +232,14 @@ function RecipePhoto({ recipe }: { recipe: ViewedRecipe }) {
 
 type Change = ReturnType<typeof useRecipeChange>;
 
-/** Splits the failure of the last change between the two places that show it: the tags, or the cooking actions. */
-function errorFor({ mutation }: Change, tags: boolean): string | undefined {
-  if (!mutation.isError || isTagChange(mutation.variables) !== tags) return undefined;
-  return changeErrorMessage(mutation.error);
-}
-
-function EditorTags({ recipe, change }: { recipe: EditorRecipe; change: Change }) {
-  const editing: TagEditing = {
-    attach: (tag, done) => change.mutation.mutate({ kind: "attachTag", tag }, { onSuccess: done }),
-    remove: (tag, done) => change.mutation.mutate({ kind: "removeTag", tag }, { onSuccess: done }),
-    busy: change.busy,
-    error: errorFor(change, true),
-  };
-  return <RecipeTags recipeId={recipe.id} tags={recipe.tags} editing={editing} />;
-}
-
 function EditorActions({ recipe, change }: { recipe: EditorRecipe; change: Change }) {
-  const run = (kind: Exclude<RecipeChange["kind"], "attachTag" | "removeTag">) => (done: () => void) =>
-    change.mutation.mutate({ kind }, { onSuccess: done });
+  const run = (kind: RecipeChange["kind"]) => (done: () => void) => change.mutation.mutate({ kind }, { onSuccess: done });
+  const { mutation } = change;
   return (
     <RecipeActions
       recipe={recipe}
       busy={change.busy}
-      error={errorFor(change, false)}
+      error={mutation.isError ? changeErrorMessage(mutation.error) : undefined}
       markCooked={run("markCooked")}
       addToPlan={run("addToPlan")}
       removeFromPlan={run("removeFromPlan")}

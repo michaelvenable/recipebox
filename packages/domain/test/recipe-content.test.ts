@@ -159,6 +159,56 @@ describe("REC-3 order is preserved", () => {
   });
 });
 
+describe("REC-21 one entry per line", () => {
+  it('saves steps typed as "Boil water", two blank lines, "Add pasta" as ["Boil water", "Add pasta"]', () => {
+    // The form sends each line as an entry; blank lines are discarded here (REC-2).
+    expect(texts(content({ steps: ["Boil water", "", "", "Add pasta"] }).steps)).toEqual(["Boil water", "Add pasta"]);
+  });
+
+  it("reports a too-long line by its position among the lines sent, blank ones included", () => {
+    expect(errorKeys(create({ steps: ["Boil water", "", "x".repeat(1001)] }))).toEqual([
+      { code: "entry.tooLong", field: "steps[2]" },
+    ]);
+  });
+});
+
+describe("REC-20 prep", () => {
+  it("is optional: missing or empty prep means none", () => {
+    expect(content({}).prep).toEqual([]);
+    expect(content({ prep: undefined }).prep).toEqual([]);
+    expect(content({ prep: [] }).prep).toEqual([]);
+  });
+
+  it("keeps prep entries in the order entered (REC-3)", () => {
+    const c = content({ prep: ["Chop the onions.", "Soak the noodles.", "Chop the onions."] });
+    expect(texts(c.prep)).toEqual(["Chop the onions.", "Soak the noodles.", "Chop the onions."]);
+    expect(Object.isFrozen(c.prep)).toBe(true);
+  });
+
+  it("trims every prep entry and discards blank ones (REC-2)", () => {
+    expect(texts(content({ prep: ["  Chop. ", "", "\t", " Soak.\n"] }).prep)).toEqual(["Chop.", "Soak."]);
+  });
+
+  it("has no 'at least 1' rule: only blank entries leave no prep", () => {
+    expect(content({ prep: ["   ", ""] }).prep).toEqual([]);
+  });
+
+  it("accepts a prep entry of 1,000 characters and rejects 1,001 with its position", () => {
+    expect(texts(content({ prep: ["x".repeat(1000)] }).prep)).toEqual(["x".repeat(1000)]);
+    expect(errorKeys(create({ prep: ["Chop.", " ", "x".repeat(1001)] }))).toEqual([
+      { code: "entry.tooLong", field: "prep[2]" },
+    ]);
+  });
+
+  it("reports a too-long prep entry alongside other errors", () => {
+    expect(errorKeys(create({ name: "", prep: ["x".repeat(1001)], steps: [] }))).toEqual([
+      { code: "name.required", field: "name" },
+      { code: "entry.tooLong", field: "prep[0]" },
+      { code: "steps.required", field: "steps" },
+    ]);
+  });
+});
+
 describe("REC-11 tag rules", () => {
   it("trims and lowercases tags", () => {
     expect(texts(content({ tags: [" Dinner ", "QUICK"] }).tags)).toEqual(["dinner", "quick"]);

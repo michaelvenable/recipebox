@@ -4,7 +4,7 @@ import { characterCount } from "./text.js";
 
 export const MAX_ENTRY_LENGTH = 1000;
 
-/** One ingredient or step: trimmed, 1–1,000 characters as counted by X-13 (REC-1, REC-2). */
+/** One ingredient, prep entry or step: trimmed, 1–1,000 characters as counted by X-13 (REC-1, REC-2, REC-20). */
 export class TextEntry {
   private constructor(private readonly text: string) {
     Object.freeze(this);

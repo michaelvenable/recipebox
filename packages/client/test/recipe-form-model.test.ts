@@ -3,15 +3,17 @@ import { RecipeContentInput } from "@recipebox/shared";
 import {
   MAX_PHOTO_BYTES,
   contentInput,
-  entryField,
+  contentSnapshot,
+  entryLines,
   formErrors,
   formFrom,
   formatTotalTime,
-  newEntry,
   obviousErrors,
   photoProblem,
-  tagField,
+  tagBeingTyped,
+  tagItems,
   totalMinutes,
+  withSuggestion,
 } from "../src/recipes/recipe-form.js";
 
 describe("REC-1 total time as hours:minutes or minutes", () => {
@@ -20,6 +22,8 @@ describe("REC-1 total time as hours:minutes or minutes", () => {
     ["   ", undefined],
     ["1:30", 90],
     ["0:45", 45],
+    [":45", 45],
+    [":05", 5],
     ["2:00", 120],
     ["01:05", 65],
     ["0:00", 0],
@@ -46,7 +50,8 @@ describe("REC-1 total time as hours:minutes or minutes", () => {
     ["1,5"],
     ["1:5"],
     ["1:300"],
-    [":30"],
+    [":5"],
+    [":"],
     ["1:"],
     ["1:30:00"],
     ["1 : 30"],
@@ -77,64 +82,173 @@ describe("REC-1 total time as hours:minutes or minutes", () => {
   });
 
   it("asks for hours:minutes or minutes when the time can't be read, on the total time field", () => {
-    const form = { ...formFrom(undefined), name: "Toast", totalTime: "1:75" };
-    form.ingredients = [newEntry("Bread")];
-    form.steps = [newEntry("Toast it.")];
+    const form = { ...formFrom(undefined), name: "Toast", ingredients: "Bread", steps: "Toast it.", totalTime: "1:75" };
     expect(obviousErrors(form)).toEqual([
       {
         code: "totalTime.format",
         field: "totalTimeMinutes",
-        message: "Enter the time as hours:minutes, like 1:30, or as minutes, like 45.",
+        message: "Enter the time as hours:minutes, like 1:30 or :45, or as minutes, like 45.",
       },
     ]);
     expect(obviousErrors({ ...form, totalTime: "1:30" })).toEqual([]);
   });
 });
 
+const STEW = {
+  id: "r",
+  name: "Stew",
+  ingredients: ["Beef", "2 carrots"],
+  prep: ["Dice the beef.", "Slice the carrots."],
+  steps: ["Brown the beef.", "Simmer."],
+  totalTimeMinutes: 45,
+  tags: ["dinner", "slow"],
+  hasPhoto: false,
+};
+
 describe("REC-1, REC-2, X-12 the content sent", () => {
   it("is exactly a RecipeContentInput, as typed, with no total time when it is blank", () => {
-    const form = { ...formFrom(undefined), name: "  Pad Thai ", tags: ["dinner"] };
-    form.ingredients = [newEntry("2 eggs"), newEntry("  ")];
+    const form = { ...formFrom(undefined), name: "  Pad Thai ", ingredients: "2 eggs\n  ", steps: "Fry.", tags: "dinner" };
     const input = contentInput(form);
-    expect(input).toEqual({ name: "  Pad Thai ", ingredients: ["2 eggs", "  "], steps: [""], tags: ["dinner"] });
+    expect(input).toEqual({ name: "  Pad Thai ", ingredients: ["2 eggs", "  "], prep: [], steps: ["Fry."], tags: ["dinner"] });
     expect("totalTimeMinutes" in input).toBe(false);
     expect(RecipeContentInput.parse(input)).toEqual(input);
   });
 
   it("includes the total time in minutes", () => {
     expect(contentInput({ ...formFrom(undefined), totalTime: "1:05" }).totalTimeMinutes).toBe(65);
+    expect(contentInput({ ...formFrom(undefined), totalTime: ":45" }).totalTimeMinutes).toBe(45);
   });
 
   it("starts an existing recipe's total time as hours:minutes", () => {
-    const recipe = { id: "r", name: "Stew", ingredients: ["Beef"], steps: ["Simmer."], totalTimeMinutes: 45, tags: [], hasPhoto: false };
-    expect(formFrom(recipe).totalTime).toBe("0:45");
-    expect(formFrom({ ...recipe, totalTimeMinutes: undefined }).totalTime).toBe("");
+    expect(formFrom(STEW).totalTime).toBe("0:45");
+    expect(formFrom({ ...STEW, totalTimeMinutes: undefined }).totalTime).toBe("");
   });
 });
 
-describe("REC-1 server errors in the form's fields", () => {
-  it("puts each error on the field it names, rows by key and tags by text, and the rest in the summary", () => {
-    const form = { ...formFrom(undefined), tags: ["dinner, quick"] };
-    form.ingredients = [newEntry("a"), newEntry("b")];
-    const second = form.ingredients[1]!;
+describe("REC-21 one entry per line", () => {
+  it('sends "Boil water", two blank lines, "Add pasta" as lines, which the server saves as ["Boil water", "Add pasta"]', () => {
+    // Blank lines are sent as they are, so entry i stays line i + 1; the server discards them (REC-2).
+    expect(entryLines("Boil water\n\n\nAdd pasta")).toEqual(["Boil water", "", "", "Add pasta"]);
+    expect(contentInput({ ...formFrom(undefined), steps: "Boil water\n\n\nAdd pasta" }).steps).toEqual([
+      "Boil water",
+      "",
+      "",
+      "Add pasta",
+    ]);
+  });
+
+  it("splits on any kind of line break and keeps the text as typed, numbering included", () => {
+    expect(entryLines("1. Chop\r\n2. Fry\rServe")).toEqual(["1. Chop", "2. Fry", "Serve"]);
+    expect(entryLines("  a pinch of salt ")).toEqual(["  a pinch of salt "]);
+    expect(entryLines("")).toEqual([]);
+  });
+
+  it("starts an existing recipe with its entries one per line, and sends them back unchanged", () => {
+    const form = formFrom(STEW);
+    expect(form.ingredients).toBe("Beef\n2 carrots");
+    expect(form.prep).toBe("Dice the beef.\nSlice the carrots.");
+    expect(form.steps).toBe("Brown the beef.\nSimmer.");
+    const input = contentInput(form);
+    expect(input.ingredients).toEqual(STEW.ingredients);
+    expect(input.prep).toEqual(STEW.prep);
+    expect(input.steps).toEqual(STEW.steps);
+  });
+
+  it("starts a recipe without prep with an empty Prep box", () => {
+    expect(formFrom({ ...STEW, prep: [] }).prep).toBe("");
+    // The server leaves prep out when there is none (REC-20).
+    const { prep: _prep, ...withoutPrep } = STEW;
+    expect(formFrom(withoutPrep).prep).toBe("");
+  });
+
+  it("shows line breaks inside an entry saved earlier as a space, so it stays one entry", () => {
+    const form = formFrom({ ...STEW, steps: ["Whisk the eggs.\nThen fold in the flour.", "Bake\r\n\r\nfor 20 minutes.", "Cool.\r"] });
+    expect(form.steps).toBe("Whisk the eggs. Then fold in the flour.\nBake for 20 minutes.\nCool. ");
+    expect(contentInput(form).steps).toEqual(["Whisk the eggs. Then fold in the flour.", "Bake for 20 minutes.", "Cool. "]);
+  });
+
+  it("counts an edit to any box as a change", () => {
+    const form = formFrom(STEW);
+    expect(contentSnapshot(form)).toBe(contentSnapshot(formFrom(STEW)));
+    for (const field of ["ingredients", "prep", "steps", "tags"] as const) {
+      expect(contentSnapshot({ ...form, [field]: `${form[field]}x` }), field).not.toBe(contentSnapshot(form));
+    }
+  });
+
+  it("asks for an ingredient and a step when their boxes have only blank lines, but not for prep", () => {
+    const form = { ...formFrom(undefined), name: "Toast", ingredients: " \n\n", prep: "", steps: "\n" };
+    expect(obviousErrors(form).map((e) => e.field)).toEqual(["ingredients", "steps"]);
+    expect(obviousErrors({ ...form, ingredients: "\nBread", steps: "Toast it." })).toEqual([]);
+  });
+});
+
+describe("REC-10, REC-11 tags typed as a comma-separated list", () => {
+  it('sends "Dinner, quick,, " as "Dinner" and "quick"; the server lowercases them', () => {
+    expect(tagItems("Dinner, quick,, ")).toEqual(["Dinner", "quick"]);
+    expect(contentInput({ ...formFrom(undefined), tags: "Dinner, quick,, " }).tags).toEqual(["Dinner", "quick"]);
+  });
+
+  it("sends no tags for an empty or blank field", () => {
+    expect(tagItems("")).toEqual([]);
+    expect(tagItems(" , ,")).toEqual([]);
+  });
+
+  it("starts an existing recipe with its tags separated by commas", () => {
+    expect(formFrom(STEW).tags).toBe("dinner, slow");
+    expect(formFrom({ ...STEW, tags: [] }).tags).toBe("");
+  });
+});
+
+describe("REC-12 the tag being typed", () => {
+  it("is the text after the last comma", () => {
+    expect(tagBeingTyped("dinner, qu")).toEqual({ before: "dinner,", current: " qu" });
+    expect(tagBeingTyped("qu")).toEqual({ before: "", current: "qu" });
+    expect(tagBeingTyped("dinner, ")).toEqual({ before: "dinner,", current: " " });
+  });
+
+  it("is replaced by a chosen suggestion, followed by a comma for the next tag", () => {
+    expect(withSuggestion("dinner, qu", "quick")).toBe("dinner, quick, ");
+    expect(withSuggestion("dinner,qu", "quick")).toBe("dinner, quick, ");
+    expect(withSuggestion("", "quick")).toBe("quick, ");
+    expect(withSuggestion("dinner, ", "quick")).toBe("dinner, quick, ");
+  });
+});
+
+describe("REC-1, REC-21 server errors in the form's fields", () => {
+  it("puts each error on the field it names, an entry's with its line and a tag's with the tag, and the rest in the summary", () => {
+    const form = { ...formFrom(undefined), ingredients: "a\n\nb", prep: "Chop.", tags: "dinner, Not a tag!" };
     const errors = formErrors(
       [
         { code: "name.tooLong", field: "name", message: "Name must be at most 200 characters." },
-        { code: "entry.tooLong", field: "ingredients[1]", message: "An entry must be at most 1000 characters." },
+        { code: "entry.tooLong", field: "ingredients[2]", message: "An entry must be at most 1000 characters." },
+        { code: "entry.tooLong", field: "prep[0]", message: "An entry must be at most 1000 characters." },
         { code: "steps.required", field: "steps", message: "At least 1 step is required." },
-        { code: "tag.comma", field: "tags[0]", message: "A tag can't contain a comma." },
+        { code: "tag.invalid", field: "tags[1]", message: "A tag can only contain letters." },
         { code: "request.unknownField", field: "cookedAt", message: '"cookedAt" is not an accepted field.' },
         { code: "recipe.inTrash", message: "This recipe is in the trash." },
       ],
       form,
     );
-    expect([...errors.fields.keys()]).toEqual(["name", entryField("ingredients", second), "steps", tagField("dinner, quick")]);
+    expect(Object.fromEntries(errors.fields)).toEqual({
+      name: ["Name must be at most 200 characters."],
+      ingredients: ["Line 3: An entry must be at most 1000 characters."],
+      prep: ["Line 1: An entry must be at most 1000 characters."],
+      steps: ["At least 1 step is required."],
+      tags: ["“Not a tag!”: A tag can only contain letters."],
+    });
     expect(errors.general).toEqual(['"cookedAt" is not an accepted field.', "This recipe is in the trash."]);
   });
 
-  it("puts an error on a row that isn't there on the list as a whole", () => {
-    const errors = formErrors([{ code: "entry.tooLong", field: "steps[5]", message: "Too long." }], formFrom(undefined));
+  it("puts an error on a line or tag that isn't there on the field as a whole", () => {
+    const errors = formErrors(
+      [
+        { code: "entry.tooLong", field: "steps[5]", message: "Too long." },
+        { code: "tag.tooLong", field: "tags[3]", message: "Too long." },
+      ],
+      formFrom(undefined),
+    );
     expect(errors.fields.get("steps")).toEqual(["Too long."]);
+    expect(errors.fields.get("tags")).toEqual(["Too long."]);
   });
 });
 

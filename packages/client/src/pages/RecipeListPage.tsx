@@ -37,7 +37,7 @@ export function RecipeListPage() {
     <div className="recipe-list-page">
       <header className="page-header">
         {/* Visitors see the app's name, as in docs/mockups/Main.dc.html; editors see the section name (ListEditor). */}
-        <h1>{isEditor ? "Recipes" : "RecipeBox"}</h1>
+        <h1>{isEditor ? "Catalog" : "Recipe Box"}</h1>
         {isEditor && (
           <Link to="/recipes/new" className="add-recipe">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
@@ -56,7 +56,7 @@ export function RecipeListPage() {
           filter.searchNow();
         }}
       >
-        <label htmlFor="recipe-search" className="field-label">
+        <label htmlFor="recipe-search" className="visually-hidden">
           Search by name
         </label>
         <div className="search-box">
@@ -68,7 +68,7 @@ export function RecipeListPage() {
             ref={searchField}
             id="recipe-search"
             type="search"
-            placeholder="e.g. curry"
+            placeholder="Find a recipe"
             autoComplete="off"
             enterKeyHint="search"
             value={filter.term}
@@ -145,6 +145,9 @@ interface ResultsProps {
 /** The results and their states: loading, error, an empty collection, nothing matching, or the recipes. */
 function Results({ recipes: loaded, isPending, isUpdating, failed, retry, filter, isEditor, showAll }: ResultsProps) {
   const filtering = isFiltering(filter);
+  const hasTerm = filter.name.trim() !== "";
+  // REC-13: with only tags picked, the picked chips say what is shown; a summary only when nothing matches.
+  const summarized = hasTerm || (filtering && !isUpdating && loaded?.length === 0);
   // While the unfiltered list loads (e.g. right after "Show all recipes"), an empty previous result would claim "No recipes
   // yet." about a collection it wasn't loaded for, so show loading instead. While a search or filter loads, the previous
   // results stay, and the summary below says "Searching…" in the same live region, so refining a search that matched nothing
@@ -180,9 +183,9 @@ function Results({ recipes: loaded, isPending, isUpdating, failed, retry, filter
 
   return (
     <>
-      {/* A live region, so screen readers hear how many recipes a search or filter found. */}
+      {/* A live region, so screen readers hear how many recipes a search found, or that a filter found none. */}
       <p role="status" className="results-summary">
-        {filtering && (
+        {summarized && (
           <>
             {isUpdating ? "Searching…" : describeResults(recipes.length, filter)}{" "}
             <button type="button" className="link-button" onClick={showAll}>

@@ -50,7 +50,7 @@ export function RecipeActions({ recipe, busy, error, markCooked, addToPlan, remo
     <section className="card recipe-actions" aria-label="Cooking">
       {cookedToday ? (
         // Not `disabled`: a disabled button can't hold focus, and would hide the state from keyboard and screen reader users.
-        <button key="cooked" ref={cookButton} type="button" className="button cook-button cooked-today" aria-disabled="true">
+        <button key="cooked" ref={cookButton} type="button" className="button cooked-today" aria-disabled="true">
           Cooked today ✓
         </button>
       ) : (
@@ -58,7 +58,7 @@ export function RecipeActions({ recipe, busy, error, markCooked, addToPlan, remo
           key="cook"
           ref={cookButton}
           type="button"
-          className="button button-primary cook-button"
+          className="button"
           disabled={busy}
           onClick={(event) => act("cook", markCooked, event.currentTarget)}
         >
@@ -67,7 +67,7 @@ export function RecipeActions({ recipe, busy, error, markCooked, addToPlan, remo
       )}
       {recipe.toMake !== undefined ? (
         <div className="on-plan">
-          <span>On your Want to make list ✓</span>
+          <span>On your meal plan ✓</span>
           <button
             ref={removeButton}
             type="button"

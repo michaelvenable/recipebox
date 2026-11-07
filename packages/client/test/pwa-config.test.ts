@@ -21,8 +21,8 @@ function servesApp(pathAndSearch: string): boolean {
 describe("X-4 web app manifest", () => {
   it("names the app and opens it standalone at the root", () => {
     expect(manifest).toMatchObject({
-      name: "RecipeBox",
-      short_name: "RecipeBox",
+      name: "Recipe Box",
+      short_name: "Recipe Box",
       start_url: "/",
       scope: "/",
       display: "standalone",
@@ -72,7 +72,7 @@ describe("X-4 index.html for installing", () => {
 
   it("names the app and opens it full screen when added to an iPhone or iPad home screen", () => {
     expect(html).toContain('<meta name="apple-mobile-web-app-capable" content="yes" />');
-    expect(html).toContain('<meta name="apple-mobile-web-app-title" content="RecipeBox" />');
+    expect(html).toContain('<meta name="apple-mobile-web-app-title" content="Recipe Box" />');
   });
 
   it("no longer loads fonts from another site: they are part of the app", () => {

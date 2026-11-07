@@ -18,6 +18,13 @@ const PAD_THAI: PublicRecipe = {
   hasPhoto: true,
 };
 const TOAST: PublicRecipe = { id: OTHER_ID, name: "Toast", ingredients: ["Bread"], steps: ["Toast it."], tags: [], hasPhoto: false };
+/** A recipe with prep (REC-20). */
+const CURRY: PublicRecipe = {
+  ...PAD_THAI,
+  name: "Curry",
+  prep: ["Chop the onions.", "Grind the spices."],
+  steps: ["Fry the onions.", "Simmer."],
+};
 
 function asEditor(recipe: PublicRecipe, extra: Partial<EditorRecipe> = {}): EditorRecipe {
   return { ...recipe, cookedAt: [], timesCooked: 0, ...extra };
@@ -108,6 +115,10 @@ function step(n: number): HTMLElement {
   return screen.getByRole("button", { name: `Step ${n} done` });
 }
 
+function prep(n: number): HTMLElement {
+  return screen.getByRole("button", { name: `Prep ${n} done` });
+}
+
 const EDITOR_CONTROLS = ["I cooked this today", "I want to cook this", "Edit", "+ Tag", "History", "Remove", "Remove tag dinner"];
 
 function editorControlsShown(): string[] {
@@ -135,6 +146,7 @@ describe("REC-4 view", () => {
     expect(screen.getAllByRole("checkbox").map((box) => box.closest("label")?.textContent)).toEqual(PAD_THAI.ingredients);
     const steps = within(screen.getByRole("region", { name: "Steps" })).getAllByRole("listitem");
     expect(steps.map((li) => li.textContent)).toEqual(["1Soak the noodles.", "2Stir the sauce.", "3Fry everything."]);
+    expect(screen.queryByText("Tap a number when done")).not.toBeInTheDocument();
   });
 
   it("shows the photo from the API, described by the recipe's name (REC-7)", async () => {
@@ -181,6 +193,24 @@ describe("REC-4 view", () => {
   });
 });
 
+describe("REC-20 prep", () => {
+  it("shows prep numbered from 1, in order, in a section before the steps", async () => {
+    await openRecipe({ me: VISITOR, recipes: { [ID]: () => CURRY } });
+    const section = screen.getByRole("region", { name: "Prep" });
+    expect(within(section).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["1Chop the onions.", "2Grind the spices."]);
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(headings.indexOf("Prep")).toBeLessThan(headings.indexOf("Steps"));
+    expect(headings.indexOf("Prep")).toBeGreaterThan(-1);
+  });
+
+  it("shows no Prep section for a recipe with no prep entries", async () => {
+    await openRecipe({ me: VISITOR, recipes: { [ID]: () => PAD_THAI } });
+    expect(screen.queryByRole("region", { name: "Prep" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Prep" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Steps" })).toBeInTheDocument();
+  });
+});
+
 describe("X-1, X-8 visitors and editors", () => {
   it.each([
     ["visitors", VISITOR],
@@ -188,15 +218,15 @@ describe("X-1, X-8 visitors and editors", () => {
   ])("shows %s the recipe without editing controls, to-make mark or cooking history", async (_who, me) => {
     await openRecipe({ me, recipes: { [ID]: () => PAD_THAI } });
     expect(editorControlsShown()).toEqual([]);
-    expect(screen.queryByText("Want to make", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
     expect(screen.queryByText(/cooked/i)).not.toBeInTheDocument();
     // What everyone may do: tick (REC-19).
-    expect(screen.getByRole("button", { name: "Clear ticks" })).toBeInTheDocument();
+    expect(step(1)).toBeEnabled();
   });
 
-  it("shows editors the actions, history and Edit link", async () => {
+  it("shows editors the actions, history and Edit link, but no way to change the tags (REC-10)", async () => {
     await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI, cooked(at(2026, 7, 2))) } });
-    expect(editorControlsShown()).toEqual(["I cooked this today", "I want to cook this", "Edit", "+ Tag", "History", "Remove tag dinner"]);
+    expect(editorControlsShown()).toEqual(["I cooked this today", "I want to cook this", "Edit", "History"]);
     expect(screen.getByRole("link", { name: "Edit" })).toHaveAttribute("href", `/recipes/${ID}/edit`);
   });
 
@@ -205,7 +235,7 @@ describe("X-1, X-8 visitors and editors", () => {
     await openRecipe({ me: VISITOR, recipes: { [ID]: () => asEditor(PAD_THAI, { toMake: { addedAt: at(2026, 10, 1) } }) } });
     await screen.findByRole("link", { name: "Sign in" });
     expect(editorControlsShown()).toEqual([]);
-    expect(screen.queryByText("Want to make", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
   });
 
   it("refuses a public recipe carrying a private field, as a contract error", async () => {
@@ -216,7 +246,7 @@ describe("X-1, X-8 visitors and editors", () => {
 });
 
 describe("REC-19 ticks", () => {
-  it("ticks and unticks ingredients and steps, and Clear ticks resets both", async () => {
+  it("ticks and unticks ingredients and steps", async () => {
     await openRecipe({ me: VISITOR, recipes: { [ID]: () => PAD_THAI } });
     await userEvent.click(ingredient("2 eggs"));
     await userEvent.click(step(2));
@@ -227,11 +257,22 @@ describe("REC-19 ticks", () => {
 
     await userEvent.click(step(2));
     expect(step(2)).toHaveAttribute("aria-pressed", "false");
-    await userEvent.click(step(3));
+    await userEvent.click(ingredient("2 eggs"));
+    expect(ingredient("2 eggs")).not.toBeChecked();
+    expect(screen.queryByRole("button", { name: "Clear ticks" })).not.toBeInTheDocument();
+  });
 
-    await userEvent.click(screen.getByRole("button", { name: "Clear ticks" }));
-    expect(screen.getAllByRole("checkbox").filter((box) => (box as HTMLInputElement).checked)).toEqual([]);
-    for (const n of [1, 2, 3]) expect(step(n)).toHaveAttribute("aria-pressed", "false");
+  it("ticks and unticks prep entries apart from the steps (REC-20)", async () => {
+    await openRecipe({ me: VISITOR, recipes: { [ID]: () => CURRY } });
+    await userEvent.click(prep(2));
+    expect(prep(2)).toHaveAttribute("aria-pressed", "true");
+    expect(prep(1)).toHaveAttribute("aria-pressed", "false");
+    expect(step(2)).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(step(1));
+    expect(prep(1)).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(prep(2));
+    expect(prep(2)).toHaveAttribute("aria-pressed", "false");
+    expect(step(1)).toHaveAttribute("aria-pressed", "true");
   });
 
   it("never sends ticks to the API or saves them on the device", async () => {
@@ -240,20 +281,22 @@ describe("REC-19 ticks", () => {
     const before = fetchMock.mock.calls.length;
     await userEvent.click(ingredient("2 eggs"));
     await userEvent.click(step(1));
-    await userEvent.click(screen.getByRole("button", { name: "Clear ticks" }));
+    await userEvent.click(step(1));
     expect(fetchMock.mock.calls.length).toBe(before);
     expect(changes(fetchMock)).toEqual([]);
     expect(setItem).not.toHaveBeenCalled();
   });
 
   it("clears ticks on leaving the recipe and coming back", async () => {
-    const { router } = await openRecipe({ me: VISITOR, recipes: { [ID]: () => PAD_THAI } });
+    const { router } = await openRecipe({ me: VISITOR, recipes: { [ID]: () => CURRY } });
     await userEvent.click(ingredient("2 eggs"));
+    await userEvent.click(prep(1));
     await userEvent.click(step(1));
     await act(() => router.navigate("/"));
     await act(() => router.navigate(-1));
-    await screen.findByRole("heading", { level: 1, name: "Pad Thai" });
+    await screen.findByRole("heading", { level: 1, name: "Curry" });
     expect(ingredient("2 eggs")).not.toBeChecked();
+    expect(prep(1)).toHaveAttribute("aria-pressed", "false");
     expect(step(1)).toHaveAttribute("aria-pressed", "false");
   });
 
@@ -306,58 +349,54 @@ describe("REC-18 screen stays on", () => {
     Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
   });
 
-  it("keeps the screen on while the recipe is open, and says so", async () => {
+  it("keeps the screen on while the recipe is open, without a note saying so", async () => {
     const wakeLock = installWakeLock();
     await openRecipe({ me: VISITOR, recipes: { [ID]: () => PAD_THAI } });
-    expect(await screen.findByText(SCREEN_ON)).toBeInTheDocument();
-    expect(wakeLock.request).toHaveBeenCalledExactlyOnceWith("screen");
+    await waitFor(() => expect(wakeLock.request).toHaveBeenCalledExactlyOnceWith("screen"));
+    expect(wakeLock.sentinels[0]?.released).toBe(false);
+    expect(screen.queryByText(SCREEN_ON)).not.toBeInTheDocument();
   });
 
   it("releases the lock on leaving the recipe", async () => {
     const wakeLock = installWakeLock();
     const { router } = await openRecipe({ me: VISITOR, recipes: { [ID]: () => PAD_THAI } });
-    await screen.findByText(SCREEN_ON);
+    await waitFor(() => expect(wakeLock.sentinels).toHaveLength(1));
     await act(() => router.navigate("/"));
     expect(wakeLock.sentinels[0]?.release).toHaveBeenCalled();
-    expect(screen.queryByText(SCREEN_ON)).not.toBeInTheDocument();
   });
 
   it("asks again when the page becomes visible after the browser released the lock", async () => {
     const wakeLock = installWakeLock();
     await openRecipe({ me: VISITOR, recipes: { [ID]: () => PAD_THAI } });
-    await screen.findByText(SCREEN_ON);
+    await waitFor(() => expect(wakeLock.sentinels).toHaveLength(1));
 
     // The browser releases the lock when the page is hidden.
     await act(async () => {
       setVisibility("hidden");
       await wakeLock.sentinels[0]?.release();
     });
-    expect(screen.queryByText(SCREEN_ON)).not.toBeInTheDocument();
 
     await act(async () => setVisibility("visible"));
-    expect(await screen.findByText(SCREEN_ON)).toBeInTheDocument();
-    expect(wakeLock.request).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(wakeLock.request).toHaveBeenCalledTimes(2));
   });
 
   it("doesn't ask again while the lock is still held", async () => {
     const wakeLock = installWakeLock();
     await openRecipe({ me: VISITOR, recipes: { [ID]: () => PAD_THAI } });
-    await screen.findByText(SCREEN_ON);
+    await waitFor(() => expect(wakeLock.sentinels).toHaveLength(1));
     await act(async () => setVisibility("visible"));
     expect(wakeLock.request).toHaveBeenCalledTimes(1);
   });
 
-  it("shows no note, and no error, when the browser has no wake lock", async () => {
+  it("shows no error when the browser has no wake lock", async () => {
     await openRecipe({ me: VISITOR, recipes: { [ID]: () => PAD_THAI } });
-    expect(screen.queryByText(SCREEN_ON)).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("shows no note, and no error, when the browser refuses the lock", async () => {
+  it("shows no error when the browser refuses the lock", async () => {
     const wakeLock = installWakeLock(() => Promise.reject(new DOMException("Battery saver", "NotAllowedError")));
     await openRecipe({ me: VISITOR, recipes: { [ID]: () => PAD_THAI } });
     await waitFor(() => expect(wakeLock.request).toHaveBeenCalled());
-    expect(screen.queryByText(SCREEN_ON)).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -392,6 +431,13 @@ describe("COOK-1, COOK-8 cooked today", () => {
       { method: "POST", path: `/recipes/${ID}/cookings`, body: "{}", contentType: "application/json" },
     ]);
     expect(screen.getByText(/Last cooked today · cooked once/)).toBeInTheDocument();
+  });
+
+  it("styles I cooked this today like I want to cook this, not as the primary action", async () => {
+    await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI) } });
+    const cook = screen.getByRole("button", { name: "I cooked this today" });
+    expect(cook).not.toHaveClass("button-primary");
+    expect(cook.className).toBe(screen.getByRole("button", { name: "I want to cook this" }).className);
   });
 
   it("reads Cooked today ✓ when it was last cooked earlier on this local day", async () => {
@@ -498,11 +544,11 @@ describe("PLAN-1, PLAN-4, PLAN-7 the to-make list from the recipe", () => {
       recipes: { [ID]: () => asEditor(PAD_THAI) },
       change: () => asEditor(PAD_THAI, { toMake: { addedAt: new Date().toISOString() } }),
     });
-    expect(screen.queryByText("Want to make", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "I want to cook this" }));
 
-    expect(await screen.findByText("On your Want to make list ✓")).toBeInTheDocument();
-    expect(screen.getByText("Want to make", { selector: ".to-make-badge" })).toBeInTheDocument();
+    expect(await screen.findByText("On your meal plan ✓")).toBeInTheDocument();
+    expect(screen.getByText("Meal Plan", { selector: ".to-make-badge" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "I want to cook this" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove" })).toHaveFocus();
     expect(changes(fetchMock)).toEqual([
@@ -516,13 +562,13 @@ describe("PLAN-1, PLAN-4, PLAN-7 the to-make list from the recipe", () => {
       recipes: { [ID]: () => asEditor(PAD_THAI, { ...history, toMake: { addedAt: at(2026, 10, 1) } }) },
       change: () => asEditor(PAD_THAI, history),
     });
-    expect(screen.getByText("Want to make", { selector: ".to-make-badge" })).toBeInTheDocument();
+    expect(screen.getByText("Meal Plan", { selector: ".to-make-badge" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(await screen.findByRole("button", { name: "I want to cook this" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "I want to cook this" })).toHaveFocus();
-    expect(screen.queryByText("On your Want to make list ✓")).not.toBeInTheDocument();
-    expect(screen.queryByText("Want to make", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("On your meal plan ✓")).not.toBeInTheDocument();
+    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
     expect(screen.getByText(/Last cooked Aug 2 · cooked once/)).toBeInTheDocument();
     expect(changes(fetchMock)).toEqual([
       { method: "POST", path: `/recipes/${ID}/remove-from-plan`, body: "{}", contentType: "application/json" },
@@ -538,7 +584,7 @@ describe("PLAN-1, PLAN-4, PLAN-7 the to-make list from the recipe", () => {
     queryClient.setQueryData(planKeys.all, []);
     queryClient.setQueryData(tagKeys.all, []);
     await userEvent.click(screen.getByRole("button", { name: "I want to cook this" }));
-    await screen.findByText("On your Want to make list ✓");
+    await screen.findByText("On your meal plan ✓");
 
     expect(queryClient.getQueryState(recipeKeys.list({ name: "", tags: [] }))?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(planKeys.all)?.isInvalidated).toBe(true);
@@ -555,12 +601,12 @@ describe("PLAN-5 cooked recipes leave the list", () => {
     });
     queryClient.setQueryData(planKeys.all, []);
     queryClient.setQueryData(rediscoverKeys.all, []);
-    expect(screen.getByText("On your Want to make list ✓")).toBeInTheDocument();
+    expect(screen.getByText("On your meal plan ✓")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "I cooked this today" }));
     expect(await screen.findByRole("button", { name: "Cooked today ✓" })).toBeInTheDocument();
-    expect(screen.queryByText("On your Want to make list ✓")).not.toBeInTheDocument();
-    expect(screen.queryByText("Want to make", { selector: ".to-make-badge" })).not.toBeInTheDocument();
+    expect(screen.queryByText("On your meal plan ✓")).not.toBeInTheDocument();
+    expect(screen.queryByText("Meal Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "I want to cook this" })).toBeInTheDocument();
     expect(queryClient.getQueryState(planKeys.all)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(rediscoverKeys.all)?.isInvalidated).toBe(true);
@@ -601,156 +647,15 @@ describe("COOK-5 history on the recipe", () => {
   });
 });
 
-describe("REC-10, REC-12 tags from the recipe view", () => {
-  it("attaches a suggested tag, offering every tag in use before anything is typed", async () => {
-    const { fetchMock, queryClient } = await openRecipe({
-      recipes: { [ID]: () => asEditor(PAD_THAI) },
-      suggestions: (url) => (url.searchParams.get("typed") === "" ? ["curry", "thai", "vegetarian"] : ["thai"]),
-      change: (_method, _path, body) => asEditor(PAD_THAI, { tags: ["dinner", "noodles", "quick", (body as { tag: string }).tag] }),
-    });
-    queryClient.setQueryData(tagKeys.all, []);
-    await userEvent.click(screen.getByRole("button", { name: "+ Tag" }));
-    const field = screen.getByRole("textbox", { name: "Add a tag" });
-    expect(field).toHaveFocus();
-    const suggested = await screen.findByRole("group", { name: "Suggested tags" });
-    expect(within(suggested).getAllByRole("button").map((b) => b.textContent)).toEqual(["curry", "thai", "vegetarian"]);
-
-    await userEvent.type(field, "th");
-    await waitFor(() => expect(within(screen.getByRole("group", { name: "Suggested tags" })).getAllByRole("button")).toHaveLength(1));
-    expect(requests(fetchMock).map((r) => r.path)).toContain(`/tag-suggestions?typed=th&recipeId=${ID}`);
-
-    await userEvent.click(screen.getByRole("button", { name: "thai" }));
-    await waitFor(() =>
-      expect(within(screen.getByRole("list", { name: "Tags" })).getAllByRole("listitem").map((li) => li.textContent)).toContain("thai"),
-    );
-    expect(changes(fetchMock)).toEqual([
-      { method: "POST", path: `/recipes/${ID}/tags`, body: JSON.stringify({ tag: "thai" }), contentType: "application/json" },
-    ]);
-    expect(screen.getByRole("textbox", { name: "Add a tag" })).toHaveValue("");
-    expect(queryClient.getQueryState(tagKeys.all)?.isInvalidated).toBe(true);
-  });
-
-  it("sends a typed tag as typed on Enter; the server reads it (REC-11)", async () => {
-    const { fetchMock } = await openRecipe({
-      recipes: { [ID]: () => asEditor(PAD_THAI) },
-      suggestions: () => [],
-      change: () => asEditor(PAD_THAI),
-    });
-    await userEvent.click(screen.getByRole("button", { name: "+ Tag" }));
-    await userEvent.type(screen.getByRole("textbox", { name: "Add a tag" }), " Quick {Enter}");
-    await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
-    expect(changes(fetchMock)[0]?.body).toBe(JSON.stringify({ tag: " Quick " }));
-  });
-
-  it.each([
-    ["tag.comma", "A tag can't contain a comma. Add each tag separately."],
-    ["tags.tooMany", "A recipe can have at most 20 tags."],
-  ])("shows the server's message when a tag is refused (%s)", async (code, message) => {
-    await openRecipe({
-      recipes: { [ID]: () => asEditor(PAD_THAI) },
-      suggestions: () => [],
-      change: () => jsonResponse(400, { errors: [{ code, field: "tag", message }] }),
-    });
-    await userEvent.click(screen.getByRole("button", { name: "+ Tag" }));
-    const field = screen.getByRole("textbox", { name: "Add a tag" });
-    await userEvent.type(field, "dinner, quick{Enter}");
-    expect(await screen.findByRole("alert")).toHaveTextContent(message);
-    expect(field).toHaveValue("dinner, quick");
-  });
-
-  it("removes a tag", async () => {
-    const { fetchMock } = await openRecipe({
-      recipes: { [ID]: () => asEditor(PAD_THAI) },
-      change: () => asEditor(PAD_THAI, { tags: ["dinner", "quick"] }),
-    });
-    await userEvent.click(screen.getByRole("button", { name: "Remove tag noodles" }));
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Remove tag noodles" })).not.toBeInTheDocument());
-    expect(within(screen.getByRole("list", { name: "Tags" })).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
-      "dinner",
-      "quick",
-      "+ Tag",
-    ]);
-    expect(changes(fetchMock)).toEqual([
-      { method: "DELETE", path: `/recipes/${ID}/tags`, body: JSON.stringify({ tag: "noodles" }), contentType: "application/json" },
-    ]);
-  });
-
-  it("moves focus to the next tag's remove button, or to + Tag after the last tag", async () => {
-    let tags = [...PAD_THAI.tags];
-    await openRecipe({
-      recipes: { [ID]: () => asEditor(PAD_THAI) },
-      change: (_method, _path, body) => {
-        tags = tags.filter((t) => t !== (body as { tag: string }).tag);
-        return asEditor(PAD_THAI, { tags });
-      },
-    });
-    await userEvent.click(screen.getByRole("button", { name: "Remove tag noodles" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Remove tag quick" })).toHaveFocus());
-    await userEvent.click(screen.getByRole("button", { name: "Remove tag quick" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "+ Tag" })).toHaveFocus());
-  });
-
-  it("leaves focus where the editor moved it while a to-make change was being saved", async () => {
-    let answer: (response: Response) => void = () => {};
-    await openRecipe({
-      recipes: { [ID]: () => asEditor(PAD_THAI) },
-      suggestions: () => [],
-      change: () => new Promise<Response>((resolve) => (answer = resolve)),
-    });
-    await userEvent.click(screen.getByRole("button", { name: "I want to cook this" }));
-    await userEvent.click(screen.getByRole("button", { name: "+ Tag" }));
-    const field = screen.getByRole("textbox", { name: "Add a tag" });
-    await userEvent.type(field, "ve");
-
-    answer(jsonResponse(200, asEditor(PAD_THAI, { toMake: { addedAt: new Date().toISOString() } })));
-    await screen.findByText("On your Want to make list ✓");
-    await waitFor(() => expect(screen.getByRole("button", { name: "Remove" })).toBeEnabled());
-    expect(field).toHaveFocus();
-  });
-
-  it("leaves focus where the editor moved it while a tag removal was being saved", async () => {
-    let answer: (response: Response) => void = () => {};
-    await openRecipe({
-      recipes: { [ID]: () => asEditor(PAD_THAI) },
-      suggestions: () => [],
-      change: () => new Promise<Response>((resolve) => (answer = resolve)),
-    });
-    await userEvent.click(screen.getByRole("button", { name: "Remove tag noodles" }));
-    await userEvent.click(screen.getByRole("button", { name: "+ Tag" }));
-    const field = screen.getByRole("textbox", { name: "Add a tag" });
-
-    answer(jsonResponse(200, asEditor(PAD_THAI, { tags: ["dinner", "quick"] })));
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Remove tag noodles" })).not.toBeInTheDocument());
-    await waitFor(() => expect(screen.getByRole("button", { name: "Remove tag quick" })).toBeEnabled());
-    expect(field).toHaveFocus();
-  });
-
-  it("marks the tag counts, lists, plan and rediscovery stale, since their entries show tags", async () => {
-    const { queryClient } = await openRecipe({
-      recipes: { [ID]: () => asEditor(PAD_THAI) },
-      change: () => asEditor(PAD_THAI, { tags: ["dinner", "quick"] }),
-    });
-    queryClient.setQueryData(recipeKeys.list({ name: "", tags: [] }), []);
-    queryClient.setQueryData(tagKeys.all, []);
-    queryClient.setQueryData(planKeys.all, []);
-    queryClient.setQueryData(rediscoverKeys.all, []);
-    await userEvent.click(screen.getByRole("button", { name: "Remove tag noodles" }));
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Remove tag noodles" })).not.toBeInTheDocument());
-    for (const key of [recipeKeys.list({ name: "", tags: [] }), tagKeys.all, planKeys.all, rediscoverKeys.all]) {
-      expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
-    }
-  });
-
-  it("closes the form with Done or Escape", async () => {
-    await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI) }, suggestions: () => [] });
-    await userEvent.click(screen.getByRole("button", { name: "+ Tag" }));
-    await userEvent.click(screen.getByRole("button", { name: "Done" }));
+describe("REC-10 tags on the recipe view", () => {
+  it("shows editors the tags without any way to add or remove them", async () => {
+    const { fetchMock } = await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI) } });
+    const tags = screen.getByRole("list", { name: "Tags" });
+    expect(within(tags).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["dinner", "noodles", "quick"]);
+    expect(within(tags).queryAllByRole("button")).toEqual([]);
+    expect(screen.queryByRole("button", { name: "+ Tag" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Add a tag" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "+ Tag" })).toHaveFocus();
-
-    await userEvent.click(screen.getByRole("button", { name: "+ Tag" }));
-    await userEvent.keyboard("{Escape}");
-    expect(screen.queryByRole("textbox", { name: "Add a tag" })).not.toBeInTheDocument();
+    expect(requests(fetchMock).some((r) => r.path.startsWith("/tag-suggestions"))).toBe(false);
   });
 });
 
@@ -795,11 +700,11 @@ describe("REC-17, X-12 failed changes", () => {
     await userEvent.click(screen.getByRole("button", { name: "I want to cook this" }));
     await screen.findByRole("alert");
     await userEvent.click(screen.getByRole("button", { name: "I want to cook this" }));
-    expect(await screen.findByText("On your Want to make list ✓")).toBeInTheDocument();
+    expect(await screen.findByText("On your meal plan ✓")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("sends no time with any change: an empty body, or only the tag (X-12)", async () => {
+  it("sends no time with any change: an empty body (X-12)", async () => {
     const { fetchMock } = await openRecipe({
       recipes: { [ID]: () => asEditor(PAD_THAI) },
       suggestions: () => [],
@@ -810,8 +715,6 @@ describe("REC-17, X-12 failed changes", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Remove" }));
     await userEvent.click(await screen.findByRole("button", { name: "I cooked this today" }));
     await waitFor(() => expect(changes(fetchMock)).toHaveLength(3));
-    await userEvent.click(screen.getByRole("button", { name: "Remove tag quick" }));
-    await waitFor(() => expect(changes(fetchMock)).toHaveLength(4));
-    expect(changes(fetchMock).map((r) => r.body)).toEqual(["{}", "{}", "{}", JSON.stringify({ tag: "quick" })]);
+    expect(changes(fetchMock).map((r) => r.body)).toEqual(["{}", "{}", "{}"]);
   });
 });

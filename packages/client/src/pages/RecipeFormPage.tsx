@@ -23,8 +23,8 @@ function EditRecipe({ id }: { id: string }) {
   const changePending = useIsMutating({ mutationKey: recipeKeys.change(id) }) > 0;
 
   // Save sends the whole content (REC-5), so the form must start from the recipe as saved now: not a cached copy that may be
-  // out of date, and not one from before a change still being saved from the recipe view, such as a tag removal (REC-10).
-  // Otherwise saving would quietly undo that change. The reload must also have succeeded: after a failed one the cache still
+  // out of date, and not one from before a change still being saved from the recipe view (COOK-1, PLAN-1), so it never starts
+  // from a recipe the server is still changing. The reload must also have succeeded: after a failed one the cache still
   // holds the old copy, which may be of a recipe since moved to the trash (404, REC-17) or just out of date. Once filled, the
   // form keeps what is being typed whatever loads later.
   const [start, setStart] = useState<ViewedRecipe>();

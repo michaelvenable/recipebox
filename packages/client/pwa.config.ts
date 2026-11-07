@@ -12,8 +12,8 @@ export const BACKGROUND_COLOR = THEME_COLOR;
 
 export const manifest: Partial<ManifestOptions> = {
   id: "/",
-  name: "RecipeBox",
-  short_name: "RecipeBox",
+  name: "Recipe Box",
+  short_name: "Recipe Box",
   description: "Our household's recipes, to view on a phone or tablet while cooking.",
   lang: "en",
   start_url: "/",

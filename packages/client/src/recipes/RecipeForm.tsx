@@ -6,12 +6,11 @@ import { ApiError } from "../api/client.js";
 import { recipeKeys } from "../api/query-keys.js";
 import { createRecipe, removePhoto, saveRecipeContent, uploadPhoto } from "../api/recipes.js";
 import { TopBar } from "../layout/top-bar.js";
-import { EntryList } from "./EntryList.js";
+import { EntriesField } from "./EntriesField.js";
 import { photoChanged } from "./photo-version.js";
 import { KEEP_PHOTO, type PhotoChange, PhotoField } from "./PhotoField.js";
 import { changeErrorMessage, showSavedRecipe } from "./recipe-changes.js";
 import {
-  type Entry,
   type FormErrors,
   type FormValues,
   NO_ERRORS,
@@ -20,10 +19,8 @@ import {
   formErrors,
   formFrom,
   obviousErrors,
-  tagField,
-  withTag,
 } from "./recipe-form.js";
-import { RecipeTags, type TagEditing } from "./RecipeTags.js";
+import { TagsField } from "./TagsField.js";
 
 interface SavePlan {
   /** The recipe to change, or undefined to create it. */
@@ -111,10 +108,8 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
   const [saved, setSaved] = useState(() => ({ id: recipe?.id, content: contentSnapshot(initial), hasPhoto: recipe?.hasPhoto ?? false }));
   const [problem, setProblem] = useState<Problem>();
   const [askingToDiscard, setAskingToDiscard] = useState(false);
-  // A tag typed but not yet added (REC-10): Save adds it rather than dropping it, and leaving asks first.
-  const [tagDraft, setTagDraft] = useState("");
 
-  const dirty = contentSnapshot(form) !== saved.content || photo.kind !== "keep" || tagDraft.trim() !== "";
+  const dirty = contentSnapshot(form) !== saved.content || photo.kind !== "keep";
   // Set just before leaving on purpose (after saving, or discarding), so the leaving isn't stopped to ask.
   const leaving = useRef(false);
   // A save outlives the form if the editor is signed out meanwhile; then it must not navigate from whatever page is shown.
@@ -165,9 +160,7 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
 
   async function submit() {
     if (busy) return;
-    const sent = withTag(form, tagDraft);
-    if (sent !== form) setForm(sent);
-    setTagDraft("");
+    const sent = form;
     const obvious = obviousErrors(sent);
     if (obvious.length > 0) {
       setProblem({ errors: formErrors(obvious, sent), contentSaved: false, photo });
@@ -202,26 +195,6 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
   // A photo error is about the photo that was tried; it goes once another is picked or the photo is removed.
   const photoError = problem !== undefined && problem.photo === photo ? fieldErrors.get("photo") : undefined;
   const set = (change: Partial<FormValues>) => setForm((current) => ({ ...current, ...change }));
-
-  const tagMessages = [
-    ...(fieldErrors.get("tags") ?? []),
-    ...form.tags.flatMap((tag) => (fieldErrors.get(tagField(tag)) ?? []).map((message) => `“${tag}”: ${message}`)),
-  ];
-  const tagEditing: TagEditing = {
-    // Kept in the form until Save; the server reads each tag and applies the tag rules then (REC-11).
-    attach: (typed, done) => {
-      setForm((current) => withTag(current, typed));
-      done();
-    },
-    remove: (tag, done) => {
-      setForm((current) => ({ ...current, tags: current.tags.filter((t) => t !== tag) }));
-      done();
-    },
-    busy,
-    // Shown with the tags, and tied to the tag field while it is open.
-    error: tagMessages.length > 0 ? tagMessages.join(" ") : undefined,
-    draft: { text: tagDraft, setText: setTagDraft },
-  };
 
   const nameErrors = fieldErrors.get("name");
   const timeErrors = fieldErrors.get("totalTimeMinutes");
@@ -324,23 +297,18 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
               </p>
             )}
             <p id={`${id}-time-hint`} className="field-hint">
-              Optional. Hours:minutes, like 1:30, or minutes, like 45.
+              Optional. Examples: 1:30, :45.
             </p>
           </div>
 
-          <EntryList field="ingredients" entries={form.ingredients} onChange={(ingredients: Entry[]) => set({ ingredients })} errors={fieldErrors} />
-          <EntryList field="steps" entries={form.steps} onChange={(steps: Entry[]) => set({ steps })} errors={fieldErrors} />
+          {/* REC-21: one box each, one entry per line; Prep between ingredients and steps, as on the recipe (REC-20). */}
+          <EntriesField field="ingredients" value={form.ingredients} onChange={(ingredients) => set({ ingredients })} errors={fieldErrors.get("ingredients")} />
+          <EntriesField field="prep" value={form.prep} onChange={(prep) => set({ prep })} errors={fieldErrors.get("prep")} />
+          <EntriesField field="steps" value={form.steps} onChange={(steps) => set({ steps })} errors={fieldErrors.get("steps")} />
+
+          <TagsField recipeId={saved.id} value={form.tags} onChange={(tags) => set({ tags })} errors={fieldErrors.get("tags")} />
         </fieldset>
       </form>
-
-      {/* After the form, not in it: adding a tag is a form of its own (RecipeTags), and forms can't nest. */}
-      <section className="field" aria-labelledby={`${id}-tags`}>
-        <h2 id={`${id}-tags`} className="field-title">
-          Tags
-        </h2>
-        <RecipeTags recipeId={saved.id} tags={form.tags} editing={tagEditing} />
-        <p className="field-hint">Tags are saved in lowercase. Up to 20 per recipe.</p>
-      </section>
     </div>
   );
 }

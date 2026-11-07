@@ -27,7 +27,7 @@ const twentyTags = Array.from({ length: 20 }, (_, i) => `tag${String(i).padStart
 
 /** A recipe with everything set, to check what changes leave alone. */
 function fullRecipe(): Recipe {
-  const r = recipe({ tags: ["dinner", "quick"], totalTimeMinutes: 30 });
+  const r = recipe({ tags: ["dinner", "quick"], totalTimeMinutes: 30, prep: ["Soak the noodles in warm water."] });
   valueOf(r.setPhoto(photo("pad-thai.jpg")));
   valueOf(r.markCooked(at("2026-09-01T18:00:00Z")));
   valueOf(r.markCooked(at("2026-10-15T18:00:00Z")));
@@ -70,6 +70,7 @@ describe("REC-5 edit", () => {
     expect(r.content.ingredients.map((e) => e.value)).toEqual(["2 eggs", "wide noodles"]);
     expect(r.content.steps.map((e) => e.value)).toEqual(["Fry.", "Serve."]);
     expect(r.content.totalTime).toBeUndefined();
+    expect(r.content.prep).toEqual([]); // input without prep means none (REC-20)
     expect(tagNames(r)).toEqual(["noodles"]);
   });
 
@@ -468,6 +469,7 @@ describe("snapshot", () => {
       id: ID,
       name: "Pad Thai",
       ingredients: ["200 g rice noodles", "2 eggs"],
+      prep: ["Soak the noodles in warm water."],
       steps: ["Soak the noodles.", "Fry everything."],
       totalTimeMinutes: 30,
       tags: ["dinner", "quick"],
@@ -476,6 +478,22 @@ describe("snapshot", () => {
       deletedAt: "2026-10-21T09:00:00.000Z",
       schemaVersion: 1,
     });
+  });
+
+  it("stores prep entries in order (REC-20)", () => {
+    const r = recipe({ prep: [" Chop the onions. ", "", "Soak the noodles."] });
+    expect(r.toSnapshot().prep).toEqual(["Chop the onions.", "Soak the noodles."]);
+    expect(Recipe.fromSnapshot(r.toSnapshot()).content.prep.map((e) => e.value)).toEqual([
+      "Chop the onions.",
+      "Soak the noodles.",
+    ]);
+  });
+
+  it("reads a document stored before prep existed as having no prep (REC-20)", () => {
+    const stored = recipe().toSnapshot();
+    expect("prep" in stored).toBe(false);
+    expect(Recipe.fromSnapshot(stored).content.prep).toEqual([]);
+    expect(Recipe.fromSnapshot({ ...stored, prep: [] }).content.prep).toEqual([]);
   });
 
   it("omits optional fields that aren't set", () => {
@@ -530,6 +548,9 @@ describe("snapshot", () => {
       ["no ingredients", (s) => (s.ingredients = [])],
       ["a blank ingredient", (s) => s.ingredients.push("   ")],
       ["no steps", (s) => (s.steps = [])],
+      ["a blank prep entry", (s) => (s.prep = ["Chop.", " "])],
+      ["an untrimmed prep entry", (s) => (s.prep = [" Chop."])],
+      ["a prep entry of 1,001 characters", (s) => (s.prep = ["x".repeat(1001)])],
       ["a step of 1,001 characters", (s) => s.steps.push("x".repeat(1001))],
       ["total time 0", (s) => (s.totalTimeMinutes = 0)],
       ["an uppercase tag", (s) => (s.tags = ["Dinner"])],

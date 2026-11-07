@@ -17,43 +17,43 @@ function linkNames(nav: HTMLElement): string[] {
 }
 
 describe("X-8 navigation row", () => {
-  it("shows visitors Recipes and Sign in, and no editor pages", async () => {
+  it("shows visitors Catalog and Sign in, and no editor pages", async () => {
     mockApiAs(VISITOR);
     renderAt("/");
-    expect(linkNames(await mainNav())).toEqual(["Recipes", "Sign in"]);
+    expect(linkNames(await mainNav())).toEqual(["Catalog", "Sign in"]);
   });
 
-  it("shows editors Recipes, Want to make, Rediscover, Trash and an Account button", async () => {
+  it("shows editors Catalog, Meal Plan, Recommendations, Trash and an Account button", async () => {
     mockApiAs(EDITOR);
     renderAt("/");
     const nav = await mainNav();
-    expect(linkNames(nav)).toEqual(["Recipes", "Want to make", "Rediscover", "Trash", "Account"]);
-    expect(within(nav).getByRole("link", { name: "Want to make" })).toHaveAttribute("href", "/plan");
-    expect(within(nav).getByRole("link", { name: "Rediscover" })).toHaveAttribute("href", "/recommendations");
+    expect(linkNames(nav)).toEqual(["Catalog", "Meal Plan", "Recommendations", "Trash", "Account"]);
+    expect(within(nav).getByRole("link", { name: "Meal Plan" })).toHaveAttribute("href", "/plan");
+    expect(within(nav).getByRole("link", { name: "Recommendations" })).toHaveAttribute("href", "/recommendations");
     expect(within(nav).getByRole("link", { name: "Trash" })).toHaveAttribute("href", "/trash");
     expect(within(nav).getByRole("link", { name: "Account" })).toHaveAttribute("href", "/account");
   });
 
-  it("shows signed-in non-editors Recipes and the Account button, with no editor pages and no Sign in", async () => {
+  it("shows signed-in non-editors Catalog and the Account button, with no editor pages and no Sign in", async () => {
     mockApiAs(NON_EDITOR);
     renderAt("/");
-    expect(linkNames(await mainNav())).toEqual(["Recipes", "Account"]);
+    expect(linkNames(await mainNav())).toEqual(["Catalog", "Account"]);
   });
 
   it("treats the person as a visitor if /me can't be loaded", async () => {
     mockFetch(() => jsonResponse(503, { errors: [] }));
     renderAt("/");
-    expect(linkNames(await mainNav())).toEqual(["Recipes", "Sign in"]);
+    expect(linkNames(await mainNav())).toEqual(["Catalog", "Sign in"]);
   });
 });
 
 describe("X-8 current page", () => {
   it.each([
-    ["/", "Recipes"],
-    ["/recipes/8d3f2a4e-1b2c-4d5e-8f90-1234567890ab", "Recipes"],
-    ["/recipes/new", "Recipes"],
-    ["/plan", "Want to make"],
-    ["/recommendations", "Rediscover"],
+    ["/", "Catalog"],
+    ["/recipes/8d3f2a4e-1b2c-4d5e-8f90-1234567890ab", "Catalog"],
+    ["/recipes/new", "Catalog"],
+    ["/plan", "Meal Plan"],
+    ["/recommendations", "Recommendations"],
     ["/trash", "Trash"],
     ["/account", "Account"],
   ])("marks only the current item at %s with aria-current=page", async (path, current) => {
@@ -79,7 +79,7 @@ describe("X-8 current page", () => {
     renderAt("/account");
     const nav = await mainNav();
     expect(within(nav).getByRole("link", { name: "Sign in" })).toHaveAttribute("aria-current", "page");
-    expect(within(nav).getByRole("link", { name: "Recipes" })).not.toHaveAttribute("aria-current");
+    expect(within(nav).getByRole("link", { name: "Catalog" })).not.toHaveAttribute("aria-current");
   });
 
   it("follows navigation", async () => {
@@ -88,7 +88,7 @@ describe("X-8 current page", () => {
     const nav = await mainNav();
     await userEvent.click(within(nav).getByRole("link", { name: "Trash" }));
     expect(within(nav).getByRole("link", { name: "Trash" })).toHaveAttribute("aria-current", "page");
-    expect(within(nav).getByRole("link", { name: "Recipes" })).not.toHaveAttribute("aria-current");
+    expect(within(nav).getByRole("link", { name: "Catalog" })).not.toHaveAttribute("aria-current");
   });
 });
 

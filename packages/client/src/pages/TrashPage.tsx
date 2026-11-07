@@ -52,7 +52,6 @@ export function TrashPage() {
   return (
     <div className="trash-page">
       <h1>Trash</h1>
-      <p className="muted">Deleted recipes stay here for 30 days, then they're removed for good.</p>
       {problem !== undefined && (
         <p ref={problemMessage} className="form-error" role="alert" tabIndex={-1}>
           {problem.text}

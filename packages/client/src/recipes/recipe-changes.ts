@@ -3,18 +3,10 @@ import { type Mutation, type QueryClient, useIsMutating, useMutation, useMutatio
 import type { EditorRecipe, RecipeSummary, RediscoverEntry, ToMakeEntry } from "@recipebox/shared";
 import { ApiError } from "../api/client.js";
 import { planKeys, recipeKeys, rediscoverKeys, tagKeys } from "../api/query-keys.js";
-import { type ListedRecipe, addToPlan, attachTag, markCooked, removeFromPlan, removeTag } from "../api/recipes.js";
+import { type ListedRecipe, addToPlan, markCooked, removeFromPlan } from "../api/recipes.js";
 
-export type RecipeChange =
-  | { kind: "markCooked" }
-  | { kind: "addToPlan" }
-  | { kind: "removeFromPlan" }
-  | { kind: "attachTag"; tag: string }
-  | { kind: "removeTag"; tag: string };
-
-export function isTagChange(change: RecipeChange | undefined): boolean {
-  return change?.kind === "attachTag" || change?.kind === "removeTag";
-}
+/** Tags are changed only in the create and edit form, not from the view (REC-10). */
+export type RecipeChange = { kind: "markCooked" } | { kind: "addToPlan" } | { kind: "removeFromPlan" };
 
 function send(id: string, change: RecipeChange): Promise<EditorRecipe> {
   switch (change.kind) {
@@ -24,10 +16,6 @@ function send(id: string, change: RecipeChange): Promise<EditorRecipe> {
       return addToPlan(id);
     case "removeFromPlan":
       return removeFromPlan(id);
-    case "attachTag":
-      return attachTag(id, change.tag);
-    case "removeTag":
-      return removeTag(id, change.tag);
   }
 }
 
@@ -47,7 +35,7 @@ export function useRecipeChange(id: string) {
     mutationKey,
     mutationFn: (change: RecipeChange) => send(id, change),
     // Runs even if the view that started the change has gone, so the cache always gets the saved recipe.
-    onSuccess: (recipe, change) => showSavedRecipe(queryClient, recipe, { tagsChanged: isTagChange(change) }),
+    onSuccess: (recipe) => showSavedRecipe(queryClient, recipe, { tagsChanged: false }),
   });
   const busy = useIsMutating({ mutationKey }) > 0;
   return { mutation, busy };

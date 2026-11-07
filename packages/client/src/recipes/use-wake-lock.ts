@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 
 /**
- * Keeps the screen on while `enabled`, with the Screen Wake Lock API (REC-18). Returns whether the lock is held, for the note
- * that says so.
+ * Keeps the screen on while `enabled`, with the Screen Wake Lock API (REC-18). Returns whether the lock is held.
  *
  * The browser releases the lock whenever the page is hidden (another tab or app, the screen locked), so it is requested again
  * each time the page becomes visible. It is released when `enabled` turns false or the component goes away. Browsers without

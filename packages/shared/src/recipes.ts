@@ -15,6 +15,8 @@ import { z } from "zod";
 export const RecipeContentInput = z.strictObject({
   name: z.string(),
   ingredients: z.array(z.string()),
+  /** Optional, so a client from before prep existed keeps working; absent means none (REC-20). */
+  prep: z.array(z.string()).optional(),
   steps: z.array(z.string()),
   totalTimeMinutes: z.number().optional(),
   tags: z.array(z.string()).optional(),
@@ -58,6 +60,11 @@ export const PublicRecipe = z.strictObject({
   id: z.string(),
   name: z.string(),
   ingredients: z.array(z.string()),
+  /**
+   * Absent when the recipe has no prep (REC-20). Optional, not an empty list, because clients from before prep parse this shape
+   * strictly and would refuse a response with the key.
+   */
+  prep: z.array(z.string()).optional(),
   steps: z.array(z.string()),
   totalTimeMinutes: z.number().optional(),
   tags: z.array(z.string()),

@@ -8,7 +8,7 @@ import { Thumbnail } from "../recipes/RecipeCard.js";
 import { useNow } from "../recipes/use-now.js";
 
 /**
- * "Haven't made in a while" at /recommendations (COOK-6): every recipe, in the server's order (never cooked first by name,
+ * "Haven't made in a while", called "Recommendations" in the app, at /recommendations (COOK-6): every recipe, in the server's order (never cooked first by name,
  * then least recently cooked first), each linking to the recipe with its last cooking and how long ago that was. The labels are
  * worked out on the device and kept current while the page is open (X-12). Editor-only (X-1), behind EditorOnly in routes.tsx.
  */
@@ -19,7 +19,7 @@ export function RediscoverPage() {
   return (
     <div className="rediscover-page">
       <header className="list-page-header">
-        <h1>Haven't made in a while</h1>
+        <h1>Recommendations</h1>
         {recipes.data !== undefined && recipes.data.length > 0 && <p className="muted">Least recently cooked first</p>}
       </header>
       <RediscoverContents entries={recipes.data} failed={recipes.isError} retry={() => void recipes.refetch()} now={now} />
@@ -60,7 +60,7 @@ function RediscoverContents({ entries, failed, retry, now }: RediscoverContentsP
   }
   const today = localDayKey(now);
   return (
-    <ul className="entry-cards" aria-label="Haven't made in a while">
+    <ul className="entry-cards" aria-label="Recommendations">
       {entries.map((entry) => (
         <RediscoverRow key={entry.id} entry={entry} now={now} today={today} />
       ))}

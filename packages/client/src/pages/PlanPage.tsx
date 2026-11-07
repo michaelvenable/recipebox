@@ -78,7 +78,7 @@ export function PlanPage() {
   return (
     <div className="plan-page">
       <header className="list-page-header">
-        <h1>Want to make</h1>
+        <h1>Meal Plan</h1>
         {visible !== undefined && visible.length > 0 && <p className="muted">{countLabel(visible.length)} · oldest first</p>}
       </header>
       {problem !== undefined && (
@@ -124,7 +124,7 @@ function PlanContents({ entries, visible, failed, retry, today, removal, removeB
     if (failed) {
       return (
         <div className="card stack" role="alert">
-          <p>Couldn't load the Want to make list. Check the connection and try again.</p>
+          <p>Couldn't load the meal plan. Check the connection and try again.</p>
           <button type="button" className="button" onClick={retry}>
             Try again
           </button>
@@ -135,7 +135,7 @@ function PlanContents({ entries, visible, failed, retry, today, removal, removeB
   }
   if (visible.length === 0) return <EmptyPlan browseLink={browseLink} />;
   return (
-    <ul className="entry-cards" aria-label="Want to make">
+    <ul className="entry-cards" aria-label="Meal Plan">
       {visible.map((entry) => (
         <PlanRow
           key={entry.id}
@@ -152,7 +152,7 @@ function PlanContents({ entries, visible, failed, retry, today, removal, removeB
   );
 }
 
-/** PLAN-3: an empty list says how to add recipes (docs/mockups/ToMakeEmpty.dc.html). */
+/** PLAN-3: an empty list says so (docs/mockups/ToMakeEmpty.dc.html). */
 function EmptyPlan({ browseLink }: { browseLink: RefObject<HTMLAnchorElement | null> }) {
   return (
     <div className="empty-state">
@@ -162,7 +162,6 @@ function EmptyPlan({ browseLink }: { browseLink: RefObject<HTMLAnchorElement | n
         </svg>
       </div>
       <h2>Nothing planned yet</h2>
-      <p className="muted">Open a recipe and choose "I want to cook this" to save it here for later.</p>
       <Link ref={browseLink} to="/" className="button button-primary">
         Browse recipes
       </Link>
@@ -203,7 +202,7 @@ function PlanRow({ entry, today, removal, buttonRef }: PlanRowProps) {
         ref={buttonRef}
         type="button"
         className="round-button"
-        aria-label={`Remove ${entry.name} from the Want to make list`}
+        aria-label={`Remove ${entry.name} from the meal plan`}
         disabled={busy}
         onClick={onRemove}
       >

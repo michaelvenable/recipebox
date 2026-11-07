@@ -14,6 +14,8 @@ export interface RecipeSnapshot {
   id: string;
   name: string;
   ingredients: string[];
+  /** Omitted when there is none; documents stored before REC-20 have no prep. */
+  prep?: string[];
   steps: string[];
   totalTimeMinutes?: number;
   /** Lowercase, unique, alphabetical. */
@@ -232,6 +234,7 @@ export class Recipe {
       cookedAt: this.cookings.map((i) => i.toIso()),
       schemaVersion: 1,
     };
+    if (c.prep.length > 0) snapshot.prep = c.prep.map((e) => e.value);
     if (c.totalTime !== undefined) snapshot.totalTimeMinutes = c.totalTime.value;
     if (this.photoRef !== undefined) {
       snapshot.photo = { blobName: this.photoRef.blobName, contentType: this.photoRef.contentType };
@@ -259,6 +262,7 @@ export class Recipe {
       RecipeContent.create({
         name: s.name,
         ingredients: s.ingredients,
+        prep: s.prep,
         steps: s.steps,
         totalTimeMinutes: s.totalTimeMinutes,
         tags: s.tags,
@@ -269,6 +273,7 @@ export class Recipe {
     if (
       content.name.value !== s.name ||
       !sameTexts(content.ingredients, s.ingredients) ||
+      !sameTexts(content.prep, s.prep ?? []) ||
       !sameTexts(content.steps, s.steps) ||
       !sameTexts(content.tags, s.tags)
     ) {
@@ -298,6 +303,7 @@ function contentInput(content: RecipeContent): RecipeContentInput {
   return {
     name: content.name.value,
     ingredients: content.ingredients.map((e) => e.value),
+    prep: content.prep.map((e) => e.value),
     steps: content.steps.map((e) => e.value),
     totalTimeMinutes: content.totalTime?.value,
     tags: content.tags.map((t) => t.value),

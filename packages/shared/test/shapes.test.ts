@@ -27,6 +27,7 @@ const publicRecipe: PublicRecipe = {
   id: ID,
   name: "Pancakes",
   ingredients: ["2 eggs", "200 g flour"],
+  prep: ["Sift the flour."],
   steps: ["Mix.", "Fry."],
   totalTimeMinutes: 20,
   tags: ["breakfast"],
@@ -58,7 +59,14 @@ function expectOptional(schema: z.ZodType, valid: Record<string, unknown>, keys:
 }
 
 describe("api.md Shapes: RecipeContentInput", () => {
-  const valid = { name: "Pancakes", ingredients: ["2 eggs"], steps: ["Mix."], totalTimeMinutes: 20, tags: ["breakfast"] };
+  const valid = {
+    name: "Pancakes",
+    ingredients: ["2 eggs"],
+    prep: ["Sift the flour."],
+    steps: ["Mix."],
+    totalTimeMinutes: 20,
+    tags: ["breakfast"],
+  };
 
   it("parses a valid body", () => {
     expect(RecipeContentInput.parse(valid)).toEqual(valid);
@@ -66,8 +74,9 @@ describe("api.md Shapes: RecipeContentInput", () => {
   it("requires name, ingredients and steps", () => {
     expectRequired(RecipeContentInput, valid, ["name", "ingredients", "steps"]);
   });
-  it("allows totalTimeMinutes and tags to be absent or undefined", () => {
-    expectOptional(RecipeContentInput, valid, ["totalTimeMinutes", "tags"]);
+  it("allows prep (REC-20), totalTimeMinutes and tags to be absent or undefined", () => {
+    expectOptional(RecipeContentInput, valid, ["prep", "totalTimeMinutes", "tags"]);
+    expect(RecipeContentInput.safeParse({ ...valid, prep: "Sift." }).success).toBe(false);
   });
   it("rejects wrong types: a string where an array is expected, a string time", () => {
     expect(RecipeContentInput.safeParse({ ...valid, ingredients: "2 eggs" }).success).toBe(false);
@@ -135,9 +144,10 @@ describe("api.md Shapes: PublicRecipe and EditorRecipe", () => {
   it("parses a valid public recipe", () => {
     expect(PublicRecipe.parse(publicRecipe)).toEqual(publicRecipe);
   });
-  it("PublicRecipe requires everything but totalTimeMinutes", () => {
+  it("PublicRecipe requires everything but prep and totalTimeMinutes", () => {
     expectRequired(PublicRecipe, publicRecipe, ["id", "name", "ingredients", "steps", "tags", "hasPhoto"]);
-    expectOptional(PublicRecipe, publicRecipe, ["totalTimeMinutes"]);
+    // REC-20: left out when a recipe has none, so clients from before prep can still read the recipe.
+    expectOptional(PublicRecipe, publicRecipe, ["prep", "totalTimeMinutes"]);
   });
   it("parses a valid editor recipe", () => {
     expect(EditorRecipe.parse(editorRecipe)).toEqual(editorRecipe);
@@ -153,7 +163,7 @@ describe("api.md Shapes: PublicRecipe and EditorRecipe", () => {
       "cookedAt",
       "timesCooked",
     ]);
-    expectOptional(EditorRecipe, editorRecipe, ["toMake", "lastCookedAt", "totalTimeMinutes"]);
+    expectOptional(EditorRecipe, editorRecipe, ["toMake", "lastCookedAt", "totalTimeMinutes", "prep"]);
   });
   it("EditorRecipe parses a never-cooked recipe that isn't on the list", () => {
     const { toMake: _t, lastCookedAt: _l, ...rest } = editorRecipe;

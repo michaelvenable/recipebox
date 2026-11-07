@@ -42,6 +42,8 @@ export function toPublicRecipe(recipe: Recipe): PublicRecipe {
     id: recipe.id.value,
     name: content.name.value,
     ingredients: content.ingredients.map((e) => e.value),
+    // Left out when there is none, like totalTimeMinutes, so clients from before prep (strict shapes) can still read it.
+    prep: content.prep.length > 0 ? content.prep.map((e) => e.value) : undefined,
     steps: content.steps.map((e) => e.value),
     totalTimeMinutes: content.totalTime?.value,
     tags: content.tags.map((t) => t.value),

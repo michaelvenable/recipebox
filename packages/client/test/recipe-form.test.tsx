@@ -99,13 +99,15 @@ const openNew = (fake: FakeApi = {}) => openForm(fake, "/recipes/new");
 const openEdit = (fake: FakeApi = {}, recipe: EditorRecipe = PAD_THAI) =>
   openForm({ recipes: { [recipe.id]: () => recipe }, ...fake }, `/recipes/${recipe.id}/edit`);
 
-const TIME_HINT = "Optional. Hours:minutes, like 1:30, or minutes, like 45.";
+const TIME_HINT = "Optional. Examples: 1:30, :45.";
 
 const field = (name: string) => screen.getByRole("textbox", { name });
 const button = (name: string) => screen.getByRole("button", { name });
 const save = () => userEvent.click(button("Save"));
-const entryValues = (noun: "Ingredient" | "Step") =>
-  screen.queryAllByRole("textbox", { name: new RegExp(`^${noun} \\d+$`) }).map((box) => (box as HTMLTextAreaElement).value);
+const suggested = () =>
+  within(screen.getByRole("group", { name: "Suggested tags" }))
+    .getAllByRole("button")
+    .map((b) => b.textContent);
 
 function jpeg(name = "photo.jpg"): File {
   return new File(["jpeg bytes"], name, { type: "image/jpeg" });
@@ -129,10 +131,8 @@ describe("REC-1 create", () => {
     });
     expect(screen.getByRole("heading", { level: 1, name: "New recipe" })).toBeInTheDocument();
     await userEvent.type(field("Name"), "  Pad Thai ");
-    await userEvent.type(field("Ingredient 1"), "2 eggs");
-    await userEvent.click(button("+ Add ingredient"));
-    await userEvent.type(field("Ingredient 2"), "  ");
-    await userEvent.type(field("Step 1"), "Fry.");
+    await userEvent.type(field("Ingredients"), "2 eggs{Enter}  ");
+    await userEvent.type(field("Steps"), "Fry.");
     await save();
 
     await waitFor(() => expect(router.state.location.pathname).toBe(`/recipes/${NEW_ID}`));
@@ -142,7 +142,7 @@ describe("REC-1 create", () => {
         method: "POST",
         path: "/recipes",
         // REC-2: trimming and dropping blank entries are the server's.
-        body: { name: "  Pad Thai ", ingredients: ["2 eggs", "  "], steps: ["Fry."], tags: [] },
+        body: { name: "  Pad Thai ", ingredients: ["2 eggs", "  "], prep: [], steps: ["Fry."], tags: [] },
         contentType: "application/json",
         credentials: "include",
       },
@@ -161,74 +161,53 @@ describe("REC-1 create", () => {
             { code: "name.tooLong", field: "name", message: "Name must be at most 200 characters." },
             { code: "entry.tooLong", field: "ingredients[1]", message: "An entry must be at most 1000 characters." },
             { code: "totalTime.outOfRange", field: "totalTimeMinutes", message: "Total time must be from 1 to 1440 minutes." },
-            { code: "tag.comma", field: "tags[0]", message: "A tag can't contain a comma. Add each tag separately." },
+            { code: "tag.tooLong", field: "tags[1]", message: "A tag must be at most 30 characters." },
           ],
         }),
     });
     await userEvent.type(field("Name"), "A long name");
-    await userEvent.type(field("Ingredient 1"), "eggs");
-    await userEvent.click(button("+ Add ingredient"));
-    await userEvent.type(field("Ingredient 2"), "far too long");
-    await userEvent.type(field("Step 1"), "Cook.");
+    await userEvent.type(field("Ingredients"), "eggs{Enter}far too long");
+    await userEvent.type(field("Steps"), "Cook.");
     await userEvent.type(field("Total time"), "25:00");
-    await userEvent.click(button("+ Tag"));
-    await userEvent.type(field("Add a tag"), "dinner, quick{Enter}");
+    await userEvent.type(field("Tags"), "dinner, a very long tag indeed");
     await save();
 
     const summary = await screen.findByText("Not saved. Fix the 4 fields marked below.");
     expect(summary.closest("[role=alert]")).toHaveFocus();
     expect(field("Name")).toHaveAttribute("aria-invalid", "true");
     expect(field("Name")).toHaveAccessibleDescription("Name must be at most 200 characters.");
-    expect(field("Ingredient 1")).not.toHaveAttribute("aria-invalid");
-    expect(field("Ingredient 2")).toHaveAccessibleDescription("An entry must be at most 1000 characters.");
+    // REC-21: the error names the line of the entry it is about.
+    expect(field("Ingredients")).toHaveAttribute("aria-invalid", "true");
+    expect(field("Ingredients")).toHaveAccessibleDescription("Line 2: An entry must be at most 1000 characters.");
+    expect(field("Steps")).not.toHaveAttribute("aria-invalid");
     expect(field("Total time")).toHaveAttribute("aria-invalid", "true");
     expect(field("Total time")).toHaveAccessibleDescription(`Total time must be from 1 to 1440 minutes. ${TIME_HINT}`);
-    expect(field("Add a tag")).toHaveAccessibleDescription("“dinner, quick”: A tag can't contain a comma. Add each tag separately.");
+    expect(field("Tags")).toHaveAttribute("aria-invalid", "true");
+    expect(field("Tags")).toHaveAccessibleDescription("“a very long tag indeed”: A tag must be at most 30 characters.");
     expect(router.state.location.pathname).toBe("/recipes/new");
     expect(changes(fetchMock)).toHaveLength(1);
   });
 
-  it("keeps a row's error with the row when a row above it is removed", async () => {
-    await openNew({
-      change: () => refused(400, "entry.tooLong", "An entry must be at most 1000 characters.", "ingredients[1]"),
-    });
-    await userEvent.type(field("Name"), "Toast");
-    await userEvent.type(field("Ingredient 1"), "Bread");
-    await userEvent.click(button("+ Add ingredient"));
-    await userEvent.type(field("Ingredient 2"), "Butter, a lot");
-    await userEvent.click(button("+ Add ingredient"));
-    await userEvent.type(field("Ingredient 3"), "Jam");
-    await userEvent.type(field("Step 1"), "Toast it.");
-    await save();
-    await screen.findByText("Not saved. Fix the field marked below.");
-
-    await userEvent.click(button("Remove ingredient 1"));
-    expect(field("Ingredient 1")).toHaveValue("Butter, a lot");
-    expect(field("Ingredient 1")).toHaveAccessibleDescription("An entry must be at most 1000 characters.");
-    expect(field("Ingredient 2")).toHaveValue("Jam");
-    expect(field("Ingredient 2")).not.toHaveAttribute("aria-describedby");
-  });
-
   it("says what is obviously missing without sending anything: a name, an ingredient and a step", async () => {
     const { fetchMock } = await openNew();
-    await userEvent.type(field("Ingredient 1"), "   ");
+    await userEvent.type(field("Ingredients"), "   {Enter}{Enter}");
     await save();
 
     const summary = await screen.findByText("Not saved. Fix the 3 fields marked below.");
     expect(summary.closest("[role=alert]")).toHaveFocus();
     expect(field("Name")).toHaveAccessibleDescription("Enter a name (up to 200 characters).");
-    expect(screen.getByRole("group", { name: "Ingredients" })).toHaveAccessibleDescription(
-      "Add at least one ingredient. Blank ones are ignored.",
-    );
-    expect(screen.getByRole("group", { name: "Steps" })).toHaveAccessibleDescription("Add at least one step. Blank steps are ignored.");
+    expect(field("Ingredients")).toHaveAccessibleDescription("Add at least one ingredient. Blank lines are ignored.");
+    expect(field("Steps")).toHaveAccessibleDescription("Add at least one step. Blank lines are ignored.");
+    // Prep is optional (REC-20).
+    expect(field("Prep")).not.toHaveAttribute("aria-invalid");
     expect(changes(fetchMock)).toEqual([]);
   });
 
   it("says when the server can't be reached, keeping what was typed", async () => {
     await openNew({ change: () => Promise.reject(new TypeError("Failed to fetch")) });
     await userEvent.type(field("Name"), "Toast");
-    await userEvent.type(field("Ingredient 1"), "Bread");
-    await userEvent.type(field("Step 1"), "Toast it.");
+    await userEvent.type(field("Ingredients"), "Bread");
+    await userEvent.type(field("Steps"), "Toast it.");
     await save();
     const summary = await screen.findByRole("alert");
     expect(summary).toHaveTextContent("Not saved.Couldn't reach the server. Check the connection and try again.");
@@ -243,14 +222,12 @@ describe("REC-5 edit", () => {
     await openEdit();
     expect(screen.getByRole("heading", { level: 1, name: "Edit recipe" })).toBeInTheDocument();
     expect(field("Name")).toHaveValue("Pad Thai");
-    expect(entryValues("Ingredient")).toEqual(PAD_THAI.ingredients);
-    expect(entryValues("Step")).toEqual(PAD_THAI.steps);
+    // REC-21: one entry per line; REC-10: tags separated by commas.
+    expect(field("Ingredients")).toHaveValue("200 g flat rice noodles\n3 tbsp tamarind paste\n2 eggs");
+    expect(field("Prep")).toHaveValue("");
+    expect(field("Steps")).toHaveValue("Soak the noodles.\nFry everything.");
     expect(field("Total time")).toHaveValue("1:30");
-    expect(within(screen.getByRole("list", { name: "Tags" })).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
-      "dinner",
-      "noodles",
-      "+ Tag",
-    ]);
+    expect(field("Tags")).toHaveValue("dinner, noodles");
   });
 
   it("saves the whole content with PUT, tags included, then shows the saved recipe and marks what shows it stale", async () => {
@@ -275,6 +252,7 @@ describe("REC-5 edit", () => {
         body: {
           name: "Pad Thai Jay",
           ingredients: PAD_THAI.ingredients,
+          prep: [],
           steps: PAD_THAI.steps,
           totalTimeMinutes: 90,
           tags: ["dinner", "noodles"],
@@ -341,46 +319,82 @@ describe("REC-17, REC-4 a recipe in the trash", () => {
   });
 });
 
-describe("REC-3, REC-5 ingredients and steps", () => {
-  it("adds and removes entries, sending them in the order shown", async () => {
+describe("REC-21 one entry per line", () => {
+  it("has one box each for ingredients, prep and steps, in that order, and no per-entry rows", async () => {
+    await openNew();
+    const boxes = screen.getAllByRole("textbox").filter((box) => box.tagName === "TEXTAREA");
+    expect(boxes).toEqual([field("Ingredients"), field("Prep"), field("Steps")]);
+    expect(screen.queryByRole("button", { name: /^\+ Add / })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Remove / })).not.toBeInTheDocument();
+  });
+
+  it('sends each line as an entry: "Boil water", two blank lines, "Add pasta" goes as lines for the server to clean up', async () => {
     const { fetchMock } = await openEdit({ change: () => PAD_THAI });
-    await userEvent.click(button("Remove ingredient 1"));
-    expect(entryValues("Ingredient")).toEqual(["3 tbsp tamarind paste", "2 eggs"]);
-    // Focus goes to the row that took the removed one's place.
-    expect(field("Ingredient 1")).toHaveFocus();
-
-    await userEvent.click(button("Remove ingredient 2"));
-    expect(entryValues("Ingredient")).toEqual(["3 tbsp tamarind paste"]);
-    // The last row was removed, so focus goes to the one before it.
-    expect(field("Ingredient 1")).toHaveFocus();
-
-    await userEvent.click(button("+ Add ingredient"));
-    expect(field("Ingredient 2")).toHaveFocus();
-    await userEvent.type(field("Ingredient 2"), "1 lime,\ncut into wedges");
-
-    await userEvent.click(button("+ Add step"));
-    await userEvent.type(field("Step 3"), "Serve.");
+    await userEvent.clear(field("Steps"));
+    // Enter starts a new line in the box rather than saving.
+    await userEvent.type(field("Steps"), "Boil water{Enter}{Enter}{Enter}Add pasta");
+    expect(changes(fetchMock)).toEqual([]);
     await save();
+    await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
+    // REC-2: the server discards the blank lines, saving ["Boil water", "Add pasta"].
+    expect(changes(fetchMock)[0]?.body).toMatchObject({ steps: ["Boil water", "", "", "Add pasta"] });
+  });
 
+  it("keeps the text as typed, numbering included, and sends prep in the order typed (REC-3, REC-20)", async () => {
+    const { fetchMock } = await openEdit({ change: () => PAD_THAI });
+    await userEvent.type(field("Prep"), "1. Soak the noodles{Enter}2. Chop the shallots");
+    await userEvent.type(field("Ingredients"), "{Enter}1 lime");
+    await save();
     await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
     expect(changes(fetchMock)[0]?.body).toMatchObject({
-      ingredients: ["3 tbsp tamarind paste", "1 lime,\ncut into wedges"],
-      steps: ["Soak the noodles.", "Fry everything.", "Serve."],
+      ingredients: [...PAD_THAI.ingredients, "1 lime"],
+      prep: ["1. Soak the noodles", "2. Chop the shallots"],
+      steps: PAD_THAI.steps,
     });
   });
 
-  it("offers only removing a row, not moving it", async () => {
-    await openEdit();
-    const row = screen.getAllByRole("listitem").find((li) => within(li).queryByRole("textbox", { name: "Ingredient 2" }) !== null);
-    expect(within(row!).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Remove ingredient 2"]);
-    expect(screen.queryByRole("button", { name: /^Move / })).not.toBeInTheDocument();
+  it("shows a recipe's prep one per line when editing it", async () => {
+    await openEdit({}, { ...PAD_THAI, prep: ["Soak the noodles.", "Chop the shallots."] });
+    expect(field("Prep")).toHaveValue("Soak the noodles.\nChop the shallots.");
   });
 
-  it("focuses + Add when the last entry is removed", async () => {
-    await openNew();
-    await userEvent.click(button("Remove step 1"));
-    expect(entryValues("Step")).toEqual([]);
-    expect(button("+ Add step")).toHaveFocus();
+  it("loads a stored step with a line break as one line, saves it as one step, and doesn't call that a change", async () => {
+    const stored = { ...PAD_THAI, steps: ["Whisk the eggs.\nThen fold in the flour.", "Fry everything."] };
+    const { fetchMock, router } = await openEdit({ change: () => stored }, stored);
+    expect(field("Steps")).toHaveValue("Whisk the eggs. Then fold in the flour.\nFry everything.");
+
+    // Flattened on load, but nothing was typed: leaving doesn't ask, and Save sends nothing.
+    await userEvent.click(button("Cancel"));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/recipes/${ID}`);
+    expect(changes(fetchMock)).toEqual([]);
+  });
+
+  it("saves a stored step with a line break as one step", async () => {
+    const stored = { ...PAD_THAI, steps: ["Whisk the eggs.\nThen fold in the flour."] };
+    const { fetchMock } = await openEdit({ change: () => stored }, stored);
+    await userEvent.type(field("Name"), "!");
+    await save();
+    await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
+    expect(changes(fetchMock)[0]?.body).toMatchObject({ steps: ["Whisk the eggs. Then fold in the flour."] });
+  });
+
+  it("names the line of a prep entry the server refused", async () => {
+    await openNew({ change: () => refused(400, "entry.tooLong", "An entry must be at most 1000 characters.", "prep[2]") });
+    await userEvent.type(field("Name"), "Toast");
+    await userEvent.type(field("Ingredients"), "Bread");
+    await userEvent.type(field("Prep"), "Slice the bread.{Enter}{Enter}far too long");
+    await userEvent.type(field("Steps"), "Toast it.");
+    await save();
+    await screen.findByText("Not saved. Fix the field marked below.");
+    expect(field("Prep")).toHaveAccessibleDescription("Line 3: An entry must be at most 1000 characters.");
+  });
+
+  it("counts a changed box as an unsaved change", async () => {
+    await openEdit();
+    await userEvent.type(field("Prep"), "Soak.");
+    await userEvent.click(button("Cancel"));
+    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeInTheDocument();
   });
 });
 
@@ -396,6 +410,7 @@ describe("REC-1 total time", () => {
   it.each([
     ["2:15", 135],
     ["0:45", 45],
+    [":45", 45],
     [" 90 ", 90],
   ])("sends %j as %j minutes", async (typed, minutes) => {
     const { fetchMock } = await openEdit({ change: () => PAD_THAI });
@@ -414,7 +429,7 @@ describe("REC-1 total time", () => {
     expect(await screen.findByText("Not saved. Fix the field marked below.")).toBeInTheDocument();
     expect(field("Total time")).toHaveAttribute("aria-invalid", "true");
     expect(field("Total time")).toHaveAccessibleDescription(
-      `Enter the time as hours:minutes, like 1:30, or as minutes, like 45. ${TIME_HINT}`,
+      `Enter the time as hours:minutes, like 1:30 or :45, or as minutes, like 45. ${TIME_HINT}`,
     );
     expect(changes(fetchMock)).toEqual([]);
   });
@@ -431,47 +446,88 @@ describe("REC-1 total time", () => {
   });
 });
 
-describe("REC-10, REC-12 tags in the form", () => {
-  it("offers suggestions for a new recipe without a recipe id, and saves the tags with the content", async () => {
+describe("REC-10, REC-11, REC-12 tags in the form", () => {
+  it('is one text field; "Dinner, quick,, " goes as "Dinner" and "quick", lowercasing being the server\'s', async () => {
+    const { fetchMock } = await openEdit({ change: () => PAD_THAI });
+    expect(screen.queryByRole("button", { name: "+ Tag" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Tags are saved in lowercase. Up to 20 per recipe.")).not.toBeInTheDocument();
+    await userEvent.clear(field("Tags"));
+    await userEvent.type(field("Tags"), "Dinner, quick,, ");
+    await save();
+    await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
+    expect(changes(fetchMock)[0]?.body).toMatchObject({ tags: ["Dinner", "quick"] });
+  });
+
+  it("removes a tag by deleting it from the text", async () => {
+    const { fetchMock } = await openEdit({ change: () => PAD_THAI });
+    await userEvent.clear(field("Tags"));
+    await userEvent.type(field("Tags"), "noodles");
+    await save();
+    await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
+    expect(changes(fetchMock)[0]?.body).toMatchObject({ tags: ["noodles"] });
+  });
+
+  it("offers suggestions for the text after the last comma; choosing one replaces it and adds a comma", async () => {
     const { fetchMock } = await openNew({
-      suggestions: (url) => (url.searchParams.get("typed") === "" ? ["curry", "thai"] : ["thai"]),
+      suggestions: (url) => {
+        const typed = url.searchParams.get("typed");
+        if (typed === "") return ["curry", "quick", "thai"];
+        return ["curry", "quick", "thai"].filter((tag) => tag.includes(typed ?? ""));
+      },
       change: () => jsonResponse(201, { ...PAD_THAI, id: NEW_ID }),
       recipes: { [NEW_ID]: () => ({ ...PAD_THAI, id: NEW_ID }) },
     });
-    await userEvent.click(button("+ Tag"));
-    const suggested = await screen.findByRole("group", { name: "Suggested tags" });
-    expect(within(suggested).getAllByRole("button").map((b) => b.textContent)).toEqual(["curry", "thai"]);
+    expect(screen.queryByRole("group", { name: "Suggested tags" })).not.toBeInTheDocument();
+    await userEvent.click(field("Tags"));
+    // Before anything is typed, every tag in use is offered (REC-12).
+    await waitFor(() => expect(suggested()).toEqual(["curry", "quick", "thai"]));
     expect(suggestionRequests(fetchMock)).toContain("?typed=");
 
-    await userEvent.click(button("thai"));
-    // REC-12: a tag the recipe has is not offered again.
-    await waitFor(() =>
-      expect(within(screen.getByRole("group", { name: "Suggested tags" })).getAllByRole("button").map((b) => b.textContent)).toEqual([
-        "curry",
-      ]),
-    );
-    await userEvent.type(field("Add a tag"), " Quick {Enter}");
-    await userEvent.type(field("Add a tag"), "spicy{Enter}");
-    await userEvent.click(button("Remove tag spicy"));
-    expect(within(screen.getByRole("list", { name: "Tags" })).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
-      "thai",
-      "Quick",
-    ]);
+    await userEvent.type(field("Tags"), "thai, qu");
+    await waitFor(() => expect(suggestionRequests(fetchMock)).toContain("?typed=qu"));
+    await waitFor(() => expect(suggested()).toEqual(["quick"]));
+    await userEvent.click(button("quick"));
+    expect(field("Tags")).toHaveValue("thai, quick, ");
+    expect(field("Tags")).toHaveFocus();
+    // Tags already in the list are not offered again.
+    await waitFor(() => expect(suggested()).toEqual(["curry"]));
 
     await userEvent.type(field("Name"), "Pad Thai");
-    await userEvent.type(field("Ingredient 1"), "Noodles");
-    await userEvent.type(field("Step 1"), "Cook.");
+    await userEvent.type(field("Ingredients"), "Noodles");
+    await userEvent.type(field("Steps"), "Cook.");
     await save();
     await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
-    // Lowercasing and sorting are the server's (REC-11).
-    expect(changes(fetchMock)[0]?.body).toMatchObject({ tags: ["thai", "Quick"] });
+    expect(changes(fetchMock)[0]?.body).toMatchObject({ tags: ["thai", "quick"] });
   });
 
   it("asks for suggestions for an existing recipe with its id", async () => {
     const { fetchMock } = await openEdit({ suggestions: () => ["thai"] });
-    await userEvent.click(button("+ Tag"));
-    await userEvent.type(field("Add a tag"), "th");
+    await userEvent.clear(field("Tags"));
+    await userEvent.type(field("Tags"), "th");
     await waitFor(() => expect(suggestionRequests(fetchMock)).toContain(`?typed=th&recipeId=${ID}`));
+  });
+
+  it("hides the suggestions once focus leaves the tags", async () => {
+    await openNew({ suggestions: () => ["curry"] });
+    await userEvent.click(field("Tags"));
+    await waitFor(() => expect(suggested()).toEqual(["curry"]));
+    await userEvent.click(field("Name"));
+    expect(screen.queryByRole("group", { name: "Suggested tags" })).not.toBeInTheDocument();
+  });
+
+  it("counts a changed tag as an unsaved change", async () => {
+    await openEdit();
+    await userEvent.type(field("Tags"), ", spicy");
+    await userEvent.click(button("Cancel"));
+    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeInTheDocument();
+  });
+
+  it("ties a refused tag's message to the tags field, naming the tag", async () => {
+    await openEdit({ change: () => refused(400, "tag.tooLong", "A tag must be at most 30 characters.", "tags[2]") });
+    await userEvent.type(field("Tags"), ", a very long tag indeed");
+    await save();
+    await screen.findByText("Not saved. Fix the field marked below.");
+    expect(field("Tags")).toHaveAccessibleDescription("“a very long tag indeed”: A tag must be at most 30 characters.");
   });
 });
 
@@ -515,8 +571,8 @@ describe("REC-7 photo", () => {
       recipes: { [NEW_ID]: () => ({ ...created, hasPhoto: true }) },
     });
     await userEvent.type(field("Name"), "Pad Thai");
-    await userEvent.type(field("Ingredient 1"), "Noodles");
-    await userEvent.type(field("Step 1"), "Cook.");
+    await userEvent.type(field("Ingredients"), "Noodles");
+    await userEvent.type(field("Steps"), "Cook.");
     await userEvent.upload(screen.getByLabelText("Add photo"), jpeg());
     await save();
 
@@ -583,8 +639,8 @@ describe("REC-7 photo", () => {
       recipes: { [NEW_ID]: () => created },
     });
     await userEvent.type(field("Name"), "Pad Thai");
-    await userEvent.type(field("Ingredient 1"), "Noodles");
-    await userEvent.type(field("Step 1"), "Cook.");
+    await userEvent.type(field("Ingredients"), "Noodles");
+    await userEvent.type(field("Steps"), "Cook.");
     await userEvent.upload(screen.getByLabelText("Add photo"), jpeg());
     await save();
     await screen.findByText("The recipe is saved, but the photo isn't.");
@@ -647,7 +703,7 @@ describe("Edit form: Cancel and Save replace the navigation row (docs/mockups/RE
   it("shows Cancel, the title and Save in place of the navigation, which returns after leaving", async () => {
     const { router } = await openEdit();
     expect(screen.queryByRole("navigation", { name: "Main" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Recipes" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Catalog" })).not.toBeInTheDocument();
     const bar = screen.getByRole("banner");
     expect(within(bar).getAllByRole("button").map((b) => b.textContent)).toEqual(["Cancel", "Save"]);
     expect(within(bar).getByRole("heading", { level: 1, name: "Edit recipe" })).toBeInTheDocument();
@@ -691,7 +747,7 @@ describe("Edit form: Cancel and Save replace the navigation row (docs/mockups/RE
 
   it("asks before leaving with unsaved changes some other way, such as the browser's back button", async () => {
     const { router } = await openEdit();
-    await userEvent.type(field("Ingredient 1"), " (wide)");
+    await userEvent.type(field("Ingredients"), " (wide)");
     await act(() => router.navigate("/"));
 
     expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeInTheDocument();
@@ -747,26 +803,24 @@ describe("Edit form: Cancel and Save replace the navigation row (docs/mockups/RE
 });
 
 describe("REC-5, REC-10 the form starts from the recipe as saved", () => {
-  it("waits for a tag change still being saved from the recipe view, so Save doesn't undo it", async () => {
+  it("waits for a change still being saved from the recipe view, starting from the recipe the server then has", async () => {
     let answer: (response: Response) => void = () => {};
     let stored = PAD_THAI;
     const fetchMock = mockRecipeApi({
       recipes: { [ID]: () => stored },
-      change: (_method, path) => (path.endsWith("/tags") ? new Promise<Response>((resolve) => (answer = resolve)) : stored),
+      change: (_method, path) => (path.endsWith("/cookings") ? new Promise<Response>((resolve) => (answer = resolve)) : stored),
     });
     const { router } = renderAt(`/recipes/${ID}`);
-    await userEvent.click(await screen.findByRole("button", { name: "Remove tag noodles" }));
+    await userEvent.click(await screen.findByRole("button", { name: "I cooked this today" }));
     await userEvent.click(screen.getByRole("link", { name: "Edit" }));
     expect(screen.getByText("Loading recipe…")).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Name" })).not.toBeInTheDocument();
 
+    // Changed on another device meanwhile; the form must start from this, not the copy from before the change.
     stored = { ...PAD_THAI, tags: ["dinner"] };
     answer(jsonResponse(200, stored));
     await screen.findByRole("textbox", { name: "Name" });
-    expect(within(screen.getByRole("list", { name: "Tags" })).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
-      "dinner",
-      "+ Tag",
-    ]);
+    expect(field("Tags")).toHaveValue("dinner");
     await userEvent.type(field("Name"), "!");
     await save();
     await waitFor(() => expect(router.state.location.pathname).toBe(`/recipes/${ID}`));
@@ -867,33 +921,5 @@ describe("REC-7 a replaced or removed photo is shown afresh", () => {
     const after = (await screen.findByRole("img", { name: "Pad Thai photo" })).getAttribute("src");
     expect(after).not.toBe(before);
     expect(after?.startsWith(`${API}/recipes/${ID}/photo?`)).toBe(true);
-  });
-});
-
-describe("REC-10 a tag typed but not added", () => {
-  it("is added on Save rather than lost", async () => {
-    const { fetchMock } = await openEdit({ change: () => PAD_THAI });
-    await userEvent.click(button("+ Tag"));
-    await userEvent.type(field("Add a tag"), "spicy");
-    await save();
-    await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
-    expect(changes(fetchMock)[0]?.body).toMatchObject({ tags: ["dinner", "noodles", "spicy"] });
-  });
-
-  it("counts as an unsaved change", async () => {
-    await openEdit();
-    await userEvent.click(button("+ Tag"));
-    await userEvent.type(field("Add a tag"), "spicy");
-    await userEvent.click(button("Cancel"));
-    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeInTheDocument();
-  });
-
-  it("ties a refused tag's message to the tag field", async () => {
-    await openEdit({ change: () => refused(400, "tag.comma", "A tag can't contain a comma. Add each tag separately.", "tags[2]") });
-    await userEvent.click(button("+ Tag"));
-    await userEvent.type(field("Add a tag"), "a, b{Enter}");
-    await save();
-    await screen.findByText("Not saved. Fix the field marked below.");
-    expect(field("Add a tag")).toHaveAccessibleDescription("“a, b”: A tag can't contain a comma. Add each tag separately.");
   });
 });
