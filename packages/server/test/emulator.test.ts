@@ -36,7 +36,7 @@ describe("integration tests never touch Azure", () => {
     const config = emulatorCosmosConfig();
 
     expect(config.endpoint).toBe(COSMOS_EMULATOR_ENDPOINT);
-    expect(config.key).toBe(COSMOS_EMULATOR_KEY);
+    expect(config.access).toEqual({ kind: "key", key: COSMOS_EMULATOR_KEY });
   });
 
   it.each([
@@ -64,6 +64,6 @@ describe("integration tests never touch Azure", () => {
   it("uses Azurite even when the environment points at a real storage account", () => {
     vi.stubEnv("STORAGE_CONNECTION_STRING", "AccountName=prod;AccountKey=a2V5;EndpointSuffix=core.windows.net");
 
-    expect(emulatorStorageConfig().connectionString).toBe(AZURITE_CONNECTION_STRING);
+    expect(emulatorStorageConfig().access).toEqual({ kind: "connectionString", connectionString: AZURITE_CONNECTION_STRING });
   });
 });

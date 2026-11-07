@@ -8,13 +8,12 @@ import { InMemoryRecipeRepository } from "../src/recipes/in-memory-recipe-reposi
 
 /** Settings a deployed app needs, so tests can build a non-local config. */
 export const DEPLOYED_SETTINGS = {
-  COSMOS_ENDPOINT: "https://recipebox.documents.azure.com:443/",
-  COSMOS_KEY: "secret",
+  COSMOS_ENDPOINT: "https://recipebox.documents.azure.com",
   COSMOS_DATABASE: "db",
   COSMOS_CONTAINER: "recipes-prod",
-  STORAGE_CONNECTION_STRING:
-    "DefaultEndpointsProtocol=https;AccountName=recipebox;AccountKey=secret;EndpointSuffix=core.windows.net",
+  STORAGE_BLOB_ENDPOINT: "https://recipebox.blob.core.windows.net",
   STORAGE_PHOTO_CONTAINER: "photos-prod",
+  AZURE_CLIENT_ID: "00000000-0000-0000-0000-000000000001",
   CLIENT_ORIGIN: "https://recipes.example.net",
 };
 

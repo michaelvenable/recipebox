@@ -14,7 +14,7 @@ import {
 export function emulatorCosmosConfig(): CosmosConfig {
   const config: CosmosConfig = {
     endpoint: COSMOS_EMULATOR_ENDPOINT,
-    key: COSMOS_EMULATOR_KEY,
+    access: { kind: "key", key: COSMOS_EMULATOR_KEY },
     database: "recipebox",
     container: "recipes",
   };
@@ -27,9 +27,9 @@ export function emulatorCosmosConfig(): CosmosConfig {
  * as emulatorCosmosConfig.
  */
 export function emulatorStorageConfig(): StorageConfig {
-  const config: StorageConfig = { connectionString: AZURITE_CONNECTION_STRING, photoContainer: "photos" };
-  assertLocalConnectionString(config.connectionString);
-  return config;
+  const connectionString = AZURITE_CONNECTION_STRING;
+  assertLocalConnectionString(connectionString);
+  return { access: { kind: "connectionString", connectionString }, photoContainer: "photos" };
 }
 
 const LOCAL_HOSTS: readonly string[] = ["localhost", "127.0.0.1"];

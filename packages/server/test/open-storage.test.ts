@@ -10,7 +10,12 @@ import { openStorage, type StorageOpeners } from "../src/open-storage.js";
 const cosmos = {} as CosmosClient;
 const photos = { containerName: "photos" } as ContainerClient;
 const recipeContainer = { id: "recipes" } as Container;
-const cosmosNames = { endpoint: "https://example", key: "k", database: "db", container: "recipes" };
+const cosmosNames = {
+  endpoint: "https://example",
+  access: { kind: "key" as const, key: "k" },
+  database: "db",
+  container: "recipes",
+};
 
 function recordingOpeners(): { calls: string[]; openers: StorageOpeners } {
   const calls: string[] = [];

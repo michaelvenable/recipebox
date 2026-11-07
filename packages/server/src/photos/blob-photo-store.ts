@@ -1,5 +1,7 @@
 import { BlobServiceClient, type ContainerClient, RestError } from "@azure/storage-blob";
+import type { TokenCredential } from "@azure/identity";
 import { Instant } from "@recipebox/domain";
+import { managedIdentityCredential } from "../azure-credential.js";
 import type { StorageConfig } from "../config.js";
 import type { PhotoStore, StoredImage, StoredImageInfo } from "./photo-store.js";
 
@@ -45,8 +47,26 @@ export class BlobPhotoStore implements PhotoStore {
   }
 }
 
-export function createPhotoContainerClient(config: StorageConfig): ContainerClient {
-  return BlobServiceClient.fromConnectionString(config.connectionString).getContainerClient(config.photoContainer);
+/**
+ * The photo container's client: Azurite's connection string locally, only the managed identity at the account's Blob endpoint
+ * when deployed (docs/architecture.md, "Access to Cosmos DB and Blob Storage"). Nothing is contacted until the first request.
+ * `credentialFor` is replaceable in tests.
+ */
+export function createPhotoContainerClient(
+  config: StorageConfig,
+  credentialFor: (clientId: string) => TokenCredential = managedIdentityCredential,
+): ContainerClient {
+  const { access } = config;
+  let service: BlobServiceClient;
+  switch (access.kind) {
+    case "connectionString":
+      service = BlobServiceClient.fromConnectionString(access.connectionString);
+      break;
+    case "managedIdentity":
+      service = new BlobServiceClient(access.blobEndpoint, credentialFor(access.clientId));
+      break;
+  }
+  return service.getContainerClient(config.photoContainer);
 }
 
 /**

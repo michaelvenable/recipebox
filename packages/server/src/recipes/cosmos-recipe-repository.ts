@@ -1,5 +1,7 @@
-import { CosmosClient, ErrorResponse, type Container } from "@azure/cosmos";
+import { CosmosClient, ErrorResponse, type Container, type CosmosClientOptions } from "@azure/cosmos";
+import type { TokenCredential } from "@azure/identity";
 import { Recipe, type RecipeId, type RecipeSnapshot } from "@recipebox/domain";
+import { managedIdentityCredential } from "../azure-credential.js";
 import type { CosmosConfig } from "../config.js";
 import type { RecipeRepository, RecipeVersion, VersionedRecipe } from "./recipe-repository.js";
 
@@ -65,8 +67,25 @@ export class CosmosRecipeRepository implements RecipeRepository {
   }
 }
 
+/**
+ * The client's options: the emulator's key locally, only the managed identity when deployed (docs/architecture.md, "Access to
+ * Cosmos DB and Blob Storage"). `credentialFor` is replaceable in tests.
+ */
+export function cosmosClientOptions(
+  config: CosmosConfig,
+  credentialFor: (clientId: string) => TokenCredential = managedIdentityCredential,
+): CosmosClientOptions {
+  const { access } = config;
+  switch (access.kind) {
+    case "key":
+      return { endpoint: config.endpoint, key: access.key };
+    case "managedIdentity":
+      return { endpoint: config.endpoint, aadCredentials: credentialFor(access.clientId) };
+  }
+}
+
 export function createCosmosClient(config: CosmosConfig): CosmosClient {
-  return new CosmosClient({ endpoint: config.endpoint, key: config.key });
+  return new CosmosClient(cosmosClientOptions(config));
 }
 
 /**
