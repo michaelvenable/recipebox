@@ -29,7 +29,8 @@ been cooked in a while.
   photos, search by name (REC-9) and filter by tag with counts (REC-13). The "to make" list and cooking history are visible only
   to signed-in editors. That includes the "to make" indicator (PLAN-7), last-cooked date and count (COOK-5) and the "haven't made
   in a while" view (COOK-6). The trash (REC-14) is private too, including the photos of recipes in it. The server never sends this
-  data to a visitor; hiding it in the app is not enough on its own.
+  data to a visitor; hiding it in the app is not enough on its own. The one exception is a shopping list an editor sends
+  (PLAN-9): anyone with its link can see that list, and nothing else, for 7 days.
 - **X-2.** All editors see and edit the same single collection. There is no per-user data.
 - **X-3.** Every screen is usable on a phone (≥ 360 px wide) and a tablet, without horizontal scrolling. Desktop browsers are also
   supported.
@@ -38,8 +39,8 @@ been cooked in a while.
   the last save wins.
 - **X-6. Changes require sign-in.** Every change requires a signed-in editor: creating, editing, deleting or restoring a recipe;
   attaching or removing tags; adding, replacing or removing a photo; adding to or removing from the "to make" list; marking a
-  recipe cooked; deleting a history entry. The server refuses any change that isn't from a signed-in editor, and nothing is
-  changed. Hiding buttons in the app is not enough on its own.
+  recipe cooked; deleting a history entry; sending a shopping list (PLAN-9). The server refuses any change that isn't from a
+  signed-in editor, and nothing is changed. Hiding buttons in the app is not enough on its own.
 - **X-7. Editors are listed in configuration.** Editors sign in with a Microsoft account. (Google sign-in is planned but not
   offered for now.) An identity is an editor only if it is on the editor list in the app's configuration. The list can hold any
   number of identities, including one or none. Anyone else who signs in is treated as a visitor: they can view but not change.
@@ -53,7 +54,8 @@ been cooked in a while.
   their permanent account ID with a button to copy it, and whether they are an editor. This is how a new editor finds the ID to
   add to the editor list (X-7). The page also lets them sign out. Someone who isn't signed in sees a "Sign in" option instead.
 - **X-12. Time.** Every time the app stores comes from the server's clock: when a recipe was cooked (COOK-1), added to the "to
-  make" list (PLAN-3) and deleted (REC-6), and the 30-day trash deadline (REC-16). The app never sends a time to be stored or
+  make" list (PLAN-3) and deleted (REC-6), the 30-day trash deadline (REC-16), and when a shopping list link was made and stops
+  working (PLAN-9). The app never sends a time to be stored or
   checked. Stored times are shown in the device's time zone. Relative labels such as "3 months ago" (COOK-6) and "10 days left"
   (REC-14) are calculated on the device, as is whether a recipe was cooked today (COOK-8). Short screen timers such as the Undo
   message (REC-6) also run on the device.
@@ -68,7 +70,8 @@ been cooked in a while.
 
 - Importing a recipe from a photo (planned; will get its own spec).
 - Serving-size scaling, nutrition data. (The shopping list from the "to make" list is in scope: PLAN-8.)
-- Sharing features such as share links or per-recipe privacy. Every recipe is viewable by anyone with the address (X-1).
+- Sharing features such as share links for recipes or per-recipe privacy. Every recipe is viewable by anyone with the address
+  (X-1). The only link that is sent is the shopping list's (PLAN-9).
 - Managing editors in the app. The editor list is set in configuration (X-7).
 - Detecting conflicting simultaneous edits (X-5, withdrawn).
 - Offline use. The app requires a network connection.

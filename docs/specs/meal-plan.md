@@ -3,7 +3,8 @@
 ## Goal
 
 Keep a simple list of recipes the household intends to make soon. There are no dates, days or meal slots. The list is private:
-only signed-in editors can see or change it (X-1, X-6). In the app, the "to make" list is called "Plan".
+only signed-in editors can see or change it (X-1, X-6), except for a shopping list an editor sends (PLAN-9). In the app, the
+"to make" list is called "Plan".
 
 ## Requirements
 
@@ -28,6 +29,19 @@ only signed-in editors can see or change it (X-1, X-6). In the app, the "to make
 
   Example: "Shakshuka" has `["6 eggs", "1 can tomatoes"]` and "Chili" has `["1 can tomatoes", "500 g beef mince"]`. The shopping
   list shows "1 can tomatoes" (Chili), "1 can tomatoes" (Shakshuka), "500 g beef mince" (Chili), "6 eggs" (Shakshuka).
+- **PLAN-9. Send the shopping list.** From the shopping list, an editor can tap "Send". The app makes a link with a random code
+  that can't be guessed and offers it through the device's share function, such as to send it in a text message. Where the
+  device has no share function, the link is copied. Either way the app shows the link and the date it stops working.
+  - Anyone who opens the link, signed in or not, sees the shopping list as it was when it was sent: the same items in the same
+    order, each with its recipe's name, and the date the link stops working. Later changes to the "to make" list or the recipes
+    don't change it. They can tick items as in PLAN-8; ticks are never saved.
+  - The shared list shows nothing else that is private (X-1), such as when recipes were added to the "to make" list.
+  - A link works for 7 days after it was made, measured by the server's clock (X-12). After that, opening it shows "This link
+    has expired", the same page as for a link that never existed. The list is permanently removed within one day after that.
+  - Each Send makes a new link. Earlier links keep working until their 7 days are up.
+
+  Example: a link made 2026-11-07 at 09:00 works until 2026-11-14 at 09:00. Opened at 09:01 that day, it shows "This link has
+  expired".
 
 ## Examples
 
@@ -42,4 +56,4 @@ only signed-in editors can see or change it (X-1, X-6). In the app, the "to make
 - Scheduling recipes on dates, days of the week, or meal slots.
 - Manually reordering the list.
 - Combining ingredients on the shopping list (PLAN-8), such as adding "2 eggs" and "3 eggs" together.
-- Sending or sharing the shopping list.
+- Stopping a shopping list link before its 7 days are up (PLAN-9), changing the 7 days, or listing the links that were sent.
