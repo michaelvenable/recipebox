@@ -49,11 +49,12 @@ Screens: `docs/mockups/Import*.dc.html`, from the "Importing a recipe from a pho
   close together, each gets its own message, one after another, so none is missed. A recipe whose name
   matches one already in the collection is added anyway, like a typed recipe.
 - **IMP-11. Failure.** An import fails when the photo shows no recipe that can be read, when what was read breaks the rules in
-  IMP-7, when the reading service fails, or when it hasn't finished within 10 minutes of the upload, measured by the server's
-  clock (X-12). Then nothing is added and the card goes away. The app shows no message about the failure (owner decision,
-  2026-11-07). The server logs one error line with the import's ID and the reason: `no-recipe-found`, `invalid-recipe`,
-  `service-error` or `timed-out`, plus the reading service's own error message for `service-error`. The line has no photo, no
-  recipe text and nothing about who started the import. Other imports in progress carry on.
+  IMP-7, when the reading service fails, when it hasn't finished within 10 minutes of the upload, measured by the server's
+  clock (X-12), or when the app's own storage fails partway. Then nothing is added and the card goes away. The app shows no
+  message about the failure (owner decision, 2026-11-07). The server logs one error line with the import's ID and the reason:
+  `no-recipe-found`, `invalid-recipe`, `service-error`, `timed-out` or `internal-error`, plus the reading service's own error
+  message for `service-error`. The line has no photo, no recipe text and nothing about who started the import. Other imports in
+  progress carry on.
 - **IMP-12. The uploaded photo isn't kept.** The photo of the page is used only to read the recipe. It is never shown in the app,
   and it is deleted when the import ends, whether it succeeds or fails. A photo left behind by an import that was interrupted is
   deleted within one day. The recipe's photo (IMP-9) is a separate image cut from it.
