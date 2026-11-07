@@ -1,4 +1,4 @@
-# Architecture
+| 4    | Google Cloud Console (later)   || 3    | Google Cloud Console (later)   |# Architecture
 
 How RecipeBox is built and deployed, and why. Behavior is defined in `docs/specs/`; the business rules are designed in
 `docs/domain-model.md`. This document covers everything around them.
@@ -99,6 +99,9 @@ sign-in pages, manages the session cookie, and passes the signed-in identity to 
 Outside requests cannot set those headers, but only while the auth layer is switched on: with it off, any request could claim to
 be an editor. So the API trusts these headers only when it runs on Container Apps and the setting `TRUST_AUTH_HEADERS=true` is
 present; the infrastructure script sets it in the same step that turns the auth layer on. Without it, everyone is a visitor.
+
+For now only Microsoft is offered (X-7). Google stays in the design: the server still recognizes `google:` identities, and adding
+it later takes the provider setup steps 3–4, its secret in the Key Vault and the `GOOGLE_CLIENT_ID` variable, with no code change.
 
 - Configuration: "Allow unauthenticated access", so visitors can read public recipes; the API decides what needs an editor.
 - Sign-in links point at `https://api.recipes.mikevenable.net/.auth/login/{aad|google}`, with `post_login_redirect_uri` returning
