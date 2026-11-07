@@ -1,0 +1,47 @@
+# The server image's build context (Dockerfile). Only package manifests, the lockfile, tsconfig files and the sources of
+# domain, shared and server are needed.
+
+# Dependencies and build output: installed and built inside the image.
+**/node_modules
+**/dist
+**/dist-types
+**/*.tsbuildinfo
+
+# Repository, agent and documentation files.
+.git
+.gitignore
+.gitattributes
+.claude
+docs
+*.md
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# The client goes to Static Web Apps, not into this image. Its package.json stays: the lockfile names the workspace.
+packages/client/*
+!packages/client/package.json
+
+# Tests and test configuration.
+**/test
+**/*.test.ts
+**/*.test.tsx
+vitest*.config.ts
+coverage
+
+# Anything that might hold a secret or local state.
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.pfx
+**/*.p12
+**/*.crt
+# Not a broader "*credential*" pattern: packages/server/src/azure-credential.ts is source code, not a secret.
+**/*secret*
+**/*credentials*.json
+**/.npmrc
+**/*.log
+**/.DS_Store
+**/.vscode
+**/.idea

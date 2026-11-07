@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "cross-env APP_ENV=development tsx watch src/main.ts",
+    "build": "tsc -b && node build.mjs",
+    "start": "node --enable-source-maps dist/app/main.js",
     "cleanup": "tsx src/jobs/cleanup.ts",
-    "cleanup:dev": "cross-env APP_ENV=development tsx src/jobs/cleanup.ts"
+    "cleanup:dev": "cross-env APP_ENV=development tsx src/jobs/cleanup.ts",
+    "cleanup:start": "node --enable-source-maps dist/app/cleanup.js"
   },
   "dependencies": {
     "@azure/cosmos": "^4.10.1",
@@ -22,6 +25,7 @@
   },
   "devDependencies": {
     "cross-env": "^10.1.0",
+    "esbuild": "^0.28.2",
     "exif-reader": "^2.0.3",
     "tsx": "^4.23.15"
   }
