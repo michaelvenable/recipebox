@@ -66,8 +66,17 @@ been cooked in a while.
     "Crème brûlée".
 - **X-14. Dark theme.** The app uses a light or dark theme to match the device's setting, and switches when the setting changes.
   There is no theme switch in the app.
+- **X-15. Privacy page.** Anyone, signed in or not, can open a Privacy page at `/privacy`. In plain words, it says what the app
+  stores and who can see it:
+  - recipes and their photos, which are public (X-1);
+  - the "to make" list, cooking history and trash, which only editors can see, apart from shopping list links (PLAN-9);
+  - sign-in through Microsoft or Google, and that the app keeps only the provider and permanent account ID from it, not a name
+    or email address (X-7);
+  - the cookies used, which are only for staying signed in (X-9);
+  - that server logs record requests, including the network address they came from, and are kept only for running the app.
 
-## Out of scope (for now)
+  It also says that nothing is sold or shared with anyone else, and that questions go to the household member who shared the
+  app. It shows no personal contact details. The Account page links to it (X-11), and it is not indexed (X-10).
 
 - Importing a recipe from a photo (planned; will get its own spec).
 - Serving-size scaling, nutrition data. (The shopping list from the "to make" list is in scope: PLAN-8.)
