@@ -1,4 +1,4 @@
-| 4    | Google Cloud Console (later)   || 3    | Google Cloud Console (later)   |# Architecture
+# Architecture
 
 How RecipeBox is built and deployed, and why. Behavior is defined in `docs/specs/`; the business rules are designed in
 `docs/domain-model.md`. This document covers everything around them.
@@ -133,8 +133,8 @@ Provider setup (done once, by hand):
 | ---- | ------------------------------ | ------------------------------------------------------------------------------------- |
 | 1    | Microsoft Entra (Azure portal) | App registration allowing personal Microsoft accounts; ID tokens on; client secret.   |
 | 2    | Microsoft Entra                | Add the Microsoft redirect URI (below).                                               |
-| 3    | Google Cloud Console           | OAuth consent screen (External, testing mode); add each Google editor as a test user. |
-| 4    | Google Cloud Console           | Web OAuth client with the Google redirect URI (below).                                |
+| 3    | Google Cloud Console (later)   | OAuth consent screen (External, testing mode); add each Google editor as a test user. |
+| 4    | Google Cloud Console (later)   | Web OAuth client with the Google redirect URI (below).                                |
 | 5    | Container app, Authentication  | Add both providers (client IDs and secrets); allow unauthenticated access.            |
 | 6    | Container app, Authentication  | Allow `https://recipes.mikevenable.net` as a post-sign-in redirect target.            |
 
