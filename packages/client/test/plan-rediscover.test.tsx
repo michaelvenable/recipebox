@@ -200,7 +200,7 @@ describe("PLAN-3 the Plan", () => {
     setClock(OCT_30_NOON);
     await openPlan();
     await screen.findByRole("list", { name: "Plan" });
-    expect(screen.getByText("4 recipes · oldest first")).toBeInTheDocument();
+    expect(screen.getByText("4 recipes")).toBeInTheDocument();
     // Not alphabetical: the order is the server's.
     expect(planLines()).toEqual([
       "Lemon RisottoAdded Oct 12",
@@ -253,7 +253,7 @@ describe("PLAN-3 the Plan", () => {
 
   it("counts one recipe in the singular", async () => {
     await openPlan({ recipes: [FISH, STEW] });
-    expect(await screen.findByText("1 recipe · oldest first")).toBeInTheDocument();
+    expect(await screen.findByText("1 recipe")).toBeInTheDocument();
   });
 
   it("says the list is empty, without a how-to, with a way to the recipes (mockup ToMakeEmpty)", async () => {
@@ -304,7 +304,7 @@ describe("PLAN-4 remove from the list", () => {
       { method: "POST", path: `/recipes/${SHAKSHUKA_ID}/remove-from-plan`, body: "{}", contentType: "application/json" },
     ]);
     expect(planLines().map((line) => line.replace(/Added.*/, ""))).toEqual(["Lemon Risotto", "Chicken Tikka Masala", "Fish Tacos"]);
-    expect(screen.getByText("3 recipes · oldest first")).toBeInTheDocument();
+    expect(screen.getByText("3 recipes")).toBeInTheDocument();
     release();
     await waitFor(() => expect(gets(fetchMock, "/plan")).toBe(2));
     expect(screen.queryByText("Shakshuka")).not.toBeInTheDocument();
@@ -319,7 +319,7 @@ describe("PLAN-4 remove from the list", () => {
     // The list was asked for again and hasn't answered: what shows is the cache, with the saved recipe in it.
     await waitFor(() => expect(gets(fetchMock, "/plan")).toBe(2));
     expect(screen.queryByText("Shakshuka")).not.toBeInTheDocument();
-    expect(screen.getByText("3 recipes · oldest first")).toBeInTheDocument();
+    expect(screen.getByText("3 recipes")).toBeInTheDocument();
     // The recipe itself, as the server returned it, for the recipe view.
     expect(queryClient.getQueryData<EditorRecipe>(recipeKeys.detail(SHAKSHUKA_ID))?.toMake).toBeUndefined();
   });
@@ -379,7 +379,7 @@ describe("PLAN-4 remove from the list", () => {
       "Couldn't remove Shakshuka from the list. The server couldn't make the change. Try again.",
     );
     expect(removeButton("Shakshuka")).toBeEnabled();
-    expect(screen.getByText("4 recipes · oldest first")).toBeInTheDocument();
+    expect(screen.getByText("4 recipes")).toBeInTheDocument();
     // Focus had moved to the next entry, and stays there.
     expect(removeButton("Fish Tacos")).toHaveFocus();
   });
@@ -525,7 +525,7 @@ describe("PLAN-1, PLAN-5, PLAN-6 coming back to the list after a change on the r
     await screen.findByText("On your plan ✓");
     await act(() => router.navigate("/plan"));
     expect(planLines().at(-1)).toBe("Pad ThaiAdded today");
-    expect(screen.getByText("5 recipes · oldest first")).toBeInTheDocument();
+    expect(screen.getByText("5 recipes")).toBeInTheDocument();
   });
 
   it("leaves out a recipe just deleted, at once (PLAN-6)", async () => {

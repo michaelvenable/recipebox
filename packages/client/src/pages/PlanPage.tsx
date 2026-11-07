@@ -79,7 +79,7 @@ export function PlanPage() {
     <div className="plan-page">
       <header className="list-page-header">
         <h1>Plan</h1>
-        {visible !== undefined && visible.length > 0 && <p className="muted">{countLabel(visible.length)} · oldest first</p>}
+        {visible !== undefined && visible.length > 0 && <p className="muted">{countLabel(visible.length)}</p>}
       </header>
       {problem !== undefined && (
         <p ref={problemMessage} className="form-error" role="alert" tabIndex={-1}>
