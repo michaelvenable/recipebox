@@ -19,6 +19,15 @@ only signed-in editors can see or change it (X-1, X-6). In the app, the "to make
   trash (REC-15) does not put it back; an editor can add it again (PLAN-1).
 - **PLAN-7. Indicator.** Wherever a recipe is shown (list, search results, recipe view), it is visibly marked if it is on the "to
   make" list.
+- **PLAN-8. Shopping list.** From the list, an editor can open a shopping list: every ingredient of every recipe on the "to
+  make" list, in one list sorted alphabetically (X-13), each showing the name of its recipe. Ingredients are free text, so they
+  are shown as entered and never combined: the same ingredient in two recipes appears twice, ordered by recipe name. Prep entries
+  and steps are not included. The editor can tick items off and untick them. Ticks are never saved, on the device or the server;
+  they are cleared when the editor leaves the shopping list. When the "to make" list is empty, there is no shopping list to
+  open. The shopping list is private, like the "to make" list (X-1).
+
+  Example: "Shakshuka" has `["6 eggs", "1 can tomatoes"]` and "Chili" has `["1 can tomatoes", "500 g beef mince"]`. The shopping
+  list shows "1 can tomatoes" (Chili), "1 can tomatoes" (Shakshuka), "500 g beef mince" (Chili), "6 eggs" (Shakshuka).
 
 ## Examples
 
@@ -32,4 +41,5 @@ only signed-in editors can see or change it (X-1, X-6). In the app, the "to make
 
 - Scheduling recipes on dates, days of the week, or meal slots.
 - Manually reordering the list.
-- Shopping lists generated from the plan.
+- Combining ingredients on the shopping list (PLAN-8), such as adding "2 eggs" and "3 eggs" together.
+- Sending or sharing the shopping list.

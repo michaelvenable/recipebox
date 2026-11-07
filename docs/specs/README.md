@@ -9,7 +9,7 @@ been cooked in a while.
 | File                                     | Prefix | Covers                                                              |
 | ---------------------------------------- | ------ | ------------------------------------------------------------------- |
 | [recipes.md](recipes.md)                 | REC    | Create, view, edit, photo, search, tags, trash                      |
-| [meal-plan.md](meal-plan.md)             | PLAN   | The "to make" list                                                  |
+| [meal-plan.md](meal-plan.md)             | PLAN   | The "to make" list and its shopping list                            |
 | [cooking-history.md](cooking-history.md) | COOK   | "I cooked this today", last-cooked dates, "haven't made in a while" |
 
 ## How to read and write these specs
@@ -67,7 +67,7 @@ been cooked in a while.
 ## Out of scope (for now)
 
 - Importing a recipe from a photo (planned; will get its own spec).
-- Shopping lists, serving-size scaling, nutrition data.
+- Serving-size scaling, nutrition data. (The shopping list from the "to make" list is in scope: PLAN-8.)
 - Sharing features such as share links or per-recipe privacy. Every recipe is viewable by anyone with the address (X-1).
 - Managing editors in the app. The editor list is set in configuration (X-7).
 - Detecting conflicting simultaneous edits (X-5, withdrawn).
