@@ -20,7 +20,7 @@ What `main.bicep` creates, all in `southcentralus` except the Static Web App (`c
 | User-assigned identity         | `id-recipebox`               | The API and the cleanup job; data roles only.               |
 | Cosmos DB (free tier)          | `cosmos-recipebox-<suffix>`  | Database `recipebox` (1000 RU/s), container `recipes`.      |
 | Storage account                | `strecipebox<suffix>`        | Private container `photos`; blob soft delete 7 days.        |
-| Key Vault                      | `kv-recipebox-<suffix>`      | The two sign-in provider client secrets, added by hand.     |
+| Key Vault                      | `kv-recipebox-<suffix>`      | Sign-in provider client secrets, added by hand.             |
 | Log Analytics                  | `log-recipebox`              | 30 days; 0.15 GB a day cap.                                 |
 | Container Apps environment     | `cae-recipebox`              | Consumption only.                                           |
 | Container app                  | `ca-recipebox-api`           | The API; 1 CPU, 2 GiB; 0 to 1 replica.                      |
@@ -29,10 +29,13 @@ What `main.bicep` creates, all in `southcentralus` except the Static Web App (`c
 
 `<suffix>` is derived from the resource group and stays the same on every deployment.
 
+The commands in this README are written for PowerShell, where a backtick continues a line; in bash, use a backslash. In Git
+Bash on Windows, also put `MSYS_NO_PATHCONV=1` before any command with a `--scope /subscriptions/...` argument (as in step 6),
+or Git Bash turns the scope into a Windows file path.
+
 ## 1. Bootstrap (once)
 
-Needs an account that is Owner (or User Access Administrator and Contributor) on the subscription, and the Azure CLI. The
-commands are written for PowerShell, where a backtick continues a line; in bash, use a backslash.
+Needs an account that is Owner (or User Access Administrator and Contributor) on the subscription, and the Azure CLI.
 
 The `az provider register` line registers the resource providers the templates use. They are already registered on "Recipe
 Box"; on a new subscription this is needed once, with your own sign-in, because the deploy identity can't register providers.
@@ -79,7 +82,7 @@ All the variables the workflow reads:
 | `ENABLE_AUTH`             | From step 6           | `true`.                                                         |
 | `MICROSOFT_CLIENT_ID`     | With `ENABLE_AUTH`    | Entra app registration's Application (client) ID.               |
 | `MICROSOFT_OPENID_ISSUER` | Optional              | Overrides the default consumers-tenant issuer (step 6).         |
-| `GOOGLE_CLIENT_ID`        | With `ENABLE_AUTH`    | Google OAuth web client ID.                                     |
+| `GOOGLE_CLIENT_ID`        | Optional, later       | Google OAuth web client ID; adds Google sign-in (step 6).       |
 | `EDITORS`                 | From step 7           | `provider:accountId` entries, comma-separated (X-7).            |
 
 ## 3. First deployment
@@ -135,11 +138,11 @@ Check `https://recipes.mikevenable.net` loads and `https://api.recipes.mikevenab
 
 ## 6. Sign-in
 
-Until this step everyone is a visitor. Do it in this order; a deployment with `ENABLE_AUTH=true` fails if the secrets are missing.
+Until this step everyone is a visitor. For now only Microsoft sign-in is offered (X-7); Google is optional and can be added
+later (below). Do it in this order; a deployment with `ENABLE_AUTH=true` fails if the secret is missing.
 
-1. Provider registrations, as in `docs/architecture.md` ("Sign-in", "Provider setup", steps 1 to 4), with the redirect URIs
-   `https://api.recipes.mikevenable.net/.auth/login/aad/callback` and
-   `https://api.recipes.mikevenable.net/.auth/login/google/callback`.
+1. The Microsoft registration, as in `docs/architecture.md` ("Sign-in", "Provider setup", steps 1 and 2), with the redirect URI
+   `https://api.recipes.mikevenable.net/.auth/login/aad/callback`.
 2. Allow yourself to write the Key Vault's secrets (the vault uses Azure RBAC, so being Owner isn't enough). Find the vault's
    name in the run's summary or with `az keyvault list --resource-group rg-recipebox-prod --query "[].name" -o tsv`, then:
 
@@ -150,37 +153,49 @@ Until this step everyone is a visitor. Do it in this order; a deployment with `E
      --assignee-object-id <your object id> --assignee-principal-type User
    ```
 
-3. Add the two client secrets to the vault, with exactly these names. The portal (Key vault, Secrets, Generate/Import) keeps the
-   values out of your shell history.
-   - `microsoft-provider-authentication-secret`: the Entra client secret.
-   - `google-provider-authentication-secret`: the Google client secret.
+3. Add the Entra client secret to the vault as `microsoft-provider-authentication-secret`, exactly that name. The portal (Key
+   vault, Secrets, Generate/Import) keeps the value out of your shell history.
 4. Set the variables and deploy. The Microsoft issuer defaults to the consumers tenant (open item 1 in
    `docs/architecture.md`); set `MICROSOFT_OPENID_ISSUER` only to override it.
 
    ```
    gh variable set MICROSOFT_CLIENT_ID --repo michaelvenable/recipebox --body <application (client) ID>
-   gh variable set GOOGLE_CLIENT_ID --repo michaelvenable/recipebox --body <client ID>
    gh variable set ENABLE_AUTH --repo michaelvenable/recipebox --body true
    gh workflow run deploy.yml --repo michaelvenable/recipebox
    ```
 
-The deployment turns on the auth layer (both providers, unauthenticated access allowed, `https://recipes.mikevenable.net` as an
+The deployment turns on the auth layer (Microsoft, unauthenticated access allowed, `https://recipes.mikevenable.net` as an
 allowed redirect target) before it sets `TRUST_AUTH_HEADERS=true` on the API, so identity headers are never trusted without it.
 Session length is left at the defaults (open item 2).
 
+Adding Google later needs no code change. Do the Google registration (`docs/architecture.md`, "Provider setup", steps 3 and 4,
+redirect URI `https://api.recipes.mikevenable.net/.auth/login/google/callback`), add the Google client secret to the vault as
+`google-provider-authentication-secret`, then set the variable and deploy:
+
+```
+gh variable set GOOGLE_CLIENT_ID --repo michaelvenable/recipebox --body <client ID>
+gh workflow run deploy.yml --repo michaelvenable/recipebox
+```
+
+With `GOOGLE_CLIENT_ID` set, the deployment adds Google to the auth layer and the Google secret reference to the API, and builds
+the client with a "Sign in with Google" button. Without it, the vault needs no Google secret. Add the secret before setting the
+variable: the deployment fails if it is missing. The first deployment with Google adds the secret reference to the API before
+the auth layer names it, as when sign-in was first turned on; editors may be visitors for a moment while it runs.
+
 Renewing a client secret (the Entra one expires): add a new version of the same secret in the vault. The app picks it up within
-30 minutes.
+30 minutes. The current Entra secret was created 2026-11-07 for 24 months, so it expires about 2028-11; renew it before then.
 
 ## 7. Editors
 
 Sign in on the app and open the Account page (X-11); it shows your provider and account ID. Then:
 
 ```
-gh variable set EDITORS --repo michaelvenable/recipebox --body "aad:<id>,google:<id>"
+gh variable set EDITORS --repo michaelvenable/recipebox --body "aad:<id>"
 gh workflow run deploy.yml --repo michaelvenable/recipebox
 ```
 
-`EDITORS` is configuration (X-7): editors are identified by provider and account ID, never by email.
+`EDITORS` is configuration (X-7): editors are identified by provider and account ID, never by email. List several separated by
+commas, e.g. `aad:<id>,aad:<id>`; once Google is added, `google:<id>` entries work too.
 
 ## Deploying by hand
 

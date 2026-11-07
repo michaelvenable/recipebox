@@ -17,9 +17,9 @@ describe("X-1, X-6 editor-only pages", () => {
     const fetchMock = mockApiAs(VISITOR);
     renderAt(path);
     expect(await screen.findByRole("heading", { level: 1, name: "Sign in to see this" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Sign in with Google" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
       "href",
-      `${API}/.auth/login/google?post_login_redirect_uri=${encodeURIComponent(`${APP}${path}`)}`,
+      `${API}/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(`${APP}${path}`)}`,
     );
     expect(requestedUrls(fetchMock)).toEqual([`${API}/me`]);
   });

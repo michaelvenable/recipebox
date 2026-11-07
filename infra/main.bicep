@@ -6,7 +6,8 @@
 // - bindCustomDomains: binds recipes.mikevenable.net and api.recipes.mikevenable.net with free managed certificates. It needs
 //   the DNS records from the dnsRecords output in place first (Route 53, by hand). Once on, keep it on.
 // - enableAuth: Container Apps' built-in sign-in (docs/architecture.md, "Sign-in"), together with TRUST_AUTH_HEADERS=true. It
-//   needs the provider registrations and their two client secrets in the Key Vault first.
+//   needs the Microsoft registration and its client secret in the Key Vault first. Google is optional (X-7: Microsoft only for
+//   now): it is added only when googleClientId is set, and then needs its registration and secret too.
 
 import { photoRoleDefinitionName } from 'shared.bicep'
 
@@ -38,7 +39,7 @@ param apiCertificateIssued bool = false
 @description('Editors (X-7): comma-separated provider:accountId, e.g. "google:1098,aad:9f3c". Empty: nobody can edit.')
 param editors string = ''
 
-@description('Turn on Container Apps built-in authentication (Microsoft and Google) and TRUST_AUTH_HEADERS together.')
+@description('Turn on Container Apps built-in authentication (Microsoft; Google if set) and TRUST_AUTH_HEADERS together.')
 param enableAuth bool = false
 
 // Read from Azure by the workflow before each deployment; see "Sign-in" below.
@@ -53,7 +54,7 @@ param microsoftClientId string = ''
 @description('OpenID issuer URL for the Microsoft provider.')
 param microsoftOpenIdIssuer string = '${environment().authentication.loginEndpoint}9188040d-6c67-4c5b-b112-36a304b66dad/v2.0'
 
-@description('Client ID of the Google OAuth web client. Required when enableAuth is true.')
+@description('Client ID of the Google OAuth web client. Empty: no Google sign-in, and no Google secret needed in the vault.')
 param googleClientId string = ''
 
 @description('When the trash cleanup job runs, as a cron expression in UTC (docs/architecture.md, "Trash cleanup": once a day).')
@@ -240,8 +241,8 @@ resource photoContainerData 'Microsoft.Authorization/roleAssignments@2022-04-01'
 // Sign-in provider secrets
 // ---------------------------------------------------------------------------------------------------------------------------
 
-// Holds the Microsoft and Google client secrets, which the owner adds by hand (infra/README.md). The container app reads them
-// through Key Vault references with the app identity, so no secret value passes through this template or GitHub.
+// Holds the Microsoft client secret, and Google's if Google is on, which the owner adds by hand (infra/README.md). The container
+// app reads them through Key Vault references with the app identity, so no secret value passes through this template or GitHub.
 resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' = {
   name: keyVaultName
   location: location
@@ -276,18 +277,21 @@ resource keyVaultSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01
 var microsoftSecretName = 'microsoft-provider-authentication-secret'
 var googleSecretName = 'google-provider-authentication-secret'
 
-var authSecrets = [
-  {
-    name: microsoftSecretName
-    keyVaultUrl: '${keyVault.properties.vaultUri}secrets/${microsoftSecretName}'
-    identity: identity.id
-  }
-  {
-    name: googleSecretName
-    keyVaultUrl: '${keyVault.properties.vaultUri}secrets/${googleSecretName}'
-    identity: identity.id
-  }
-]
+// X-7: Microsoft only for now. Google stays in the design and is turned on by setting googleClientId, with no code change; until
+// then the app has no reference to a Google secret, so none has to exist in the vault.
+var googleSignIn = !empty(googleClientId)
+
+var microsoftAuthSecret = {
+  name: microsoftSecretName
+  keyVaultUrl: '${keyVault.properties.vaultUri}secrets/${microsoftSecretName}'
+  identity: identity.id
+}
+var googleAuthSecret = {
+  name: googleSecretName
+  keyVaultUrl: '${keyVault.properties.vaultUri}secrets/${googleSecretName}'
+  identity: identity.id
+}
+var authSecrets = googleSignIn ? [microsoftAuthSecret, googleAuthSecret] : [microsoftAuthSecret]
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // Container Apps
@@ -363,7 +367,9 @@ var issueApiCertificate = bindCustomDomains && !apiCertificateIssued
 // be an editor. So apiAppPrepare never sets TRUST_AUTH_HEADERS, whatever authAlreadyEnabled says: it adds the Key Vault
 // secret references, authConfig turns the layer on, and only then apiApp sets TRUST_AUTH_HEADERS. authAlreadyEnabled, read by
 // the workflow, only decides whether apiAppPrepare is needed for sign-in. If it is wrong, editors are at worst visitors for a
-// moment while apiAppPrepare runs; headers are never trusted without the auth layer.
+// moment while apiAppPrepare runs; headers are never trusted without the auth layer. The workflow also passes false when
+// googleClientId is set but the stored configuration has no Google yet (X-7), so the Google secret reference is on the app
+// before authConfig names it.
 var turnOnAuth = enableAuth && !authAlreadyEnabled
 
 var prepareApiApp = issueApiCertificate || turnOnAuth
@@ -419,23 +425,30 @@ resource authConfig 'Microsoft.App/containerApps/authConfigs@2025-01-01' = if (e
     globalValidation: {
       unauthenticatedClientAction: 'AllowAnonymous'
     }
-    identityProviders: {
-      azureActiveDirectory: {
-        enabled: true
-        registration: {
-          clientId: microsoftClientId
-          clientSecretSettingName: microsoftSecretName
-          openIdIssuer: microsoftOpenIdIssuer
+    // Google only when googleClientId is set (X-7).
+    identityProviders: union(
+      {
+        azureActiveDirectory: {
+          enabled: true
+          registration: {
+            clientId: microsoftClientId
+            clientSecretSettingName: microsoftSecretName
+            openIdIssuer: microsoftOpenIdIssuer
+          }
         }
-      }
-      google: {
-        enabled: true
-        registration: {
-          clientId: googleClientId
-          clientSecretSettingName: googleSecretName
-        }
-      }
-    }
+      },
+      googleSignIn
+        ? {
+            google: {
+              enabled: true
+              registration: {
+                clientId: googleClientId
+                clientSecretSettingName: googleSecretName
+              }
+            }
+          }
+        : {}
+    )
     // post_login_redirect_uri sends the editor back to the client page they were on (X-8). Session length is left at the
     // defaults (open item 2 in docs/architecture.md).
     login: {

@@ -9,17 +9,13 @@ function detail(term: string): HTMLElement {
 }
 
 describe("X-11 Account page, signed out", () => {
-  it("offers Microsoft and Google sign-in, returning to the Account page", async () => {
+  it("offers Microsoft sign-in, returning to the Account page", async () => {
     mockApiAs(VISITOR);
     renderAt("/account");
     const returnTo = encodeURIComponent(`${APP}/account`);
     expect(await screen.findByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
       "href",
       `${API}/.auth/login/aad?post_login_redirect_uri=${returnTo}`,
-    );
-    expect(screen.getByRole("link", { name: "Sign in with Google" })).toHaveAttribute(
-      "href",
-      `${API}/.auth/login/google?post_login_redirect_uri=${returnTo}`,
     );
     expect(screen.queryByRole("link", { name: "Sign out" })).not.toBeInTheDocument();
     expect(screen.queryByText("Account ID")).not.toBeInTheDocument();
@@ -28,9 +24,9 @@ describe("X-11 Account page, signed out", () => {
   it("ignores a return address that isn't a page of this app", async () => {
     mockApiAs(VISITOR);
     renderAt("/account", { from: "//evil.example/steal" });
-    expect(await screen.findByRole("link", { name: "Sign in with Google" })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
       "href",
-      `${API}/.auth/login/google?post_login_redirect_uri=${encodeURIComponent(`${APP}/account`)}`,
+      `${API}/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(`${APP}/account`)}`,
     );
   });
 
@@ -40,9 +36,9 @@ describe("X-11 Account page, signed out", () => {
     async (from) => {
       mockApiAs(VISITOR);
       renderAt("/account", { from });
-      expect(await screen.findByRole("link", { name: "Sign in with Google" })).toHaveAttribute(
+      expect(await screen.findByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
         "href",
-        `${API}/.auth/login/google?post_login_redirect_uri=${encodeURIComponent(`${APP}/account`)}`,
+        `${API}/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(`${APP}/account`)}`,
       );
     },
   );

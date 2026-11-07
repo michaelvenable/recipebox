@@ -103,19 +103,15 @@ describe("X-8 Sign in returns to the page the visitor was on", () => {
       "href",
       `${API}/.auth/login/aad?post_login_redirect_uri=${returnTo}`,
     );
-    expect(screen.getByRole("link", { name: "Sign in with Google" })).toHaveAttribute(
-      "href",
-      `${API}/.auth/login/google?post_login_redirect_uri=${returnTo}`,
-    );
   });
 
   it("keeps the query string of the page", async () => {
     mockApiAs(VISITOR);
     renderAt("/?tags=dinner");
     await userEvent.click(within(await mainNav()).getByRole("link", { name: "Sign in" }));
-    expect(await screen.findByRole("link", { name: "Sign in with Google" })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
       "href",
-      `${API}/.auth/login/google?post_login_redirect_uri=${encodeURIComponent(`${APP}/?tags=dinner`)}`,
+      `${API}/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(`${APP}/?tags=dinner`)}`,
     );
   });
 });

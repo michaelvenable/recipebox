@@ -6,8 +6,10 @@
 #   BIND_CUSTOM_DOMAINS     "true" once the DNS records exist (infra/README.md, step 5); keep it on afterwards
 #   EDITORS                 the editor list (X-7), e.g. "google:1098,aad:9f3c"; empty means nobody can edit
 #   ENABLE_AUTH             "true" to turn on built-in sign-in with TRUST_AUTH_HEADERS (infra/README.md, step 6)
-#   MICROSOFT_CLIENT_ID, GOOGLE_CLIENT_ID   required when ENABLE_AUTH is "true"
+#   MICROSOFT_CLIENT_ID     required when ENABLE_AUTH is "true"
 #   MICROSOFT_OPENID_ISSUER optional; overrides the consumers-tenant issuer in infra/main.bicep
+#   GOOGLE_CLIENT_ID        optional; set it to add Google sign-in, which isn't offered for now (X-7). It turns Google on in
+#                           both the auth layer and the client's sign-in buttons.
 #
 # Integration tests (npm run test:int) are not run here: they need the Cosmos DB emulator and Azurite.
 
@@ -66,6 +68,8 @@ jobs:
         run: npm run build -w @recipebox/client
         env:
           VITE_API_URL: ${{ env.API_URL }}
+          # "true" or "false": offer "Sign in with Google" only when the auth layer has Google (X-7, X-8; infra/main.bicep).
+          VITE_GOOGLE_SIGN_IN: ${{ vars.GOOGLE_CLIENT_ID != '' }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: client
@@ -149,10 +153,9 @@ jobs:
           for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
             [ -n "${!name}" ] || missing+=("$name")
           done
-          if [ "$ENABLE_AUTH" = "true" ]; then
-            for name in MICROSOFT_CLIENT_ID GOOGLE_CLIENT_ID; do
-              [ -n "${!name}" ] || missing+=("$name")
-            done
+          # Google is optional (X-7: Microsoft only for now); GOOGLE_CLIENT_ID only adds it.
+          if [ "$ENABLE_AUTH" = "true" ] && [ -z "$MICROSOFT_CLIENT_ID" ]; then
+            missing+=(MICROSOFT_CLIENT_ID)
           fi
           if [ "${#missing[@]}" -gt 0 ]; then
             echo "::error title=Missing repository variables::Set ${missing[*]} (infra/README.md)."
@@ -180,11 +183,17 @@ jobs:
           auth="$(az rest --method get --only-show-errors \
             --url "${base}/containerApps/${API_APP}/authConfigs/current?${version}" \
             --query properties.platform.enabled -o tsv 2>/dev/null || true)"
+          google="$(az rest --method get --only-show-errors \
+            --url "${base}/containerApps/${API_APP}/authConfigs/current?${version}" \
+            --query properties.identityProviders.google.enabled -o tsv 2>/dev/null || true)"
           issued=false
           if [ "$certificate" = "Succeeded" ]; then issued=true; fi
           enabled=false
           if [ "${auth,,}" = "true" ]; then enabled=true; fi
-          echo "API certificate issued: ${issued}; sign-in already on: ${enabled}"
+          # Adding Google to sign-in that is already on (X-7): report sign-in as not yet on, so main.bicep adds the Google
+          # secret reference to the app (apiAppPrepare) before the auth configuration names it.
+          if [ -n "$GOOGLE_CLIENT_ID" ] && [ "${google,,}" != "true" ]; then enabled=false; fi
+          echo "API certificate issued: ${issued}; sign-in already on, with Google if wanted: ${enabled}"
           echo "certificate-issued=${issued}" >> "$GITHUB_OUTPUT"
           echo "auth-enabled=${enabled}" >> "$GITHUB_OUTPUT"
       - name: Deploy the infrastructure and the server image
@@ -262,4 +271,3 @@ jobs:
           api_location: ""
           output_location: ""
           skip_app_build: true
-          skip_api_build: true

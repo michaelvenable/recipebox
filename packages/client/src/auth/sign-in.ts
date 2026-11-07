@@ -6,7 +6,17 @@ import { fetchMe } from "../api/me.js";
 
 export type Provider = NonNullable<Me["provider"]>;
 
+// Google keeps its name even while it isn't offered (X-7): the server still recognizes `google:` identities, and the Account
+// page names the provider of whoever is signed in (X-11).
 export const PROVIDER_NAMES: Record<Provider, string> = { aad: "Microsoft", google: "Google" };
+
+/**
+ * The providers to offer for signing in (X-7, X-8): Microsoft, and Google only in a client built with
+ * VITE_GOOGLE_SIGN_IN=true, which the deploy workflow sets once Google is configured. Read on each call, so tests can change it.
+ */
+export function signInProviders(): readonly Provider[] {
+  return import.meta.env.VITE_GOOGLE_SIGN_IN === "true" ? ["aad", "google"] : ["aad"];
+}
 
 /** Sign in with `provider`, then come back to `returnTo`, an absolute address in this app (X-8). */
 export function signInUrl(provider: Provider, returnTo: string): string {
