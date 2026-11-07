@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EditorRecipe, EditorRecipeSummary, Me, RediscoverEntry, ToMakeEntry } from "@recipebox/shared";
 import { recipeKeys, rediscoverKeys } from "../src/api/query-keys.js";
 import { showSavedRecipe } from "../src/recipes/recipe-changes.js";
+import { recipeDeleted } from "../src/recipes/trash-changes.js";
 import { API, EDITOR, type FetchMock, NON_EDITOR, VISITOR, jsonResponse, mockApi, renderAt } from "./helpers.js";
 
 /** A stored time, written as the server would (UTC), for a local date and time on this device. */
@@ -50,7 +51,7 @@ interface FakeServer {
   recipes?: EditorRecipe[];
   /** GET /plan or /recommendations, to fail or hold an answer back; undefined answers from the stored recipes. */
   plan?: () => Response | Promise<Response> | undefined;
-  recommendations?: () => Response | Promise<Response> | undefined;
+  recommendations?: (url: URL) => Response | Promise<Response> | undefined;
   /** A change, to fail it; undefined makes it as the real server would. */
   change?: (method: string, path: string) => Response | Promise<Response> | undefined;
 }
@@ -65,6 +66,9 @@ function mockServer({ me = EDITOR, recipes: initial = ALL, plan, recommendations
     const method = init.method ?? "GET";
     const path = url.pathname;
     if (method === "GET") {
+      // GET /recipes and /recommendations filter by `tags` (REC-13, COOK-9): recipes with every picked tag.
+      const picked = (url.searchParams.get("tags") ?? "").split(",").filter((t) => t !== "");
+      const tagged = recipes.filter((r) => picked.every((t) => r.tags.includes(t)));
       if (path === "/plan") {
         return (
           plan?.() ??
@@ -78,12 +82,12 @@ function mockServer({ me = EDITOR, recipes: initial = ALL, plan, recommendations
         );
       }
       if (path === "/recommendations") {
-        const never = recipes.filter((r) => r.lastCookedAt === undefined).sort((a, b) => a.name.localeCompare(b.name));
-        const cookedOnes = recipes
+        const never = tagged.filter((r) => r.lastCookedAt === undefined).sort((a, b) => a.name.localeCompare(b.name));
+        const cookedOnes = tagged
           .filter((r) => r.lastCookedAt !== undefined)
           .sort((a, b) => (a.lastCookedAt ?? "").localeCompare(b.lastCookedAt ?? ""));
         return (
-          recommendations?.() ??
+          recommendations?.(url) ??
           jsonResponse(
             200,
             [...never, ...cookedOnes].map(
@@ -95,12 +99,16 @@ function mockServer({ me = EDITOR, recipes: initial = ALL, plan, recommendations
       if (path === "/recipes") {
         return jsonResponse(
           200,
-          [...recipes]
+          [...tagged]
             .sort((a, b) => a.name.localeCompare(b.name))
             .map((r): EditorRecipeSummary => ({ ...summaryOf(r), onToMakeList: r.toMake !== undefined })),
         );
       }
-      if (path === "/tags") return jsonResponse(200, []);
+      if (path === "/tags") {
+        const counts = new Map<string, number>();
+        for (const tag of recipes.flatMap((r) => r.tags)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+        return jsonResponse(200, [...counts].sort(([a], [b]) => a.localeCompare(b)).map(([tag, count]) => ({ tag, count })));
+      }
       const match = /^\/recipes\/([^/]+)$/.exec(path);
       const found = match === null ? undefined : find(decodeURIComponent(match[1] ?? ""));
       return found === undefined ? jsonResponse(404, { errors: [{ code: "recipe.notFound", message: "Not found." }] }) : jsonResponse(200, found);
@@ -739,5 +747,228 @@ describe("COOK-6 Haven't made in a while, called Recommendations", () => {
     expect(await screen.findByRole("heading", { level: 1, name: heading })).toBeInTheDocument();
     expect(gets(fetchMock, "/recommendations")).toBe(0);
     expect(screen.queryByText("Pad Thai")).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Recommendations filtered by tags
+// ---------------------------------------------------------------------------------------------------------------------------
+
+describe("COOK-9 filter recommendations by tags", () => {
+  // Never cooked, by name; then least recently cooked first. Not in name order, so the server's order shows.
+  const PANCAKES = recipe(LEMON_ID, "Blueberry Pancakes", { tags: ["breakfast"] });
+  const TACOS = recipe(FISH_ID, "Fish Tacos", { tags: ["dinner", "quick"] });
+  const STEW_TAGGED = recipe(STEW_ID, "Beef Stew", { tags: ["dinner", "quick"], ...cooked(at(2026, 0, 10)) });
+  const SHAKSHUKA_TAGGED = recipe(SHAKSHUKA_ID, "Shakshuka", { tags: ["breakfast", "vegetarian"], ...cooked(at(2026, 2, 2)) });
+  const MUFFINS = recipe(CURRY_ID, "Banana Muffins", { tags: ["breakfast", "vegetarian"], ...cooked(at(2026, 7, 2)) });
+  const TAGGED = [MUFFINS, STEW_TAGGED, TACOS, SHAKSHUKA_TAGGED, PANCAKES];
+
+  const names = () => rediscoverLines().map((line) => line.split(" | ")[0]);
+  const chipGroup = () => screen.getByRole("group", { name: "Filter by tag" });
+  const chips = () => within(chipGroup()).getAllByRole("button");
+  const chip = (name: string) => within(chipGroup()).getByRole("button", { name });
+  const pressed = () => chips().filter((c) => c.getAttribute("aria-pressed") === "true").map((c) => c.textContent);
+  /** The GET /recommendations requests' `tags`, in order ("" for none). */
+  const requestedTags = (fetchMock: FetchMock) =>
+    fetchMock.mock.calls
+      .map(([input]) => new URL(String(input)))
+      .filter((url) => url.pathname === "/recommendations")
+      .map((url) => url.searchParams.get("tags") ?? "");
+
+  async function openFiltered(server: FakeServer = {}, path = "/recommendations") {
+    setClock(OCT_30_NOON);
+    const fake = mockServer({ recipes: TAGGED, ...server });
+    const rendered = renderAt(path);
+    await screen.findByRole("heading", { level: 1, name: "Recommendations" });
+    await screen.findByRole("group", { name: "Filter by tag" });
+    return { ...fake, ...rendered };
+  }
+
+  it("offers every tag in use, alphabetically, with its count, under the heading, none picked", async () => {
+    await openFiltered();
+    expect(chips().map((c) => c.textContent)).toEqual(["breakfast · 3", "dinner · 2", "quick · 2", "vegetarian · 2"]);
+    expect(pressed()).toEqual([]);
+    const list = await screen.findByRole("list", { name: "Recommendations" });
+    expect(names()).toEqual(["Blueberry Pancakes", "Fish Tacos", "Beef Stew", "Shakshuka", "Banana Muffins"]);
+    // Under the heading, above the list, as in docs/mockups/Rediscover.dc.html.
+    const heading = screen.getByRole("heading", { level: 1, name: "Recommendations" });
+    expect(heading.compareDocumentPosition(chipGroup()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chipGroup().compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("spec example: picking breakfast asks the server and shows only those recipes, still least recently cooked first", async () => {
+    const { fetchMock, router } = await openFiltered();
+    await screen.findByRole("list", { name: "Recommendations" });
+
+    await userEvent.click(chip("breakfast · 3"));
+
+    await waitFor(() => expect(names()).toEqual(["Blueberry Pancakes", "Shakshuka", "Banana Muffins"]));
+    expect(pressed()).toEqual(["breakfast · 3"]);
+    expect(requestedTags(fetchMock)).toEqual(["", "breakfast"]);
+    expect(router.state.location.search).toBe("?tags=breakfast");
+  });
+
+  it("with several tags picked, asks for recipes with all of them", async () => {
+    const { fetchMock } = await openFiltered();
+    await screen.findByRole("list", { name: "Recommendations" });
+
+    await userEvent.click(chip("breakfast · 3"));
+    await waitFor(() => expect(names()).toHaveLength(3));
+    await userEvent.click(chip("vegetarian · 2"));
+
+    await waitFor(() => expect(names()).toEqual(["Shakshuka", "Banana Muffins"]));
+    expect(pressed()).toEqual(["breakfast · 3", "vegetarian · 2"]);
+    expect(requestedTags(fetchMock).at(-1)).toBe("breakfast,vegetarian");
+  });
+
+  it("keeps the server's order rather than sorting again", async () => {
+    // An order no client-side sort would give: neither by name nor by last cooking.
+    await openFiltered({
+      recommendations: (url) =>
+        url.searchParams.get("tags") === "breakfast"
+          ? jsonResponse(200, [
+              { id: SHAKSHUKA_ID, name: "Shakshuka", tags: ["breakfast", "vegetarian"], hasPhoto: false, lastCookedAt: at(2026, 2, 2) },
+              { id: LEMON_ID, name: "Blueberry Pancakes", tags: ["breakfast"], hasPhoto: false },
+              { id: CURRY_ID, name: "Banana Muffins", tags: ["breakfast", "vegetarian"], hasPhoto: false, lastCookedAt: at(2026, 7, 2) },
+            ])
+          : undefined,
+    });
+    await screen.findByRole("list", { name: "Recommendations" });
+    await userEvent.click(chip("breakfast · 3"));
+    await waitFor(() => expect(names()).toEqual(["Shakshuka", "Blueberry Pancakes", "Banana Muffins"]));
+  });
+
+  it('says "No recipes tagged breakfast and quick" when no recipe has both; "Show all recipes" clears the filter', async () => {
+    const { router } = await openFiltered();
+    await screen.findByRole("list", { name: "Recommendations" });
+
+    await userEvent.click(chip("breakfast · 3"));
+    await waitFor(() => expect(names()).toHaveLength(3));
+    await userEvent.click(chip("quick · 2"));
+
+    expect(await screen.findByText(/^No recipes tagged breakfast and quick/)).toHaveAttribute("role", "status");
+    expect(screen.queryByRole("list", { name: "Recommendations" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/No recipes yet/)).not.toBeInTheDocument();
+    // The chips stay, so a tag can be unpicked.
+    expect(pressed()).toEqual(["breakfast · 3", "quick · 2"]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Show all recipes" }));
+    await screen.findByRole("list", { name: "Recommendations" });
+    expect(names()).toHaveLength(5);
+    expect(pressed()).toEqual([]);
+    expect(router.state.location.search).toBe("");
+  });
+
+  it("unpicking every tag shows every recipe again", async () => {
+    const { router, fetchMock } = await openFiltered({}, "/recommendations?tags=breakfast");
+    await waitFor(() => expect(names()).toEqual(["Blueberry Pancakes", "Shakshuka", "Banana Muffins"]));
+    expect(pressed()).toEqual(["breakfast · 3"]);
+
+    await userEvent.click(chip("breakfast · 3"));
+
+    await waitFor(() => expect(names()).toEqual(["Blueberry Pancakes", "Fish Tacos", "Beef Stew", "Shakshuka", "Banana Muffins"]));
+    expect(pressed()).toEqual([]);
+    expect(router.state.location.search).toBe("");
+    expect(requestedTags(fetchMock)).toEqual(["breakfast", ""]);
+  });
+
+  it("keeps the previous results on screen while a filter loads, without a loading message", async () => {
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await openFiltered({
+      recommendations: (url) => (url.searchParams.has("tags") ? held.then(() => jsonResponse(200, [])) : undefined),
+    });
+    await screen.findByRole("list", { name: "Recommendations" });
+
+    await userEvent.click(chip("breakfast · 3"));
+
+    expect(pressed()).toEqual(["breakfast · 3"]);
+    expect(names()).toHaveLength(5);
+    expect(screen.getByRole("list", { name: "Recommendations" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByText("Loading recipes…")).not.toBeInTheDocument();
+    release();
+  });
+
+  it("is separate from the recipe list's filter: picking a tag on one doesn't pick it on the other", async () => {
+    setClock(OCT_30_NOON);
+    const { fetchMock } = mockServer({ recipes: TAGGED });
+    const { router } = renderAt("/");
+    await screen.findByRole("heading", { level: 1, name: "Catalog" });
+    await userEvent.click(await screen.findByRole("button", { name: "breakfast · 3" }));
+    await waitFor(() => expect(router.state.location.search).toBe("?tags=breakfast"));
+
+    await act(() => router.navigate("/recommendations"));
+    await screen.findByRole("list", { name: "Recommendations" });
+    await screen.findByRole("group", { name: "Filter by tag" });
+    expect(pressed()).toEqual([]);
+    expect(names()).toHaveLength(5);
+    expect(requestedTags(fetchMock)).toEqual([""]);
+
+    await userEvent.click(chip("dinner · 2"));
+    await waitFor(() => expect(names()).toEqual(["Fish Tacos", "Beef Stew"]));
+
+    // Back to the recipe list: still filtered by breakfast only, not by dinner.
+    await act(() => router.navigate(-1));
+    await screen.findByRole("heading", { level: 1, name: "Catalog" });
+    await waitFor(() => expect(pressed()).toEqual(["breakfast · 3"]));
+    expect(router.state.location.search).toBe("?tags=breakfast");
+  });
+
+  it("moves a recipe just cooked to the end of a filtered view at once when coming back", async () => {
+    let holdList = false;
+    const { router } = await openFiltered(
+      { recommendations: () => (holdList ? never() : undefined) },
+      "/recommendations?tags=breakfast",
+    );
+    await waitFor(() => expect(names()).toEqual(["Blueberry Pancakes", "Shakshuka", "Banana Muffins"]));
+    await act(() => router.navigate(`/recipes/${LEMON_ID}`));
+    holdList = true;
+    await userEvent.click(await screen.findByRole("button", { name: "I cooked this today" }));
+    await screen.findByRole("button", { name: "Cooked today ✓" });
+
+    await act(() => router.navigate("/recommendations?tags=breakfast"));
+
+    expect(names()).toEqual(["Shakshuka", "Banana Muffins", "Blueberry Pancakes"]);
+    expect(rediscoverLines().at(-1)).toBe("Blueberry Pancakes | Last cooked today | today");
+  });
+
+  it("after an edit that may have changed tags, loads a filtered view again rather than showing the old one", async () => {
+    let holdList = false;
+    const { router, queryClient } = await openFiltered(
+      { recommendations: () => (holdList ? never() : undefined) },
+      "/recommendations?tags=breakfast",
+    );
+    await waitFor(() => expect(names()).toEqual(["Blueberry Pancakes", "Shakshuka", "Banana Muffins"]));
+    await act(() => router.navigate(`/recipes/${LEMON_ID}`));
+    await screen.findByRole("button", { name: "I cooked this today" });
+    holdList = true;
+
+    // The edit form's save: Blueberry Pancakes is no longer tagged breakfast.
+    act(() => showSavedRecipe(queryClient, { ...PANCAKES, tags: ["dessert"] }, { tagsChanged: true }));
+    await act(() => router.navigate("/recommendations?tags=breakfast"));
+
+    expect(await screen.findByText("Loading recipes…")).toBeInTheDocument();
+    expect(screen.queryByText("Blueberry Pancakes")).not.toBeInTheDocument();
+  });
+
+  it("takes a deleted recipe out of a filtered view at once (REC-6)", async () => {
+    let holdList = false;
+    const { router, queryClient } = await openFiltered(
+      { recommendations: () => (holdList ? never() : undefined) },
+      "/recommendations?tags=breakfast",
+    );
+    await waitFor(() => expect(names()).toEqual(["Blueberry Pancakes", "Shakshuka", "Banana Muffins"]));
+    await act(() => router.navigate(`/recipes/${LEMON_ID}`));
+    await screen.findByRole("button", { name: "I cooked this today" });
+    holdList = true;
+
+    act(() => recipeDeleted(queryClient, PANCAKES));
+    await act(() => router.navigate("/recommendations?tags=breakfast"));
+
+    expect(names()).toEqual(["Shakshuka", "Banana Muffins"]);
+    expect(queryClient.getQueryData<RediscoverEntry[]>(rediscoverKeys.list(["breakfast"]))?.map((e) => e.name)).toEqual([
+      "Shakshuka",
+      "Banana Muffins",
+    ]);
   });
 });

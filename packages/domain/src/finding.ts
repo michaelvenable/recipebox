@@ -13,16 +13,21 @@ import { collateText, compareText, containsText } from "./text.js";
  * valid tag (blank or too long) can't be on any recipe, so no recipe has all picked tags and the result is empty.
  */
 export function findRecipes(recipes: readonly Recipe[], by: { name?: string; tags?: readonly string[] }): Recipe[] {
-  const picked = (by.tags ?? []).map((t) => Tag.create(t));
-  if (picked.some((p) => !p.ok)) return [];
-  const tags = picked.flatMap((p) => (p.ok ? [p.value] : []));
+  const hasPickedTags = hasAllTags(by.tags ?? []);
   const term = by.name ?? "";
-  return sortByName(
-    recipes.filter(
-      (r) =>
-        !r.isDeleted && r.content.name.matches(term) && tags.every((wanted) => r.tags.some((t) => t.equals(wanted))),
-    ),
-  );
+  return sortByName(recipes.filter((r) => !r.isDeleted && r.content.name.matches(term) && hasPickedTags(r)));
+}
+
+/**
+ * Whether a recipe has every picked tag: the tag filter of the recipe list (REC-13) and of "haven't made in a while" (COOK-9).
+ * Picked tags are read like tag input (trimmed, lowercased, NFC). A picked text that isn't a valid tag can't be on any recipe,
+ * so then no recipe matches. No picked tags matches every recipe.
+ */
+export function hasAllTags(picked: readonly string[]): (recipe: Recipe) => boolean {
+  const parsed = picked.map((t) => Tag.create(t));
+  if (parsed.some((p) => !p.ok)) return () => false;
+  const tags = parsed.flatMap((p) => (p.ok ? [p.value] : []));
+  return (recipe) => tags.every((wanted) => recipe.tags.some((t) => t.equals(wanted)));
 }
 
 /**

@@ -82,7 +82,8 @@ Tags:
 
 Cooking history:
 - `POST /recipes/{id}/cookings` — "I cooked this today" (COOK-1, PLAN-5). The server records its own time. Returns `EditorRecipe`.
-- `GET /recommendations` — "Haven't made in a while" (COOK-6). Returns `RediscoverEntry[]`.
+- `GET /recommendations?tags=` — "Haven't made in a while" (COOK-6), filtered by tags (COOK-9). `tags` is read as on
+  `GET /recipes`: comma-separated, only recipes with every one, still in the COOK-6 order. Returns `RediscoverEntry[]`.
 
 Trash:
 - `GET /trash` — the trash (REC-14). Returns `TrashEntry[]`, each with `deletedAt` and `removalDueAt`.

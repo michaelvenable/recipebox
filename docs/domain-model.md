@@ -198,12 +198,16 @@ class ShoppingListLink {
 ### Rediscovery ordering
 
 ```ts
-function orderForRediscovery(recipes: readonly Recipe[]): Recipe[];   // COOK-6
+function orderForRediscovery(recipes: readonly Recipe[], by?: { tags?: string[] }): Recipe[];   // COOK-6, COOK-9
 ```
 
 1. Never-cooked recipes first, sorted by `RecipeName.compare`.
 2. Then by `lastCookedAt`, oldest first.
 3. Ties (same last-cooked time) sorted by `RecipeName.compare`.
+
+With `by.tags`, only recipes that have every picked tag are kept, in the same order (COOK-9). The rule is `findRecipes`'s
+(REC-13), shared through `hasAllTags` in finding.ts: picked tags are read like tag input, and a picked text that isn't a valid
+tag matches no recipe.
 
 "3 months ago" text is presentation, calculated on the device (X-12), not in the domain.
 

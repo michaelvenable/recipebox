@@ -57,6 +57,7 @@ export function showSavedRecipe(queryClient: QueryClient, recipe: EditorRecipe, 
   );
   queryClient.setQueryData<ToMakeEntry[]>(planKeys.all, (entries) => entries && withPlanEntry(entries, recipe));
   queryClient.setQueryData<RediscoverEntry[]>(rediscoverKeys.all, (entries) => entries && withRediscoverEntry(entries, recipe));
+  updateFilteredRecommendations(queryClient, recipe, tagsChanged);
   void queryClient.invalidateQueries({ queryKey: recipeKeys.lists() });
   void queryClient.invalidateQueries({ queryKey: planKeys.all });
   void queryClient.invalidateQueries({ queryKey: rediscoverKeys.all });
@@ -122,6 +123,22 @@ function withRediscoverEntry(entries: RediscoverEntry[], recipe: EditorRecipe): 
   };
   if (old.lastCookedAt === recipe.lastCookedAt) return entries.map((e) => (e.id === recipe.id ? entry : e));
   return [...entries.filter((e) => e.id !== recipe.id), entry];
+}
+
+/**
+ * "Haven't made in a while" filtered by tags (COOK-9) after a recipe was saved. Which views the recipe belongs in is the server's
+ * to say, by the domain's tag rule, so it isn't worked out here. A change that leaves the tags alone (cooking, the to-make list, a
+ * photo) leaves that as it was, and each view gets the same update as the unfiltered one. After a change that may have changed
+ * the tags (edit, restore), views not on screen are dropped, so opening one again loads it rather than showing the recipe where
+ * it no longer belongs, or missing where it now does. The caller then reloads them all through `rediscoverKeys.all`.
+ */
+function updateFilteredRecommendations(queryClient: QueryClient, recipe: EditorRecipe, tagsChanged: boolean): void {
+  const filtered = { predicate: (query: { queryKey: readonly unknown[] }) => rediscoverKeys.isFiltered(query.queryKey) };
+  if (tagsChanged) {
+    queryClient.removeQueries({ ...filtered, type: "inactive" });
+    return;
+  }
+  queryClient.setQueriesData<RediscoverEntry[]>(filtered, (entries) => entries && withRediscoverEntry(entries, recipe));
 }
 
 const CHANGE_PREFIX = [...recipeKeys.all, "change"] as const;

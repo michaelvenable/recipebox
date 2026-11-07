@@ -1,4 +1,6 @@
-// The recipe list's search (REC-9) and tag filter (REC-13), kept in the page's address so reload, back and forward keep them.
+// The recipe list's search (REC-9) and tag filter (REC-13), and the tag filter of "haven't made in a while" (COOK-9), each kept
+// in its own page's address so reload, back and forward keep them. Being in the address of different pages keeps the two filters
+// apart: picking a tag on one doesn't pick it on the other (COOK-9).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { type RecipeFilter, filterQuery } from "../api/recipes.js";
@@ -9,8 +11,17 @@ export const SEARCH_DEBOUNCE_MS = 300;
 /** Reads `?name=…&tags=a,b`. Missing parts mean no search and no tags; a tag picked twice counts once. */
 export function filterFromSearch(search: string): RecipeFilter {
   const params = new URLSearchParams(search);
+  return { name: params.get("name") ?? "", tags: tagsFromParams(params) };
+}
+
+function tagsFromParams(params: URLSearchParams): string[] {
   const tags = (params.get("tags") ?? "").split(",").filter((tag) => tag !== "");
-  return { name: params.get("name") ?? "", tags: [...new Set(tags)] };
+  return [...new Set(tags)];
+}
+
+/** `tags` with `tag` picked if it wasn't, or unpicked if it was. */
+function toggled(tags: readonly string[], tag: string): string[] {
+  return tags.includes(tag) ? tags.filter((t) => t !== tag) : [...tags, tag];
 }
 
 /**
@@ -56,8 +67,7 @@ export function useListFilter() {
   /** Picks or unpicks a tag, applying any search text still waiting for the pause along with it. */
   const toggleTag = useCallback(
     (tag: string) => {
-      const tags = applied.tags.includes(tag) ? applied.tags.filter((t) => t !== tag) : [...applied.tags, tag];
-      apply({ name: term, tags });
+      apply({ name: term, tags: toggled(applied.tags, tag) });
     },
     [term, applied, apply],
   );
@@ -69,4 +79,27 @@ export function useListFilter() {
   }, [apply]);
 
   return { applied, term, setTerm, searchNow, toggleTag, clear };
+}
+
+/**
+ * Picked tags only, from `?tags=a,b` in the page's address, for a view with no search: "haven't made in a while" (COOK-9).
+ * Like useListFilter, changes replace the history entry.
+ */
+export function useTagFilter() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tags = useMemo(() => tagsFromParams(new URLSearchParams(location.search)), [location.search]);
+
+  const apply = useCallback(
+    (next: readonly string[]) => navigate({ search: filterQuery({ name: "", tags: next }) }, { replace: true }),
+    [navigate],
+  );
+
+  /** Picks or unpicks a tag. */
+  const toggleTag = useCallback((tag: string) => void apply(toggled(tags, tag)), [tags, apply]);
+
+  /** Unpicks every tag: every recipe again (COOK-9). */
+  const clear = useCallback(() => void apply([]), [apply]);
+
+  return { tags, toggleTag, clear };
 }

@@ -69,6 +69,10 @@ interface ListQuery {
   tags?: unknown;
 }
 
+interface TagsQuery {
+  tags?: unknown;
+}
+
 interface SuggestionQuery {
   typed?: unknown;
   recipeId?: unknown;
@@ -342,8 +346,18 @@ export function registerRecipeRoutes(app: FastifyInstance, { recipes, clock, new
       applyChange(reply, request.params.id, (recipe) => recipe.markCooked(clock())),
   );
 
-  // COOK-6: editor-only (X-1); the order is the domain's.
-  app.get("/recommendations", { preHandler: requireEditor }, async (): Promise<RediscoverEntry[]> =>
-    orderForRediscovery(await recipes.list()).map(toRediscoverEntry),
+  // COOK-6, COOK-9: editor-only (X-1); the order and the tag filter are the domain's. `tags` is read as on GET /recipes.
+  app.get<{ Querystring: TagsQuery }>(
+    "/recommendations",
+    { preHandler: requireEditor },
+    async (request, reply): Promise<RediscoverEntry[] | FastifyReply> => {
+      const tags = queryText(request.query.tags);
+      if (tags === null) {
+        return sendErrors(reply, 400, [
+          { code: "request.invalid", message: "Give tags at most once; tags are comma-separated." },
+        ]);
+      }
+      return orderForRediscovery(await recipes.list(), { tags: pickedTags(tags) }).map(toRediscoverEntry);
+    },
   );
 }

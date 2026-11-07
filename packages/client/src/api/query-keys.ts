@@ -46,9 +46,16 @@ export const shoppingListKeys = {
   all: ["shoppingList"] as const,
 };
 
-/** GET /recommendations, "Haven't made in a while" (COOK-6). Cooking a recipe changes its order. */
+/**
+ * GET /recommendations, "Haven't made in a while" (COOK-6). Cooking a recipe changes its order. `all` is the unfiltered view and
+ * the prefix of the views filtered by tags (COOK-9), so invalidating it reaches them all.
+ */
 export const rediscoverKeys = {
   all: ["recommendations"] as const,
+  /** The view with only recipes that have every tag in `tags` (COOK-9); `all` when none is picked. */
+  list: (tags: readonly string[]) => (tags.length === 0 ? rediscoverKeys.all : ([...rediscoverKeys.all, { tags: [...tags] }] as const)),
+  /** Whether a query key is one of the views filtered by tags, not the unfiltered one. */
+  isFiltered: (queryKey: readonly unknown[]) => queryKey[0] === rediscoverKeys.all[0] && queryKey.length > 1,
 };
 
 /** GET /trash (REC-14). Deleting (REC-6) and restoring (REC-15) change it. */

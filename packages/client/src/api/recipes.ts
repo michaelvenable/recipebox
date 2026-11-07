@@ -132,9 +132,12 @@ export function fetchShoppingList(signal?: AbortSignal): Promise<ShoppingItem[]>
   return apiGet("/plan/shopping-list", ShoppingItem.array(), signal);
 }
 
-/** GET /recommendations: never cooked first by name, then least recently cooked first (COOK-6). Editors only (X-1). */
-export function fetchRecommendations(signal?: AbortSignal): Promise<RediscoverEntry[]> {
-  return apiGet("/recommendations", RediscoverEntry.array(), signal);
+/**
+ * GET /recommendations: never cooked first by name, then least recently cooked first (COOK-6), only recipes with every picked
+ * tag (COOK-9), as the server filters them. Editors only (X-1).
+ */
+export function fetchRecommendations(tags: readonly string[], signal?: AbortSignal): Promise<RediscoverEntry[]> {
+  return apiGet(`/recommendations${filterQuery({ name: "", tags })}`, RediscoverEntry.array(), signal);
 }
 
 /**

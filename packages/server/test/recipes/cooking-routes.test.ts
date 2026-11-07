@@ -1,9 +1,11 @@
 // Cooking history endpoints (docs/api.md) against the in-memory repository, using the examples table in
 // docs/specs/cooking-history.md. The rules themselves are tested in packages/domain; these tests show each endpoint applies them.
 import { describe, expect, it } from "vitest";
-import { EditorRecipe, RediscoverEntry } from "@recipebox/shared";
+import { EditorRecipe, EditorRecipeSummary, RediscoverEntry } from "@recipebox/shared";
 import {
   AS_EDITOR,
+  AS_NON_EDITOR,
+  AS_VISITOR,
   change,
   content,
   expectErrors,
@@ -22,6 +24,12 @@ async function recommendations(app: App): Promise<RediscoverEntry[]> {
   const res = await get(app, "/recommendations", AS_EDITOR);
   expect(res.statusCode, res.body).toBe(200);
   return RediscoverEntry.array().parse(res.json());
+}
+
+async function listNames(app: App, query: string): Promise<string[]> {
+  const res = await get(app, `/recipes${query}`, AS_EDITOR);
+  expect(res.statusCode, res.body).toBe(200);
+  return EditorRecipeSummary.array().parse(res.json()).map((r) => r.name);
 }
 
 describe("COOK-1 mark as cooked", () => {
@@ -151,6 +159,73 @@ describe("COOK-6 haven't made in a while", () => {
       ["Once", "2026-09-01T18:00:00.000Z"],
       ["Never", "2026-10-03T18:00:00.000Z"],
     ]);
+  });
+});
+
+describe("COOK-9 filter recommendations by tags", () => {
+  /** The COOK-6 example recipes: A (never), B (last 2026-01-10), C (last 2026-08-02); only A and C tagged "breakfast". */
+  async function appWithExampleRecipes() {
+    const setup = await recipeApp();
+    await seed(setup.repository, content("C", { tags: ["breakfast", "quick"] }), {
+      cookedAt: ["2026-08-02T18:00:00.000Z"],
+    });
+    await seed(setup.repository, content("B", { tags: ["dinner", "quick"] }), { cookedAt: ["2026-01-10T18:00:00.000Z"] });
+    await seed(setup.repository, content("A", { tags: ["breakfast"] }));
+    await seed(setup.repository, content("Trashed", { tags: ["breakfast"] }), { deletedAt: "2026-09-30T10:00:00.000Z" });
+    return setup;
+  }
+
+  async function filteredNames(app: App, tags: string): Promise<string[]> {
+    const res = await get(app, `/recommendations?tags=${tags}`, AS_EDITOR);
+    expect(res.statusCode, res.body).toBe(200);
+    return RediscoverEntry.array().parse(res.json()).map((e) => e.name);
+  }
+
+  it('spec example: only A and C tagged "breakfast"; filter it: A, C, with their last cookings', async () => {
+    const { app } = await appWithExampleRecipes();
+    const res = await get(app, "/recommendations?tags=breakfast", AS_EDITOR);
+    expect(res.statusCode, res.body).toBe(200);
+    expect(RediscoverEntry.array().parse(res.json()).map((e) => [e.name, e.lastCookedAt])).toEqual([
+      ["A", undefined],
+      ["C", "2026-08-02T18:00:00.000Z"],
+    ]);
+  });
+
+  it.each([
+    ["breakfast,quick", ["C"]],
+    ["quick,breakfast", ["C"]],
+    ["quick", ["B", "C"]],
+    [encodeURIComponent("Breakfast, quick"), ["C"]],
+    ["", ["A", "B", "C"]],
+    ["breakfast,dinner", []],
+    ["dessert", []],
+  ])("tags %j gives %j: recipes with all of them, in the COOK-6 order", async (tags, expected) => {
+    const { app } = await appWithExampleRecipes();
+    expect(await filteredNames(app, tags)).toEqual(expected);
+  });
+
+  it("answers a tag that can't be valid as GET /recipes does: no recipe has it, so nothing", async () => {
+    const { app } = await appWithExampleRecipes();
+    expect(await filteredNames(app, "x".repeat(31))).toEqual([]);
+    expect(await listNames(app, `?tags=${"x".repeat(31)}`)).toEqual([]);
+  });
+
+  it("refuses tags given twice with 400, as GET /recipes does", async () => {
+    const { app } = await appWithExampleRecipes();
+    expectErrors(await get(app, "/recommendations?tags=breakfast&tags=quick", AS_EDITOR), 400, ["request.invalid"]);
+    expectErrors(await get(app, "/recipes?tags=breakfast&tags=quick", AS_EDITOR), 400, ["request.invalid"]);
+  });
+
+  it.each([
+    ["a visitor", AS_VISITOR, 401, "auth.signInRequired"],
+    ["a signed-in non-editor", AS_NON_EDITOR, 403, "auth.notEditor"],
+  ] as const)("stays editor-only: refuses %s a filtered view, revealing nothing (X-1)", async (_who, as, status, code) => {
+    const { app } = await appWithExampleRecipes();
+    for (const url of ["/recommendations?tags=breakfast", "/recommendations?tags=breakfast&tags=quick"]) {
+      const res = await get(app, url, as);
+      expectErrors(res, status, [code]);
+      for (const leak of ['"A"', '"C"', "2026-"]) expect(res.body, url).not.toContain(leak);
+    }
   });
 });
 
