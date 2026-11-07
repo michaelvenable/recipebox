@@ -42,6 +42,7 @@ How RecipeBox is built and deployed, and why. Behavior is defined in `docs/specs
 | Sign-in        | Container Apps built-in authentication                      | Microsoft and Google built in, at no cost.     |
 | Domain names   | `recipes.mikevenable.net` and `api.recipes.mikevenable.net` | Same site, so Safari keeps the cookie.         |
 | Trash cleanup  | Container Apps Job, once a day                              | Removes documents and photos (REC-16).         |
+| Data access    | A user-assigned managed identity, no keys                   | Nothing to leak or rotate; keys switched off.  |
 
 ## Repository layout
 
@@ -167,6 +168,20 @@ act as a visitor, an editor or a non-editor. The server refuses to start in deve
 - Display: the client loads photos from the API, never directly from storage. The API checks the recipe isn't in the trash (or the
   caller is an editor) and streams the image with cache headers.
 - Replace and remove delete the previous images (REC-7). Permanent removal deletes them with the recipe (REC-16).
+
+## Access to Cosmos DB and Blob Storage
+
+In Azure, the API and the trash cleanup job use one user-assigned managed identity; no keys or connection strings exist.
+- Key access is switched off on both accounts (`disableLocalAuth` on Cosmos DB, `allowSharedKeyAccess: false` on Storage).
+- The identity has data roles only, granted by the infrastructure script: Cosmos DB Built-in Data Contributor on the account,
+  and Storage Blob Data Contributor on the photo container. It cannot create or delete databases, containers or accounts,
+  which matches the rule that only local development creates them.
+- One user-assigned identity, rather than one per app and job, so its roles exist before either is first deployed.
+- Settings: `COSMOS_ENDPOINT`, `STORAGE_BLOB_ENDPOINT` (e.g. `https://<account>.blob.core.windows.net`) and `AZURE_CLIENT_ID`
+  (the identity). The server refuses to start if `COSMOS_KEY` or `STORAGE_CONNECTION_STRING` is set outside development and
+  test, so a key can't quietly be used in production.
+
+Locally, the Cosmos DB emulator and Azurite accept only their fixed, public keys, so development and test keep using them.
 
 ## Search and filtering
 
