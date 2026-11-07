@@ -139,8 +139,9 @@ Redirect URIs:
 - Microsoft: `https://api.recipes.mikevenable.net/.auth/login/aad/callback`
 - Google: `https://api.recipes.mikevenable.net/.auth/login/google/callback`
 
-The client secrets are stored as secrets on the container app, never in the repository. The Entra secret expires (at most two
-years) and must be renewed. Everything except steps 1–4 will be scripted with Bicep.
+The client secrets are kept in a Key Vault and referenced by the container app's secrets, so no secret value passes through
+the repository, Bicep or GitHub; the app's managed identity reads them. The Entra secret expires (at most two years) and must
+be renewed in the Key Vault. Everything except steps 1–4 will be scripted with Bicep.
 
 Editors (X-7):
 - An editor is identified by the identity provider plus that provider's permanent account ID, never by email address.
