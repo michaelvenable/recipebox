@@ -28,6 +28,14 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
   <header style="padding: 18px 20px 12px">
     <h1 style="margin: 0; font-size: 26px; font-weight: 700">Recommendations</h1>
   </header>
+  <div role="group" aria-label="Filter by tag" style="display: flex; gap: 8px; padding: 0 20px 14px; overflow-x: auto">
+    <sc-for list="{{chips}}" as="c" hint-placeholder-count="5">
+      <button type="button" aria-pressed="{{c.pressed}}" onClick="{{c.toggle}}" style="flex: none; min-height: 40px; padding: 0 14px; border-radius: 20px; border: 1px solid {{c.border}}; background: {{c.bg}}; color: {{c.fg}}; font: inherit; font-size: 15px; font-weight: {{c.fw}}; cursor: pointer">{{c.label}}</button>
+    </sc-for>
+  </div>
+  <sc-if value="{{none}}" hint-placeholder-val="{{ false }}">
+    <p role="status" style="margin: 0 20px 12px; font-size: 15px; color: #59615C">{{noneText}}</p>
+  </sc-if>
   <ul style="flex: 1; list-style: none; margin: 0; padding: 0 20px; display: flex; flex-direction: column; gap: 10px; overflow: hidden">
     <sc-for list="{{items}}" as="r" hint-placeholder-count="6">
       <li>
@@ -55,16 +63,34 @@ class Component extends DCLogic {
   }
   renderVals() {
     const never = '#8A3A0C', old = '#1D2420', recent = '#59615C';
+    // Least recently cooked first (COOK-6); a tag filter keeps that order and works like the Catalog's (REC-13).
+    const all = [
+      { name: 'Fish Tacos', tags: ['dinner', 'quick'], last: 'Never cooked', ago: 'New', agoColor: never, tint: '#CFDCCB' },
+      { name: 'Lemon Risotto', tags: ['dinner', 'vegetarian'], last: 'Never cooked', ago: 'New', agoColor: never, tint: '#E9E2B8' },
+      { name: 'Blueberry Pancakes', tags: ['breakfast', 'vegetarian'], last: 'Last cooked Dec 28', ago: '10 months ago', agoColor: old, tint: '#D6D9EA' },
+      { name: 'Beef Stew', tags: ['dinner'], last: 'Last cooked Jan 10', ago: '9 months ago', agoColor: old, tint: '#D9C7B4' },
+      { name: 'Chickpea Curry', tags: ['dinner', 'vegetarian'], last: 'Last cooked Mar 2', ago: '8 months ago', agoColor: old, tint: '#E3D3A4' },
+      { name: 'Shakshuka', tags: ['breakfast', 'quick', 'vegetarian'], last: 'Last cooked Jun 14', ago: '4 months ago', agoColor: old, tint: '#E5BFAE' },
+      { name: 'Pad Thai', tags: ['dinner', 'quick'], last: 'Last cooked Aug 2', ago: '3 months ago', agoColor: old, tint: '#E8CFB0' },
+      { name: 'Chicken Tikka Masala', tags: ['dinner'], last: 'Last cooked Oct 21', ago: '9 days ago', agoColor: recent, tint: '#E6C3A8' }
+    ];
+    const picked = (this.state && this.state.picked) || [];
+    const tags = [...new Set(all.flatMap((r) => r.tags))].sort();
+    const items = all.filter((r) => picked.every((t) => r.tags.includes(t)));
     return {
       nav: this.navItems('Recommendations'), acctBg: '#F0F2EE', acctFg: '#1D2420',
-      items: [
-        { name: 'Fish Tacos', last: 'Never cooked', ago: 'New', agoColor: never, tint: '#CFDCCB' },
-        { name: 'Lemon Risotto', last: 'Never cooked', ago: 'New', agoColor: never, tint: '#E9E2B8' },
-        { name: 'Beef Stew', last: 'Last cooked Jan 10', ago: '9 months ago', agoColor: old, tint: '#D9C7B4' },
-        { name: 'Chickpea Curry', last: 'Last cooked Mar 2', ago: '8 months ago', agoColor: old, tint: '#E3D3A4' },
-        { name: 'Pad Thai', last: 'Last cooked Aug 2', ago: '3 months ago', agoColor: old, tint: '#E8CFB0' },
-        { name: 'Chicken Tikka Masala', last: 'Last cooked Oct 21', ago: '9 days ago', agoColor: recent, tint: '#E6C3A8' }
-      ]
+      chips: tags.map((t) => {
+        const on = picked.includes(t);
+        return {
+          label: t + ' · ' + all.filter((r) => r.tags.includes(t)).length,
+          pressed: on ? 'true' : 'false',
+          bg: on ? '#2E6A4F' : '#FFFFFF', fg: on ? '#FFFFFF' : '#1D2420', border: on ? '#2E6A4F' : '#C9CEC8', fw: on ? '700' : '400',
+          toggle: () => this.setState({ picked: on ? picked.filter((p) => p !== t) : picked.concat(t) })
+        };
+      }),
+      none: items.length === 0,
+      noneText: 'No recipes tagged ' + picked.join(' and '),
+      items
     };
   }
 }
