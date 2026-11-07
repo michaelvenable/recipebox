@@ -562,7 +562,7 @@ describe("COOK-6 Haven't made in a while, called Recommendations", () => {
     setClock(OCT_30_NOON);
     await openRediscover();
     await screen.findByRole("list", { name: "Recommendations" });
-    expect(screen.getByText("Least recently cooked first")).toBeInTheDocument();
+    expect(screen.queryByText("Least recently cooked first")).not.toBeInTheDocument();
     expect(rediscoverLines()).toEqual([
       "Fish Tacos | Never cooked | New",
       "Lemon Risotto | Never cooked | New",
@@ -712,7 +712,6 @@ describe("COOK-6 Haven't made in a while, called Recommendations", () => {
     await openRediscover({ recipes: [] });
     expect(await screen.findByText(/No recipes yet\./)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Add your first recipe" })).toHaveAttribute("href", "/recipes/new");
-    expect(screen.queryByText("Least recently cooked first")).not.toBeInTheDocument();
   });
 
   it("says loading, not empty, while the recipes load", async () => {

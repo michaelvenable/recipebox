@@ -20,7 +20,6 @@ export function RediscoverPage() {
     <div className="rediscover-page">
       <header className="list-page-header">
         <h1>Recommendations</h1>
-        {recipes.data !== undefined && recipes.data.length > 0 && <p className="muted">Least recently cooked first</p>}
       </header>
       <RediscoverContents entries={recipes.data} failed={recipes.isError} retry={() => void recipes.refetch()} now={now} />
     </div>
