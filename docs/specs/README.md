@@ -41,18 +41,19 @@ been cooked in a while.
   attaching or removing tags; adding, replacing or removing a photo; adding to or removing from the "to make" list; marking a
   recipe cooked; deleting a history entry; sending a shopping list (PLAN-9). The server refuses any change that isn't from a
   signed-in editor, and nothing is changed. Hiding buttons in the app is not enough on its own.
-- **X-7. Editors are listed in configuration.** Editors sign in with a Microsoft account. (Google sign-in is planned but not
-  offered for now.) An identity is an editor only if it is on the editor list in the app's configuration. The list can hold any
-  number of identities, including one or none. Anyone else who signs in is treated as a visitor: they can view but not change.
+- **X-7. Editors are listed in configuration.** Editors sign in with a Microsoft or Google account; the app offers both. An
+  identity is an editor only if it is on the editor list in the app's configuration. The list can hold any number of identities,
+  including one or none. Anyone else who signs in is treated as a visitor: they can view but not change.
 - **X-8. Editing controls.** Visitors don't see editing controls; they see a "Sign in" option instead. After signing in, the
   editor returns to the page they were on.
 - **X-9. Long sessions.** An editor who uses the app on a device at least once every 30 days stays signed in on that device. After
   30 days without use, they must sign in again.
 - **X-10. Not in search engines.** The app asks search engines not to index it, so the collection doesn't appear in search
   results.
-- **X-11. Account page.** Anyone who is signed in can open an Account page showing which provider they signed in with (Microsoft),
-  their permanent account ID with a button to copy it, and whether they are an editor. This is how a new editor finds the ID to
-  add to the editor list (X-7). The page also lets them sign out. Someone who isn't signed in sees a "Sign in" option instead.
+- **X-11. Account page.** Anyone who is signed in can open an Account page showing which provider they signed in with
+  (Microsoft or Google), their permanent account ID with a button to copy it, and whether they are an editor. This is how a new
+  editor finds the ID to add to the editor list (X-7). The page also lets them sign out. Someone who isn't signed in sees a "Sign
+  in" option instead.
 - **X-12. Time.** Every time the app stores comes from the server's clock: when a recipe was cooked (COOK-1), added to the "to
   make" list (PLAN-3) and deleted (REC-6), the 30-day trash deadline (REC-16), and when a shopping list link was made and stops
   working (PLAN-9). The app never sends a time to be stored or
