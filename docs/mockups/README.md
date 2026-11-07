@@ -36,3 +36,7 @@ Updated 2026-11-07 (owner request): `ToMake.dc.html` and the new `ShoppingList.d
 - Shopping list: every ingredient of every recipe on the Plan, in one list sorted A–Z (X-13), each with its recipe's name.
   Ingredients are free text, so duplicates stay as typed. Ticks are never saved; leaving the page clears them. The other
   artboards still show the older names.
+- Send (proposed, not yet in the specs): the Shopping list has a Send button. It makes a link with a random, unguessable code
+  and opens the phone's share sheet with it (the link is copied where there is no share sheet). Anyone with the link sees a
+  copy of the list as sent, without signing in, for 7 days (`SharedList.dc.html`); after that, and for unknown links, the
+  page says the link has expired (`SharedListExpired.dc.html`).

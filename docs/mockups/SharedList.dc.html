@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shared shopping list</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2E6A4F}a:hover{color:#1F4D38}
+</style>
+</helmet>
+<div style="width: 390px; height: 1440px; box-sizing: border-box; background: #F6F6F3; color: #1D2420; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; display: flex; flex-direction: column">
+  <nav aria-label="Main" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; background: #FFFFFF; border-bottom: 1px solid #DCDFDA">
+    <a href="Main.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 22px; color: #1D2420; font-size: 15px; text-decoration: none">Catalog</a>
+    <a href="Account.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; color: #2E6A4F; font-size: 15px; font-weight: 700">Sign in</a>
+  </nav>
+  <header style="padding: 18px 20px 12px">
+    <h1 style="margin: 0; font-size: 26px; font-weight: 700">Shopping list</h1>
+    <p style="margin: 6px 0 0; font-size: 15px; color: #59615C">{{summary}}</p>
+    <p style="margin: 4px 0 0; font-size: 15px; color: #59615C">This link works until Fri, Nov 14.</p>
+  </header>
+  <ul aria-label="Shopping list" style="list-style: none; margin: 0 20px; padding: 4px 16px; background: #FFFFFF; border-radius: 16px; display: flex; flex-direction: column">
+    <sc-for list="{{items}}" as="i" hint-placeholder-count="18">
+      <li style="border-bottom: {{i.rule}}">
+        <label style="display: flex; align-items: center; gap: 14px; min-height: 48px; padding: 6px 0; cursor: pointer">
+          <input type="checkbox" checked="{{i.checked}}" onChange="{{i.toggle}}" style="flex: none; width: 24px; height: 24px; margin: 0; accent-color: #2E6A4F">
+          <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+            <span style="font-size: 18px; line-height: 1.3; color: {{i.fg}}; text-decoration: {{i.deco}}">{{i.text}}</span>
+            <span style="font-size: 14px; color: #59615C">{{i.recipe}}</span>
+          </span>
+        </label>
+      </li>
+    </sc-for>
+  </ul>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1440}}'>
+class Component extends DCLogic {
+  renderVals() {
+    // The list as it was when the link was made (a copy, not the live Plan). Opened without signing in; ticks are never saved.
+    const plan = {
+      'Lemon Risotto': ['300 g arborio rice', '1 litre vegetable stock', '1 onion, finely chopped', '2 lemons', '50 g parmesan'],
+      'Chicken Tikka Masala': ['500 g chicken thighs', '150 g plain yogurt', '1 can chopped tomatoes', '2 tbsp tikka paste'],
+      'Shakshuka': ['6 eggs', '1 can chopped tomatoes', '1 red pepper', 'Feta to serve'],
+      'Fish Tacos': ['400 g white fish', '8 corn tortillas', '2 limes', 'Red cabbage']
+    };
+    const rows = Object.entries(plan)
+      .flatMap(([recipe, list]) => list.map((text) => ({ recipe, text })))
+      .sort((a, b) => a.text.localeCompare(b.text, 'en', { sensitivity: 'base' }));
+    const done = (this.state && this.state.done) || rows.map(() => false);
+    return {
+      summary: rows.length + ' items from 4 recipes',
+      items: rows.map((r, i) => ({
+        text: r.text, recipe: r.recipe, checked: !!done[i],
+        fg: done[i] ? '#59615C' : '#1D2420', deco: done[i] ? 'line-through' : 'none',
+        rule: i === rows.length - 1 ? '0' : '1px solid #E4E6E1',
+        toggle: () => {
+          const next = done.slice();
+          next[i] = !next[i];
+          this.setState({ done: next });
+        }
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>
