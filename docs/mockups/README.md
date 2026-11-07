@@ -49,3 +49,10 @@ Updated 2026-11-07 (owner request): every artboard was saved again from the canv
 - Recommendations (COOK-9): the same tag chips as the Catalog, with counts, above the list. Picking tags keeps only recipes
   that have all of them, still least recently cooked first; when none match, "Show all recipes" clears the filter. The
   filter is separate from the Catalog's.
+
+Added 2026-11-07 (owner request): importing a recipe from a photo (IMP, `docs/specs/import.md`).
+- `ImportNewRecipe.dc.html`: the New recipe form with a "Have it on paper?" panel at the top and "Import from a photo".
+- `ImportReading.dc.html`: back on the Catalog after the upload, with a message and a "Reading your photo…" card above the
+  recipes.
+- `ImportReady.dc.html`: the imported recipe in the list, with a "‹name› imported" message and Open. There is no step to check
+  the recipe first, and no screen for a failed import: the card just goes away and the failure is logged.

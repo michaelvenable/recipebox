@@ -252,6 +252,58 @@ the current shopping list, so only the link itself is stored.
 - Locally the container is created on first run like the recipes container (`openStorage`); deployed, it comes from
   `infra/main.bicep` and its name from `COSMOS_SHOPPING_LIST_CONTAINER`. It shares the database's free throughput.
 
+## Recipe import
+
+IMP-1 to IMP-12: one photo becomes one recipe, read by an AI model in the background. Reading takes 30 seconds to 2 minutes,
+longer than a request should stay open, and the API scales to zero, so the work runs in a Container Apps job started by a
+queue message, not in the API.
+
+```
+client --POST /imports (photo)--> API --> Blob imports/{importId}, Cosmos import record, Storage queue message
+                                                   |
+Container Apps job (started by the queue) <--------+
+  read photo -> AI model (JSON) -> domain -> save recipe and its photo -> end the import, delete the page photo
+```
+
+- Starting (`POST /imports`): editor check (X-6), then the same type and size checks as a recipe photo (IMP-2, REC-7). The
+  image goes through the existing decode worker, which removes all metadata and scales it to at most 2048 px on the long side,
+  so no location reaches the AI service and the call stays small. It is stored as `imports/{importId}.jpg` in the photo
+  container. The photo route serves only recipe photos by recipe ID, so these are never served (IMP-12).
+- One at a time (IMP-3): the import record is a single document with the fixed ID `current` in a new `imports` container:
+  the `RecipeImport` snapshot (domain-model.md). Starting replaces it only if `isInProgress` is false by the server's clock
+  (X-12, IMP-11), using a replace conditional on its version (or `create` when there is none); otherwise the API answers 409
+  `import.busy`. Each import replaces the last, so there is never more than one record.
+- The job (`caj-recipebox-import`) is event-driven: a KEDA Azure Queue scaler on the `imports` queue, signed in with the
+  managed identity, one execution at a time, a 10-minute replica timeout and no retries (IMP-11, retrying is out of scope).
+  It reads the record and the photo, calls the model, and turns the answer into a recipe:
+  - The answer is untrusted input, like a request body: it is parsed against the expected shape, then the recipe is made with
+    the same domain method as `POST /recipes`, with the server's time. Tags are filtered by a domain function to tags already in
+    use, at most 5 (IMP-8). A domain refusal ends the import as `invalid-recipe` (IMP-7). The model's JSON is never stored.
+  - The recipe's ID is derived from the import ID and the recipe is written with `create`, so a message delivered twice can't
+    add the recipe twice.
+  - The dish picture (IMP-9): the model returns a box around it as fractions of the image. The job crops that area from the
+    page photo and stores it through the same code as an uploaded recipe photo. A box that is missing or too small for a
+    thumbnail means no photo.
+  - Then the record is set to `done` with the recipe's ID and name, or `failed`, and the page photo is deleted (IMP-12). A
+    lifecycle rule on the storage account deletes any `imports/` blob older than one day, which covers a job that stopped
+    partway. The trash cleanup's orphan sweep only considers `photos/{recipeId}/...`, so it never touches imports.
+- Failures (IMP-11) are one pino line at level `error`: `{ "event": "recipe-import-failed", "importId", "reason", "detail"? }`,
+  with no image, recipe text or identity. To find them, query `ContainerAppConsoleLogs_CL` in `log-recipebox` for
+  `recipe-import-failed` (`infra/README.md`). No alert rule (owner decision, 2026-11-07).
+- The model: one model deployment in an Azure AI Foundry resource in `infra/main.bicep`, called with the managed identity (no
+  key), with structured output so the answer always has the expected shape. The schema is built for each call, and its tags
+  field allows only the tags in use, as an enum. The prompt and schema live in one server file; the model is behind an
+  interface, so tests use a fake and never call Azure. Which model to deploy is chosen by trying a few on real recipe cards.
+- The client: `GET /imports/current` (editor-only, X-1) returns the record or 404. While the record is `reading`, the Catalog
+  shows the card (IMP-5) and the client checks again every 5 seconds. The device that started the import knows its
+  `importId`; when that record turns `done`, it shows "‹name› imported" with Open (IMP-10). A `failed` record just removes
+  the card.
+- Access: the identity also needs Storage Queue Data Message Sender and Processor on the `imports` queue and a role that can
+  call the model deployment. The deploy identity may assign only the roles listed in `bootstrap.bicep`, so the owner reruns
+  the bootstrap once to allow these.
+- Locally: Azurite provides the queue, and a development-only fake model returns a fixed recipe, so the whole flow runs
+  without Azure.
+
 ## Backups
 
 Cosmos DB keeps continuous backups for 7 days (point-in-time restore), and Blob Storage keeps deleted photos for 7 days (soft
@@ -280,6 +332,8 @@ storage code itself is tested against the emulators with `npm run test:int`.
 | Container Apps (Consumption) | $0 within the monthly free grant          |
 | Cosmos DB (free tier)        | $0 within the free throughput and storage |
 | Blob Storage                 | A few cents                               |
+| AI model (Foundry)           | Pay per import; cents, depending on model |
+| Storage queue                | A fraction of a cent                      |
 | Domain name                  | About $12 per year                        |
 
 ## Open items
@@ -291,3 +345,5 @@ storage code itself is tested against the emulators with `npm run test:int`.
 3. Microsoft account IDs: confirm which identifier the built-in auth passes for personal Microsoft accounts and that it stays the
    same if the app registration is ever recreated. The Account page makes this easy to check.
 4. Cosmos free tier: must be chosen when the account is created; only one free-tier account is allowed per subscription.
+5. Import model (IMP-6): try a few Foundry models on a handful of real recipe cards, including handwritten ones, and pick
+   the cheapest that reads them reliably. Check how close its dish-picture boxes are (IMP-9).

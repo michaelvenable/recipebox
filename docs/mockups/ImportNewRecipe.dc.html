@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New recipe — import from a photo</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2E6A4F}a:hover{color:#1F4D38}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F6F6F3; color: #1D2420; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <header style="display: flex; align-items: center; justify-content: space-between; padding: 12px 12px; background: #FFFFFF; border-bottom: 1px solid #DCDFDA">
+    <a href="ListEditor.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 10px; font-size: 16px; text-decoration: none">Cancel</a>
+    <h1 style="margin: 0; font-size: 18px; font-weight: 700">New recipe</h1>
+    <button type="button" style="min-height: 44px; padding: 0 18px; border: 0; border-radius: 22px; background: #2E6A4F; color: #FFFFFF; font: inherit; font-size: 16px; font-weight: 700">Save</button>
+  </header>
+
+  <form style="display: flex; flex-direction: column; gap: 24px; padding: 20px">
+    <section aria-labelledby="import-title" style="display: flex; flex-direction: column; gap: 12px; padding: 16px; background: #FFFFFF; border-radius: 14px">
+      <div style="display: flex; align-items: center; gap: 12px">
+        <div style="flex: none; width: 44px; height: 44px; border-radius: 22px; background: #E3EEE7; display: flex; align-items: center; justify-content: center">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1F4D38" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>
+        </div>
+        <h2 id="import-title" style="margin: 0; font-size: 17px; font-weight: 700">Have it on paper?</h2>
+      </div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.45">Upload a photo of the recipe to begin.</p>
+      <button type="button" style="display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border: 1px solid #2E6A4F; border-radius: 14px; background: #FFFFFF; color: #2E6A4F; font: inherit; font-size: 16px; font-weight: 700">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2E6A4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>
+        Import from a photo
+      </button>
+    </section>
+
+    <div style="display: flex; align-items: center; gap: 12px; color: #59615C; font-size: 14px">
+      <span style="flex: 1; height: 1px; background: #DCDFDA"></span>
+      or type it in
+      <span style="flex: 1; height: 1px; background: #DCDFDA"></span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="name" style="font-size: 15px; font-weight: 700">Name</label>
+      <input id="name" type="text" value="" style="height: 48px; padding: 0 14px; border: 1px solid #C9CEC8; border-radius: 12px; font: inherit; font-size: 17px; background: #FFFFFF">
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 15px; font-weight: 700">Photo</span>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <button type="button" style="min-height: 44px; padding: 0 14px; border: 1px solid #C9CEC8; border-radius: 12px; background: #FFFFFF; color: #1D2420; font: inherit; font-size: 15px">Add photo</button>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="time" style="font-size: 15px; font-weight: 700">Total time</label>
+      <input id="time" type="text" value="" aria-describedby="time-hint" style="width: 120px; height: 48px; padding: 0 14px; border: 1px solid #C9CEC8; border-radius: 12px; font: inherit; font-size: 17px; background: #FFFFFF">
+      <span id="time-hint" style="font-size: 13px; color: #59615C">Optional. Examples: 1:30, :45.</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="ingredients" style="font-size: 15px; font-weight: 700">Ingredients</label>
+      <textarea id="ingredients" rows="5" style="width: 100%; box-sizing: border-box; min-height: 141px; padding: 10px 12px; border: 1px solid #C9CEC8; border-radius: 12px; font: inherit; font-size: 17px; line-height: 1.4; background: #FFFFFF; color: #1D2420; resize: vertical"></textarea>
+    </div>
+  </form>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

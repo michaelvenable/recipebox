@@ -195,6 +195,50 @@ class ShoppingListLink {
 - `expiresAt` is derived from `createdAt`, never stored. Removing the link after it expires is the infrastructure's job
   (docs/architecture.md, "Sent shopping lists").
 
+### Recipe import
+
+```ts
+class RecipeImport {
+  static start(id: ImportId, at: Instant): RecipeImport;          // IMP-1; status "reading"
+  get id(): ImportId;
+  get startedAt(): Instant;
+  statusAt(now: Instant): "reading" | "done" | "failed";          // "reading" past its deadline reads as "failed" (IMP-11)
+  isInProgress(now: Instant): boolean;                            // IMP-3: statusAt(now) === "reading"
+  succeed(recipe: Recipe, at: Instant): Result<void>;             // IMP-10; keeps the recipe's id and name
+  fail(): void;                                                   // IMP-11
+  get recipeId(): RecipeId | undefined;
+  get recipeName(): RecipeName | undefined;
+  toSnapshot(): RecipeImportSnapshot;
+  static fromSnapshot(s: RecipeImportSnapshot): RecipeImport;
+}
+
+interface ReadRecipe {            // what was read from the photo, after the server has checked its shape
+  name: string;
+  ingredients: string[];
+  prep: string[];
+  steps: string[];
+  totalTimeMinutes?: number;
+  tags: string[];
+}
+
+function importedRecipe(id: RecipeId, read: ReadRecipe, tagsInUse: readonly Tag[]): Result<Recipe>;   // IMP-7, IMP-8
+```
+
+- The 10 minutes are a domain rule (`IMPORT_MINUTES`), counted from `startedAt` by the server's clock (X-12). An import is in
+  progress while its status is "reading" and `now` is before `startedAt` + 10 minutes. Example: started 09:00:00, in progress
+  at 09:09:59, not at 09:10:00.
+- `succeed` and `fail` apply only to an import in progress. `succeed` fails with `import.timedOut` if `at` is at or after the
+  deadline, so a recipe read too late is not added. A finished import doesn't change again: `fail` on one does nothing, and
+  `succeed` fails with `import.finished`.
+- `importedRecipe` builds the recipe with `Recipe.create`, so every content rule applies (REC-1, REC-2, REC-11) and its errors
+  come back unchanged (IMP-7). Before that, it keeps only tags that are already in use: each read tag is read like tag input
+  (REC-11), one not in `tagsInUse` or invalid is dropped, duplicates are dropped, and only the first 5 are kept, in the order
+  read (IMP-8). Dropped tags are never an error.
+- `ImportId` is a UUID made by the server, like `RecipeId`. The recipe's id is also made by the server, from the import's id,
+  so the same import always makes the same recipe id.
+- The failure reason (IMP-11) is not stored; it is logged by the server. The page photo, the AI service and the dish picture
+  are not in the domain.
+
 ### Rediscovery ordering
 
 ```ts
@@ -251,6 +295,24 @@ interface ShoppingListLinkSnapshot {
 token in the message. There is no `schemaVersion`: nothing else is to be stored, and a later change can tell old documents
 by their fields.
 
+### Recipe import snapshot
+
+Stored as one Cosmos document with the fixed id `current`, in the `imports` container, so there is only ever one (IMP-3).
+
+```ts
+interface RecipeImportSnapshot {
+  id: "current";
+  importId: string;
+  startedAt: string;              // ISO 8601 timestamp
+  status: "reading" | "done" | "failed";
+  recipeId?: string;              // only when done
+  recipeName?: string;            // only when done
+}
+```
+
+`fromSnapshot` re-validates and throws on invalid data, as for a recipe. The stored status is "reading" until the import ends;
+an expired one is read through `statusAt(now)`.
+
 ## Boundaries: what is NOT in the domain
 
 | Concern                            | Where it lives                       | Why                                    |
@@ -286,6 +348,7 @@ packages/domain/
     finding.ts        # findRecipes, tagsInUse, suggestTags, trashContents
     rediscovery.ts
     shopping-list-link.ts  # ShareToken, ShoppingListLink (PLAN-9)
+    recipe-import.ts  # ImportId, RecipeImport, importedRecipe (IMP)
     index.ts          # public exports only
   test/
     *.test.ts         # describe blocks named by spec ID, e.g. describe("COOK-5 ...")

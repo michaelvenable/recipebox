@@ -21,7 +21,7 @@ Errors:
 | 401    | Editor endpoint called without signing in              | `ErrorResponse`              |
 | 403    | Editor endpoint called by a signed-in non-editor       | `ErrorResponse`              |
 | 404    | Recipe doesn't exist, or is in the trash (see below)   | `ErrorResponse`              |
-| 409    | Change refused by the recipe's state (see below)       | `ErrorResponse`              |
+| 409    | Change refused by the recipe's or import's state       | `ErrorResponse`              |
 | 415    | A change sent without a JSON body                      | `ErrorResponse`              |
 
 Recipes in the trash: reading one gets 404, the same as an unknown id. Visitors and non-editors who try to change one get 401 or
@@ -54,8 +54,8 @@ Visitors get the public shapes. Editors calling the same endpoints get the edito
 Recipes:
 - `POST /recipes` — create (REC-1). Body `RecipeContentInput`. Returns 201 with `EditorRecipe`.
 - `PUT /recipes/{id}/content` — edit (REC-5). Body `RecipeContentInput`. Returns `EditorRecipe`.
-- `PUT /recipes/{id}/photo` — add or replace the photo (REC-7). Body: the image (`multipart/form-data`, the one exception to the
-  JSON rule, still refused from other origins by CORS). Returns `EditorRecipe`. Exactly one file part, under any field name. JPEG,
+- `PUT /recipes/{id}/photo` — add or replace the photo (REC-7). Body: the image (`multipart/form-data`, one of two exceptions to
+  the JSON rule, still refused from other origins by CORS). Returns `EditorRecipe`. Exactly one file part, under any field name. JPEG,
   PNG or WebP up to 15 MB, detected from the file's bytes. Errors (400): `photo.required`, `photo.tooLarge`,
   `photo.unsupportedType`, `photo.unreadable`. 503 `photo.busy` when too many uploads are waiting to be processed; try again.
   Location and other metadata are removed before storing.
@@ -85,6 +85,15 @@ Cooking history:
 - `GET /recommendations?tags=` — "Haven't made in a while" (COOK-6), filtered by tags (COOK-9). `tags` is read as on
   `GET /recipes`: comma-separated, only recipes with every one, still in the COOK-6 order. Returns `RediscoverEntry[]`.
 
+Import from a photo:
+- `POST /imports` — start an import (IMP-1 to IMP-4). Body: the photo, as for `PUT /recipes/{id}/photo` (`multipart/form-data`,
+  the other exception to the JSON rule; one file part; the same checks and `photo.*` errors, IMP-2). The server makes the import
+  ID and takes the start time from its clock (X-12), stores the photo without its metadata, and queues the import. Returns 202
+  with `ImportStatus` (`status` `reading`). 409 `import.busy` when an import is already in progress (IMP-3); nothing is stored.
+- `GET /imports/current` — the latest import (IMP-5, IMP-10). Returns `ImportStatus`, or 404 `import.none` when there has been
+  none. An import still `reading` after its 10 minutes is reported as `failed` (IMP-11). Read by the
+  Catalog every few seconds while an import is in progress.
+
 Trash:
 - `GET /trash` — the trash (REC-14). Returns `TrashEntry[]`, each with `deletedAt` and `removalDueAt`.
 - `POST /trash/{id}/restore` — restore (REC-15, REC-16). Returns `EditorRecipe`; 409 with `trash.expired` after 30 days. Restoring
@@ -107,6 +116,8 @@ Trash:
 - `ToMakeEntry`: `RecipeSummary` plus `addedAt`.
 - `RediscoverEntry`: `RecipeSummary` plus `lastCookedAt?`.
 - `TrashEntry`: `RecipeSummary` plus `deletedAt`, `removalDueAt`.
+- `ImportStatus`: `importId`, `status` (`reading`, `done` or `failed`), and when `done`, `recipeId` and `recipeName`. No start
+  time, failure reason or photo; the reason is only in the server log (IMP-11).
 - `Me`: `signedIn`, `provider?` (`aad` or `google`), `accountId?`, `isEditor`.
 - `ErrorResponse`: `errors[]` of `{ code, field?, message }`.
 - `EmptyRequest`: `{}`, the body of a change that needs no input (delete, restore, add to the list, mark cooked).
