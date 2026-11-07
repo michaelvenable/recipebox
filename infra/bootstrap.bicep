@@ -104,6 +104,40 @@ module deployAccess 'modules/deploy-access.bicep' = {
   }
 }
 
+// Azure Resource Manager tracks Static Web Apps operations, such as adding a custom domain, through a subscription-level status
+// endpoint, and polls it with the deploying identity's rights. Without this read, the deployment retries for hours after the
+// domain is ready. The role grants only that read; it can't change anything.
+resource deployStatusRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
+  name: guid(subscription().subscriptionId, 'recipebox-deploy-status-reader')
+  properties: {
+    roleName: 'RecipeBox Deploy Status Reader'
+    description: 'Read the status of Static Web Apps operations, so deployments can tell when they finish.'
+    type: 'CustomRole'
+    permissions: [
+      {
+        actions: [
+          'Microsoft.Web/locations/staticSitesOperationStatuses/read'
+        ]
+        notActions: []
+        dataActions: []
+        notDataActions: []
+      }
+    ]
+    assignableScopes: [
+      subscription().id
+    ]
+  }
+}
+
+resource deployStatusAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(subscription().id, 'id-recipebox-github', deployStatusRole.id)
+  properties: {
+    roleDefinitionId: deployStatusRole.id
+    principalId: deployIdentity.outputs.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // GitHub repository variables (not secrets; OpenID Connect needs none). infra/README.md, step 2.
 output AZURE_CLIENT_ID string = deployIdentity.outputs.clientId
 output AZURE_TENANT_ID string = tenant().tenantId
