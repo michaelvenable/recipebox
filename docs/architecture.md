@@ -219,6 +219,12 @@ Safety rules for the job, because it deletes data permanently:
   configured with the production database and the production storage together; pointing it at a copy of the database with
   production storage could remove photos of recipes that are past due only in the copy.
 
+## Backups
+
+Cosmos DB keeps continuous backups for 7 days (point-in-time restore), and Blob Storage keeps deleted photos for 7 days (soft
+delete). Both are free at this size. A restore is done by hand from the Azure portal. Removal under REC-16 doesn't reach these
+copies; they expire on their own (REC-16).
+
 ## Testing
 
 | Level      | Tool                        | What                                                                    |

@@ -80,7 +80,8 @@ tag.
   content, photo, tags and cooking history unchanged. It is not on the "to make" list, because deleting took it off (PLAN-6).
 - **REC-16. Permanent removal.** Once a recipe has been in the trash for 30 days, it can no longer be restored, even if it hasn't
   been removed yet. It is permanently removed, together with its photo and cooking history, within one day after that. The 30 days
-  are measured by the server's clock, never by a time the app sends.
+  are measured by the server's clock, never by a time the app sends. Backups are not covered: copies of the recipe and its photo
+  in backups can remain until those backups expire, at most 7 days later (docs/architecture.md, "Backups").
 - **REC-17. Trashed recipes can't be changed.** Any change to a recipe in the trash, other than restoring it, is refused and
   nothing changes. The editor is told the recipe is in the trash. (This can happen when another device still shows the recipe
   after it was deleted.) The exception is deleting it again: that changes nothing and shows no error.
