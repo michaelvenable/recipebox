@@ -8,7 +8,7 @@
 #   ENABLE_AUTH             "true" to turn on built-in sign-in with TRUST_AUTH_HEADERS (infra/README.md, step 6)
 #   MICROSOFT_CLIENT_ID     required when ENABLE_AUTH is "true"
 #   MICROSOFT_OPENID_ISSUER optional; overrides the consumers-tenant issuer in infra/main.bicep
-#   GOOGLE_CLIENT_ID        optional; set it to add Google sign-in, which isn't offered for now (X-7). It turns Google on in
+#   GOOGLE_CLIENT_ID        set it to offer Google sign-in (X-7). It turns Google on in
 #                           both the auth layer and the client's sign-in buttons.
 #
 # Integration tests (npm run test:int) are not run here: they need the Cosmos DB emulator and Azurite.
@@ -153,7 +153,7 @@ jobs:
           for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
             [ -n "${!name}" ] || missing+=("$name")
           done
-          # Google is optional (X-7: Microsoft only for now); GOOGLE_CLIENT_ID only adds it.
+          # Microsoft is required for sign-in; GOOGLE_CLIENT_ID adds Google (X-7).
           if [ "$ENABLE_AUTH" = "true" ] && [ -z "$MICROSOFT_CLIENT_ID" ]; then
             missing+=(MICROSOFT_CLIENT_ID)
           fi

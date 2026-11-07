@@ -6,8 +6,8 @@
 // - bindCustomDomains: binds recipes.mikevenable.net and api.recipes.mikevenable.net with free managed certificates. It needs
 //   the DNS records from the dnsRecords output in place first (Route 53, by hand). Once on, keep it on.
 // - enableAuth: Container Apps' built-in sign-in (docs/architecture.md, "Sign-in"), together with TRUST_AUTH_HEADERS=true. It
-//   needs the Microsoft registration and its client secret in the Key Vault first. Google is optional (X-7: Microsoft only for
-//   now): it is added only when googleClientId is set, and then needs its registration and secret too.
+//   needs the Microsoft registration and its client secret in the Key Vault first. Google (X-7) is
+//   added only when googleClientId is set, and then needs its registration and secret too.
 
 import { photoRoleDefinitionName } from 'shared.bicep'
 
@@ -298,8 +298,8 @@ resource keyVaultSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01
 var microsoftSecretName = 'microsoft-provider-authentication-secret'
 var googleSecretName = 'google-provider-authentication-secret'
 
-// X-7: Microsoft only for now. Google stays in the design and is turned on by setting googleClientId, with no code change; until
-// then the app has no reference to a Google secret, so none has to exist in the vault.
+// X-7: Google is turned on by setting googleClientId, with no code change. Without it the app has no reference to a Google
+// secret, so none has to exist in the vault.
 var googleSignIn = !empty(googleClientId)
 
 var microsoftAuthSecret = {

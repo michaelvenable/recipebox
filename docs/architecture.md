@@ -102,8 +102,8 @@ Outside requests cannot set those headers, but only while the auth layer is swit
 be an editor. So the API trusts these headers only when it runs on Container Apps and the setting `TRUST_AUTH_HEADERS=true` is
 present; the infrastructure script sets it in the same step that turns the auth layer on. Without it, everyone is a visitor.
 
-For now only Microsoft is offered (X-7). Google stays in the design: the server still recognizes `google:` identities, and adding
-it later takes the provider setup steps 3–4, its secret in the Key Vault and the `GOOGLE_CLIENT_ID` variable, with no code change.
+Microsoft and Google are both offered (X-7). Google is switched on by configuration: the provider setup steps 3–4, its secret in
+the Key Vault and the `GOOGLE_CLIENT_ID` variable. Without that variable, only Microsoft is offered.
 
 - Configuration: "Allow unauthenticated access", so visitors can read public recipes; the API decides what needs an editor.
 - Sign-in links point at `https://api.recipes.mikevenable.net/.auth/login/{aad|google}`, with `post_login_redirect_uri` returning
@@ -135,8 +135,8 @@ Provider setup (done once, by hand):
 | ---- | ------------------------------ | ------------------------------------------------------------------------------------- |
 | 1    | Microsoft Entra (Azure portal) | App registration allowing personal Microsoft accounts; ID tokens on; client secret.   |
 | 2    | Microsoft Entra                | Add the Microsoft redirect URI (below).                                               |
-| 3    | Google Cloud Console (later)   | OAuth consent screen (External, testing mode); add each Google editor as a test user. |
-| 4    | Google Cloud Console (later)   | Web OAuth client with the Google redirect URI (below).                                |
+| 3    | Google Cloud Console           | OAuth consent screen (External, testing mode); add each Google editor as a test user. |
+| 4    | Google Cloud Console           | Web OAuth client with the Google redirect URI (below).                                |
 | 5    | Container app, Authentication  | Add the providers (client IDs and secrets); allow unauthenticated access.             |
 | 6    | Container app, Authentication  | Allow `https://recipes.mikevenable.net` as a post-sign-in redirect target.            |
 

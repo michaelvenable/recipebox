@@ -6,7 +6,7 @@ import { fetchMe } from "../api/me.js";
 
 export type Provider = NonNullable<Me["provider"]>;
 
-// Google keeps its name even while it isn't offered (X-7): the server still recognizes `google:` identities, and the Account
+// Both providers are offered (X-7); Google's button shows only when the build has VITE_GOOGLE_SIGN_IN. The Account
 // page names the provider of whoever is signed in (X-11).
 export const PROVIDER_NAMES: Record<Provider, string> = { aad: "Microsoft", google: "Google" };
 

@@ -82,7 +82,7 @@ All the variables the workflow reads:
 | `ENABLE_AUTH`             | From step 6           | `true`.                                                         |
 | `MICROSOFT_CLIENT_ID`     | With `ENABLE_AUTH`    | Entra app registration's Application (client) ID.               |
 | `MICROSOFT_OPENID_ISSUER` | Optional              | Overrides the default consumers-tenant issuer (step 6).         |
-| `GOOGLE_CLIENT_ID`        | Optional, later       | Google OAuth web client ID; adds Google sign-in (step 6).       |
+| `GOOGLE_CLIENT_ID`        | For Google sign-in    | Google OAuth web client ID; adds Google sign-in (step 6).       |
 | `EDITORS`                 | From step 7           | `provider:accountId` entries, comma-separated (X-7).            |
 
 ## 3. First deployment
@@ -138,8 +138,8 @@ Check `https://recipes.mikevenable.net` loads and `https://api.recipes.mikevenab
 
 ## 6. Sign-in
 
-Until this step everyone is a visitor. For now only Microsoft sign-in is offered (X-7); Google is optional and can be added
-later (below). Do it in this order; a deployment with `ENABLE_AUTH=true` fails if the secret is missing.
+Until this step everyone is a visitor. Microsoft and Google sign-in are both offered (X-7); Microsoft is set up first and
+Google added after it (below). Do it in this order; a deployment with `ENABLE_AUTH=true` fails if the secret is missing.
 
 1. The Microsoft registration, as in `docs/architecture.md` ("Sign-in", "Provider setup", steps 1 and 2), with the redirect URI
    `https://api.recipes.mikevenable.net/.auth/login/aad/callback`.
@@ -168,7 +168,7 @@ The deployment turns on the auth layer (Microsoft, unauthenticated access allowe
 allowed redirect target) before it sets `TRUST_AUTH_HEADERS=true` on the API, so identity headers are never trusted without it.
 Session length is left at the defaults (open item 2).
 
-Adding Google later needs no code change. Do the Google registration (`docs/architecture.md`, "Provider setup", steps 3 and 4,
+Adding Google needs no code change. Do the Google registration (`docs/architecture.md`, "Provider setup", steps 3 and 4,
 redirect URI `https://api.recipes.mikevenable.net/.auth/login/google/callback`), add the Google client secret to the vault as
 `google-provider-authentication-secret`, then set the variable and deploy:
 
