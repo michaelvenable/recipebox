@@ -61,3 +61,11 @@ export const trashKeys = {
    */
   expired: () => ["trashExpired"] as const,
 };
+
+/**
+ * GET /shopping-lists/{token}, a sent list (PLAN-9). It never changes once sent, and is the same for every caller, so nothing
+ * invalidates it; it only stops being available after 7 days.
+ */
+export const sharedListKeys = {
+  detail: (token: string) => ["sharedList", token] as const,
+};

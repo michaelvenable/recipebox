@@ -39,3 +39,24 @@ export const TrashEntry = RecipeSummary.extend({
   removalDueAt: z.string(),
 });
 export type TrashEntry = z.infer<typeof TrashEntry>;
+
+/**
+ * POST /plan/shopping-list/shares returns ShoppingListLink (PLAN-9): the new link's random code, the app's path for it
+ * (`/list/{token}`, joined to the app's origin by the client) and when it stops working, by the server's clock (X-12).
+ */
+export const ShoppingListLink = z.strictObject({
+  token: z.string(),
+  path: z.string(),
+  expiresAt: z.string(),
+});
+export type ShoppingListLink = z.infer<typeof ShoppingListLink>;
+
+/**
+ * GET /shopping-lists/{token} returns SharedShoppingList (PLAN-9), to anyone with the link: the shopping list as it was when
+ * sent, in the same order, and when the link stops working. Nothing else; in particular no to-make dates (X-1).
+ */
+export const SharedShoppingList = z.strictObject({
+  items: ShoppingItem.array(),
+  expiresAt: z.string(),
+});
+export type SharedShoppingList = z.infer<typeof SharedShoppingList>;

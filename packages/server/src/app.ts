@@ -1,34 +1,42 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import type { HealthResponse, Me } from "@recipebox/shared";
-import type { Clock, RecipeIdGenerator } from "./clock.js";
+import type { Clock, RecipeIdGenerator, ShareTokenGenerator } from "./clock.js";
 import type { Config } from "./config.js";
 import { registerCaller } from "./http/caller.js";
 import { registerJsonOnlyChanges } from "./http/content-type.js";
 import { registerErrorHandling } from "./http/errors.js";
+import { withRedactedUrls } from "./http/request-log.js";
 import type { PhotoProcessingOptions } from "./photos/photo-processing.js";
 import { registerPhotoRoutes } from "./photos/photo-routes.js";
 import type { PhotoStore } from "./photos/photo-store.js";
 import type { RecipeRepository } from "./recipes/recipe-repository.js";
 import { registerRecipeRoutes } from "./recipes/recipe-routes.js";
+import type { SharedListRepository } from "./shopping-lists/shared-list-repository.js";
+import { registerSharedListRoutes } from "./shopping-lists/shared-list-routes.js";
 
 /** Everything the API needs from outside, passed in so tests can build it without environment variables. */
 export interface AppDependencies {
   config: Config;
   /** Where recipes are stored: Cosmos DB in main.ts, the in-memory repository in route tests. */
   recipes: RecipeRepository;
+  /** Where sent shopping lists are stored (PLAN-9): Cosmos DB in main.ts, the in-memory repository in route tests. */
+  sharedLists: SharedListRepository;
   /** Where photo images are stored: Blob Storage in main.ts, the in-memory store in route tests (REC-7). */
   photos: PhotoStore;
   /** The server's clock, the source of every stored time (X-12). */
   clock: Clock;
   /** Creates the id for a new recipe (REC-1). */
   newRecipeId: RecipeIdGenerator;
+  /** Creates the random code of a new shopping list link (PLAN-9). */
+  newShareToken: ShareTokenGenerator;
   /** How photo uploads are decoded (REC-7). Left out except in tests that simulate a decoder that hangs or crashes. */
   photoProcessing?: Omit<PhotoProcessingOptions, "log">;
   /**
    * Fastify's logger. main.ts turns it on (JSON lines to stdout, collected by Container Apps); tests leave it off unless they
    * check what is logged. Fastify's default request serializer logs method, URL and host but no headers, so cookies and
-   * authorization headers never reach the log; don't replace it with one that logs headers.
+   * authorization headers never reach the log; don't replace it with one that logs headers. The URL of a shopping list link
+   * is logged without its code (http/request-log.ts, PLAN-9).
    */
   logger?: FastifyServerOptions["logger"];
 }
@@ -37,13 +45,15 @@ export interface AppDependencies {
 export async function buildApp({
   config,
   recipes,
+  sharedLists,
   photos,
   clock,
   newRecipeId,
+  newShareToken,
   photoProcessing = {},
   logger = false,
 }: AppDependencies): Promise<FastifyInstance> {
-  const app = Fastify({ logger });
+  const app = Fastify({ logger: withRedactedUrls(logger) });
 
   registerErrorHandling(app);
   // CORS allows exactly the client's origin, with the session cookie (docs/architecture.md, "Sign-in"). Any other origin gets
@@ -70,6 +80,7 @@ export async function buildApp({
 
   // Each in its own scope, so their hooks (and the photo routes' multipart parser) apply only to them.
   await app.register(async (scope) => registerRecipeRoutes(scope, { recipes, clock, newRecipeId }));
+  await app.register(async (scope) => registerSharedListRoutes(scope, { recipes, sharedLists, clock, newShareToken }));
   await app.register(async (scope) => registerPhotoRoutes(scope, { recipes, photos, photoProcessing }));
 
   return app;

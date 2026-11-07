@@ -1,16 +1,18 @@
 import type { FastifyInstance } from "fastify";
 import { Instant } from "@recipebox/domain";
 import { type AppDependencies, buildApp } from "../src/app.js";
-import { randomRecipeId } from "../src/clock.js";
+import { randomRecipeId, randomShareToken } from "../src/clock.js";
 import { type Config, loadConfig } from "../src/config.js";
 import { InMemoryPhotoStore } from "../src/photos/in-memory-photo-store.js";
 import { InMemoryRecipeRepository } from "../src/recipes/in-memory-recipe-repository.js";
+import { InMemorySharedListRepository } from "../src/shopping-lists/in-memory-shared-list-repository.js";
 
 /** Settings a deployed app needs, so tests can build a non-local config. */
 export const DEPLOYED_SETTINGS = {
   COSMOS_ENDPOINT: "https://recipebox.documents.azure.com",
   COSMOS_DATABASE: "db",
   COSMOS_CONTAINER: "recipes-prod",
+  COSMOS_SHOPPING_LIST_CONTAINER: "shopping-lists-prod",
   STORAGE_BLOB_ENDPOINT: "https://recipebox.blob.core.windows.net",
   STORAGE_PHOTO_CONTAINER: "photos-prod",
   AZURE_CLIENT_ID: "00000000-0000-0000-0000-000000000001",
@@ -34,19 +36,21 @@ export function instant(iso: string): Instant {
   return parsed.value;
 }
 
-/** The app with an empty in-memory repository and photo store and a fixed clock, unless `deps` says otherwise. */
+/** The app with empty in-memory repositories and photo store and a fixed clock, unless `deps` says otherwise. */
 export async function appWith(
   env: Record<string, string | undefined> = {},
   logger: AppDependencies["logger"] = false,
-  deps: Partial<Pick<AppDependencies, "recipes" | "photos" | "clock" | "newRecipeId" | "photoProcessing">> = {},
+  deps: Partial<Pick<AppDependencies, "recipes" | "sharedLists" | "photos" | "clock" | "newRecipeId" | "newShareToken" | "photoProcessing">> = {},
 ): Promise<FastifyInstance> {
   return buildApp({
     config: configFrom(env),
     logger,
     recipes: deps.recipes ?? new InMemoryRecipeRepository(),
+    sharedLists: deps.sharedLists ?? new InMemorySharedListRepository(),
     photos: deps.photos ?? new InMemoryPhotoStore(),
     clock: deps.clock ?? (() => instant(TEST_TIME)),
     newRecipeId: deps.newRecipeId ?? randomRecipeId,
+    newShareToken: deps.newShareToken ?? randomShareToken,
     ...(deps.photoProcessing === undefined ? {} : { photoProcessing: deps.photoProcessing }),
   });
 }

@@ -1037,8 +1037,12 @@ code {
   font-size: 15px;
 }
 
-/* A heading with an action beside it, such as Plan's "Shopping list" (PLAN-8). Wraps below the heading if too narrow. */
-.list-page-header.with-action {
+/*
+ * A heading with an action beside it, such as Plan's "Shopping list" (PLAN-8) or the shopping list's "Send" (PLAN-9). Wraps
+ * below the heading if too narrow.
+ */
+.list-page-header.with-action,
+.heading-with-action {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -1070,6 +1074,71 @@ code {
 .pill-button:hover {
   border-color: var(--muted);
   color: var(--text);
+}
+
+/* The same as a button, such as "Send" on the shopping list (docs/mockups/ShoppingList.dc.html). */
+button.pill-button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button.pill-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* A sent shopping list link and the date it stops working (PLAN-9, docs/mockups/ShoppingList.dc.html). */
+.sent-link {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+}
+
+.list-page-header .sent-link p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.sent-link-address {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* One line, cut short with an ellipsis on a phone; selecting it still copies the whole link. */
+.sent-link-address code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: inherit;
+}
+
+.sent-link .link-button {
+  flex: none;
+  margin: 0;
+  padding: 0 8px;
+  color: inherit;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.list-page-header .sent-link-copied {
+  font-size: 14px;
+}
+
+/* "This link works until …" under the count on a sent list (docs/mockups/SharedList.dc.html). */
+.list-page-header .shared-list-until {
+  margin-top: 4px;
 }
 
 /* Shopping list (PLAN-8, docs/mockups/ShoppingList.dc.html). */
@@ -1247,6 +1316,7 @@ code {
   text-align: center;
 }
 
+.empty-state h1,
 .empty-state h2 {
   margin: 0;
   font-size: 21px;
@@ -1273,6 +1343,12 @@ code {
   border-radius: 36px;
   background: var(--plan-bg);
   color: var(--plan-fg);
+}
+
+/* A neutral icon, such as the clock on an expired shopping list link (docs/mockups/SharedListExpired.dc.html). */
+.empty-state-icon-quiet {
+  background: var(--surface-muted);
+  color: var(--muted);
 }
 
 /* Hidden from view but still focusable and announced, such as the file input inside its "Add photo" label. */

@@ -13,6 +13,7 @@ const allSettings = {
   COSMOS_ENDPOINT: "https://recipebox.documents.azure.com",
   COSMOS_DATABASE: "db",
   COSMOS_CONTAINER: "recipes-prod",
+  COSMOS_SHOPPING_LIST_CONTAINER: "shopping-lists-prod",
   STORAGE_BLOB_ENDPOINT: "https://recipebox.blob.core.windows.net",
   STORAGE_PHOTO_CONTAINER: "photos-prod",
   AZURE_CLIENT_ID: "11111111-2222-3333-4444-555555555555",
@@ -35,6 +36,7 @@ describe("loadConfig", () => {
       access: { kind: "key", key: COSMOS_EMULATOR_KEY },
       database: "recipebox",
       container: "recipes",
+      shoppingListContainer: "shopping-lists",
     });
     expect(config.storage).toEqual({
       access: { kind: "connectionString", connectionString: AZURITE_CONNECTION_STRING },
@@ -52,6 +54,7 @@ describe("loadConfig", () => {
     });
     const deployed = loadConfig(allSettings);
     expect(deployed.cosmos).toMatchObject({ endpoint: allSettings.COSMOS_ENDPOINT, database: "db", container: "recipes-prod" });
+    expect(deployed.cosmos.shoppingListContainer).toBe("shopping-lists-prod");
     expect(deployed.storage.photoContainer).toBe("photos-prod");
     expect(deployed.clientOrigin).toBe("https://recipes.example.net");
     expect(deployed.local).toBe(false);
@@ -61,8 +64,8 @@ describe("loadConfig", () => {
     "throws naming every missing setting when APP_ENV is %j",
     (appEnv) => {
       expect(() => loadConfig({ APP_ENV: appEnv })).toThrow(
-        "Missing required settings: COSMOS_ENDPOINT, COSMOS_DATABASE, COSMOS_CONTAINER, STORAGE_BLOB_ENDPOINT, " +
-          "STORAGE_PHOTO_CONTAINER, AZURE_CLIENT_ID, CLIENT_ORIGIN.",
+        "Missing required settings: COSMOS_ENDPOINT, COSMOS_DATABASE, COSMOS_CONTAINER, COSMOS_SHOPPING_LIST_CONTAINER, " +
+          "STORAGE_BLOB_ENDPOINT, STORAGE_PHOTO_CONTAINER, AZURE_CLIENT_ID, CLIENT_ORIGIN.",
       );
     },
   );

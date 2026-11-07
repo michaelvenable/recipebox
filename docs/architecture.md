@@ -35,7 +35,7 @@ How RecipeBox is built and deployed, and why. Behavior is defined in `docs/specs
 | Domain         | Pure TypeScript classes, no dependencies                    | Rules in one reviewable, testable place.       |
 | API            | Node 22 + Fastify                                           | Built-in validation; `inject()` for tests.     |
 | Contract       | Zod schemas in `packages/shared`                            | Shared types; drift fails the build.           |
-| Database       | Cosmos DB, free tier, one `recipes` container               | One recipe per document; free at this size.    |
+| Database       | Cosmos DB, free tier: `recipes`, `shopping-lists` (PLAN-9)  | One recipe per document; free at this size.    |
 | Photos         | Blob Storage, private container, served by the API          | API can hide trashed recipes' photos (X-1).    |
 | Client hosting | Static Web Apps, Free plan                                  | Free CDN, HTTPS and custom domain.             |
 | API hosting    | Container Apps, Consumption plan, scale to zero             | Free grant; a few seconds' cold start is fine. |
@@ -89,6 +89,8 @@ in `packages/shared`:
 Rules:
 - Visitors only ever receive `PublicRecipe`. A recipe in the trash is "not found" for visitors, and so is its photo.
 - Editor-only endpoints (to-make list, rediscovery view, trash) refuse visitors.
+- The one exception is a sent shopping list (PLAN-9): anyone with its link gets `SharedShoppingList`, a copy of the shopping
+  list's lines and the date the link stops working, and nothing else (see "Sent shopping lists").
 - Tests check every visitor-facing endpoint for the absence of private fields. This is a likely place for a leak, so reviewers
   should check it on every change that touches responses.
 
@@ -221,6 +223,28 @@ Safety rules for the job, because it deletes data permanently:
   deleting and the job reports a failure every day until someone looks. Nothing wrong is deleted. The job must always be
   configured with the production database and the production storage together; pointing it at a copy of the database with
   production storage could remove photos of recipes that are past due only in the copy.
+
+## Sent shopping lists
+
+PLAN-9 lets an editor send the shopping list as a link that works for 7 days without signing in.
+
+- `POST /plan/shopping-list/shares` follows "How a change is applied": editor check, the stored recipes, one domain call
+  (`SharedShoppingList.create`) with the server's time and a code the server makes (`crypto.randomBytes`, 128 bits, base64url),
+  then the snapshot is saved. The body must be `{}`, so the client can't supply the list, the code or a time.
+- Each list is one document in the `shopping-lists` container, partitioned by `/id` (the code). It is written once, with
+  `create`, so a list is never replaced.
+- Removal: the container has Cosmos DB time to live switched on with no default (`defaultTtl: -1`), and each document carries
+  `ttl` = its 7 days plus one hour, counted from the write, which is when the list was made. Cosmos DB stops returning it at
+  that point and deletes it in the background, within a day after the link stops working. Until then the domain
+  (`isAvailable`, by the server's clock) already refuses it, so the margin only guards against the database's clock running a
+  little ahead. The trash cleanup job is not involved.
+- `GET /shopping-lists/{token}` needs no sign-in and answers everyone alike. An expired, unknown or malformed code gets the same
+  404. The answer has `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
+- The code is the only key, so it is kept out of logs: the API's request log writes the path as `/shopping-lists/[redacted]`
+  (`http/request-log.ts`). The client's page for it, `/list/{token}`, is served by Static Web Apps with
+  `Referrer-Policy: no-referrer` (`staticwebapp.config.json`).
+- Locally the container is created on first run like the recipes container (`openStorage`); deployed, it comes from
+  `infra/main.bicep` and its name from `COSMOS_SHOPPING_LIST_CONTAINER`. It shares the database's free throughput.
 
 ## Backups
 

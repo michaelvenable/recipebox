@@ -42,6 +42,10 @@ Visitors get the public shapes. Editors calling the same endpoints get the edito
 - `GET /recipes/{id}/photo` and `GET /recipes/{id}/thumbnail` — the images (REC-7). 404 if there is no photo. If the recipe is in
   the trash: 404 for visitors and non-editors, but editors get the images, so the trash can show thumbnails (REC-14, X-1).
 - `GET /me` — the Account page (X-11). Returns `Me`: whether signed in, provider, account ID, and whether an editor.
+- `GET /shopping-lists/{token}` — a sent shopping list (PLAN-9), for anyone with the link and the same for everyone. Returns
+  `SharedShoppingList`. While the link works (`isAvailable` by the server's clock, X-12): 200. An expired, unknown or malformed
+  token all get the same 404 `sharedList.notFound`, so trying codes reveals nothing. Sent with `Cache-Control: no-store` and
+  `Referrer-Policy: no-referrer`; the request log shows the path as `/shopping-lists/[redacted]`, since the code is the key.
 
 ## Editor endpoints
 
@@ -69,6 +73,10 @@ Tags:
 - `POST /recipes/{id}/remove-from-plan` — remove (PLAN-4). Returns `EditorRecipe`.
 - `GET /plan/shopping-list` — the shopping list (PLAN-8): every ingredient of every recipe on the list, sorted by the domain
   (`shoppingList`). Read-only; ticks are the client's and never sent. Returns `ShoppingItem[]`.
+- `POST /plan/shopping-list/shares` — send the shopping list as a link (PLAN-9). Body `EmptyRequest`: the server builds the list
+  from the stored recipes with `shoppingList`, picks a random code (128 bits, base64url) and takes the time from its clock
+  (X-12); nothing sent by the client is stored. Returns 201 with `ShoppingListLink`. 409 `shoppingList.empty` when the plan is
+  empty. Each call makes a new link; earlier links keep working until they expire.
 
 Cooking history:
 - `POST /recipes/{id}/cookings` — "I cooked this today" (COOK-1, PLAN-5). The server records its own time. Returns `EditorRecipe`.
@@ -90,6 +98,8 @@ Trash:
 - `EditorRecipe`: `PublicRecipe` plus `toMake?` (`addedAt`), `cookedAt[]` (newest first), `lastCookedAt?`, `timesCooked`.
 - `TagCount`: `tag`, `count`. `Tag`: a string.
 - `ShoppingItem`: `text` (the ingredient as entered), `recipeId`, `recipeName`.
+- `ShoppingListLink`: `token`, `path` (`/list/{token}`, the client's page for it), `expiresAt`.
+- `SharedShoppingList`: `items[]` (`ShoppingItem`, in the order sent), `expiresAt`. No to-make dates, creation time or token.
 - `TagRequest`: `{ tag }`, the tag text as typed.
 - `ToMakeEntry`: `RecipeSummary` plus `addedAt`.
 - `RediscoverEntry`: `RecipeSummary` plus `lastCookedAt?`.

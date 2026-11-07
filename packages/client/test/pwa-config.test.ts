@@ -101,6 +101,9 @@ describe("X-4 service worker", () => {
       "/recipes/0f8fad5b-d9cb-469f-a165-70867728950e/edit",
       "/recipes/new",
       "/plan",
+      "/plan/shopping",
+      // PLAN-9: a sent shopping list. Link codes are base64url, so they never have a dot.
+      "/list/k7Qm2xV9pR4tZ8wL-a1B_c",
       "/recommendations",
       "/trash",
       "/account",
@@ -142,6 +145,27 @@ describe("X-4 and X-10 Static Web Apps configuration", () => {
   it("answers the app's pages with index.html, but not built files or /.auth", () => {
     expect(config.navigationFallback.rewrite).toBe("/index.html");
     expect(config.navigationFallback.exclude).toEqual(expect.arrayContaining(["/assets/*", "/icons/*", "/.auth/*"]));
+  });
+
+  /** Whether a navigationFallback exclude pattern (Static Web Apps wildcards: `*` and `{a,b}`) matches `path`. */
+  function excluded(path: string): boolean {
+    return config.navigationFallback.exclude.some((pattern) => {
+      const source = pattern
+        .replace(/[.+?^$()|[\]\\]/g, "\\$&")
+        .replace(/\*/g, ".*")
+        .replace(/\{([^}]*)\}/g, (_all, list: string) => `(?:${list.split(",").join("|")})`);
+      return new RegExp(`^${source}$`).test(path);
+    });
+  }
+
+  it("PLAN-9 answers a sent shopping list's page with the app", () => {
+    expect(excluded("/list/k7Qm2xV9pR4tZ8wL-a1B_c")).toBe(false);
+    expect(excluded("/assets/index-abc.js")).toBe(true);
+    expect(excluded("/robots.txt")).toBe(true);
+  });
+
+  it("PLAN-9 never passes a sent shopping list's address on from its page", () => {
+    expect(headersFor("/list/*")["Referrer-Policy"]).toBe("no-referrer");
   });
 
   it("never lets browsers keep an old service worker, page or manifest", () => {

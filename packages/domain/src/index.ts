@@ -20,3 +20,10 @@ export {
   type ShoppingItem,
 } from "./finding.js";
 export { orderForRediscovery } from "./rediscovery.js";
+export {
+  SharedShoppingList,
+  ShareToken,
+  SHARED_LIST_DAYS,
+  type SharedShoppingLine,
+  type SharedShoppingListSnapshot,
+} from "./shared-shopping-list.js";

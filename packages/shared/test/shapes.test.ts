@@ -11,6 +11,8 @@ import {
   RecipeContentInput,
   RecipeSummary,
   RediscoverEntry,
+  SharedShoppingList,
+  ShoppingListLink,
   Tag,
   TagCount,
   TagRequest,
@@ -292,5 +294,26 @@ describe("X-1 public shapes reject private fields", () => {
   });
   it("a trash entry is not a valid public summary", () => {
     expect(RecipeSummary.safeParse({ ...summary, deletedAt: T2, removalDueAt: T1 }).success).toBe(false);
+  });
+});
+
+describe("api.md Shapes: ShoppingListLink and SharedShoppingList (PLAN-9)", () => {
+  const item = { text: "6 eggs", recipeId: ID, recipeName: "Shakshuka" };
+  const shared = { items: [item], expiresAt: T1 };
+  const link = { token: "k7Qm2xV9pR4tZ8wLa1B2c3", path: "/list/k7Qm2xV9pR4tZ8wLa1B2c3", expiresAt: T1 };
+
+  it("ShoppingListLink requires token, path and expiresAt", () => {
+    expect(ShoppingListLink.parse(link)).toEqual(link);
+    expectRequired(ShoppingListLink, link, ["token", "path", "expiresAt"]);
+  });
+  it("SharedShoppingList requires items and expiresAt", () => {
+    expect(SharedShoppingList.parse(shared)).toEqual(shared);
+    expectRequired(SharedShoppingList, shared, ["items", "expiresAt"]);
+  });
+  it("SharedShoppingList refuses anything private, on the list or on its lines (X-1)", () => {
+    for (const [field, value] of Object.entries({ ...PRIVATE_FIELDS, createdAt: T2, token: "x" })) {
+      expect(SharedShoppingList.safeParse({ ...shared, [field]: value }).success, field).toBe(false);
+      expect(SharedShoppingList.safeParse({ ...shared, items: [{ ...item, [field]: value }] }).success, field).toBe(false);
+    }
   });
 });

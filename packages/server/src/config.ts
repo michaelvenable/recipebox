@@ -34,7 +34,10 @@ export interface CosmosConfig {
   /** A key locally, the managed identity when deployed; always exactly one of them. */
   access: CosmosKeyAccess | ManagedIdentityAccess;
   database: string;
+  /** The recipes container. */
   container: string;
+  /** The container of sent shopping lists (PLAN-9), with time to live switched on so each is removed after it expires. */
+  shoppingListContainer: string;
 }
 
 /** Local access to Azurite with a connection string, which also names the endpoint. Only in development and test. */
@@ -241,6 +244,7 @@ export function loadConfig(env: Env = process.env): Config {
   const cosmosEndpoint = setting("COSMOS_ENDPOINT", COSMOS_EMULATOR_ENDPOINT);
   const cosmosDatabase = setting("COSMOS_DATABASE", "recipebox");
   const cosmosContainer = setting("COSMOS_CONTAINER", "recipes");
+  const shoppingListContainer = setting("COSMOS_SHOPPING_LIST_CONTAINER", "shopping-lists");
   // Read only when deployed; locally the connection string names the endpoint and no identity is used.
   const blobEndpoint = local ? "" : setting("STORAGE_BLOB_ENDPOINT", "");
   const photoContainer = setting("STORAGE_PHOTO_CONTAINER", "photos");
@@ -264,6 +268,7 @@ export function loadConfig(env: Env = process.env): Config {
       : { kind: "managedIdentity", clientId },
     database: cosmosDatabase,
     container: cosmosContainer,
+    shoppingListContainer,
   };
   const storage: StorageConfig = {
     access: local

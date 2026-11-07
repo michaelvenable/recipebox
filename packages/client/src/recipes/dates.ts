@@ -93,3 +93,13 @@ export function trashTimeLeft({ deletedAt, removalDueAt }: { deletedAt: string; 
   const days = Math.min(TRASH_DAYS, Math.max(1, TRASH_DAYS - localDaysBetween(new Date(deletedAt), now)));
   return days === 1 ? "1 day left" : `${days} days left`;
 }
+
+const WEEKDAY_DATE = new Intl.DateTimeFormat("en", { weekday: "short", month: "short", day: "numeric" });
+
+/**
+ * A day within the coming week, such as when a shopping list link stops working (PLAN-9): "Fri, Nov 14", in the device's time
+ * zone (X-12).
+ */
+export function formatWeekdayDate(iso: string): string {
+  return WEEKDAY_DATE.format(new Date(iso));
+}

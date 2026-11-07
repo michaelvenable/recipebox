@@ -18,7 +18,7 @@ What `main.bicep` creates, all in `southcentralus` except the Static Web App (`c
 | Resource                       | Name                         | Notes                                                       |
 | ------------------------------ | ---------------------------- | ----------------------------------------------------------- |
 | User-assigned identity         | `id-recipebox`               | The API and the cleanup job; data roles only.               |
-| Cosmos DB (free tier)          | `cosmos-recipebox-<suffix>`  | Database `recipebox` (1000 RU/s), container `recipes`.      |
+| Cosmos DB (free tier)          | `cosmos-recipebox-<suffix>`  | DB `recipebox` (1000 RU/s): `recipes`, `shopping-lists`.    |
 | Storage account                | `strecipebox<suffix>`        | Private container `photos`; blob soft delete 7 days.        |
 | Key Vault                      | `kv-recipebox-<suffix>`      | Sign-in provider client secrets, added by hand.             |
 | Log Analytics                  | `log-recipebox`              | 30 days; 0.15 GB a day cap.                                 |

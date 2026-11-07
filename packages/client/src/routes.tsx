@@ -8,11 +8,12 @@ import { EditRecipePage, NewRecipePage } from "./pages/RecipeFormPage.js";
 import { RecipeListPage } from "./pages/RecipeListPage.js";
 import { RecipePage } from "./pages/RecipePage.js";
 import { RediscoverPage } from "./pages/RediscoverPage.js";
+import { SharedListPage } from "./pages/SharedListPage.js";
 import { ShoppingListPage } from "./pages/ShoppingListPage.js";
 import { TrashPage } from "./pages/TrashPage.js";
 
 /**
- * Every page. Public pages: the recipe list and a recipe (X-1). Editor-only pages are wrapped in EditorOnly, so visitors get a
+ * Every page. Public pages: the recipe list and a recipe (X-1), and a sent shopping list (PLAN-9). Editor-only pages are wrapped in EditorOnly, so visitors get a
  * sign-in message instead of the page and its API calls.
  */
 export const routes: RouteObject[] = [
@@ -27,6 +28,8 @@ export const routes: RouteObject[] = [
       { path: "/plan/shopping", element: <EditorOnly><ShoppingListPage /></EditorOnly> },
       { path: "/recommendations", element: <EditorOnly><RediscoverPage /></EditorOnly> },
       { path: "/trash", element: <EditorOnly><TrashPage /></EditorOnly> },
+      // PLAN-9: a sent shopping list, for anyone with the link; deliberately not EditorOnly.
+      { path: "/list/:token", element: <SharedListPage /> },
       { path: "/account", element: <AccountPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],

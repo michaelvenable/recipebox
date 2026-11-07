@@ -82,6 +82,7 @@ var apiCertificateName = 'cert-api-recipebox'
 // What the server expects (packages/server/src/config.ts, recipes/cosmos-recipe-repository.ts, photos/blob-photo-store.ts).
 var cosmosDatabaseName = 'recipebox'
 var cosmosContainerName = 'recipes'
+var cosmosShoppingListContainerName = 'shopping-lists'
 var photoContainerName = 'photos'
 var apiPort = 3000
 var clientOrigin = 'https://${clientHostname}'
@@ -165,6 +166,26 @@ resource cosmosContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
         kind: 'Hash'
         version: 2
       }
+    }
+  }
+}
+
+// Sent shopping lists (PLAN-9; docs/architecture.md, "Sent shopping lists"), one per document, partitioned by /id (the link's
+// code) as ensureShoppingListContainer creates it locally. Time to live is on with no default (-1): only documents with their
+// own ttl expire, and the server gives each one its 7 days plus an hour, so Cosmos DB removes it within a day after the link
+// stops working. Shares the database's free throughput.
+resource cosmosShoppingListContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-04-15' = {
+  parent: cosmosDatabase
+  name: cosmosShoppingListContainerName
+  properties: {
+    resource: {
+      id: cosmosShoppingListContainerName
+      partitionKey: {
+        paths: ['/id']
+        kind: 'Hash'
+        version: 2
+      }
+      defaultTtl: -1
     }
   }
 }
@@ -335,6 +356,7 @@ var dataSettings = [
   { name: 'COSMOS_ENDPOINT', value: cosmosEndpoint }
   { name: 'COSMOS_DATABASE', value: cosmosDatabaseName }
   { name: 'COSMOS_CONTAINER', value: cosmosContainerName }
+  { name: 'COSMOS_SHOPPING_LIST_CONTAINER', value: cosmosShoppingListContainerName }
   { name: 'STORAGE_BLOB_ENDPOINT', value: blobEndpoint }
   { name: 'STORAGE_PHOTO_CONTAINER', value: photoContainerName }
   { name: 'CLIENT_ORIGIN', value: clientOrigin }
@@ -392,6 +414,7 @@ module apiAppPrepare 'modules/api-app.bicep' = if (prepareApiApp) {
     photoContainerData
     keyVaultSecretsUser
     cosmosContainer
+    cosmosShoppingListContainer
   ]
 }
 
@@ -480,6 +503,7 @@ module apiApp 'modules/api-app.bicep' = {
     photoContainerData
     keyVaultSecretsUser
     cosmosContainer
+    cosmosShoppingListContainer
     apiCertificate
     authConfig
   ]
@@ -533,6 +557,7 @@ resource cleanupJob 'Microsoft.App/jobs@2025-01-01' = {
     cosmosDataContributor
     photoContainerData
     cosmosContainer
+    cosmosShoppingListContainer
   ]
 }
 

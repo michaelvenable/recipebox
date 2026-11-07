@@ -17,6 +17,7 @@ export function emulatorCosmosConfig(): CosmosConfig {
     access: { kind: "key", key: COSMOS_EMULATOR_KEY },
     database: "recipebox",
     container: "recipes",
+    shoppingListContainer: "shopping-lists",
   };
   assertLocalEndpoint(config.endpoint);
   return config;

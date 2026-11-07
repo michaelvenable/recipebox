@@ -10,11 +10,13 @@ import { openStorage, type StorageOpeners } from "../src/open-storage.js";
 const cosmos = {} as CosmosClient;
 const photos = { containerName: "photos" } as ContainerClient;
 const recipeContainer = { id: "recipes" } as Container;
+const shoppingListContainer = { id: "shopping-lists" } as Container;
 const cosmosNames = {
   endpoint: "https://example",
   access: { kind: "key" as const, key: "k" },
   database: "db",
   container: "recipes",
+  shoppingListContainer: "shopping-lists",
 };
 
 function recordingOpeners(): { calls: string[]; openers: StorageOpeners } {
@@ -24,6 +26,8 @@ function recordingOpeners(): { calls: string[]; openers: StorageOpeners } {
     openers: {
       ensureRecipeContainer: async () => (calls.push("ensureRecipeContainer"), recipeContainer),
       openRecipeContainer: async () => (calls.push("openRecipeContainer"), recipeContainer),
+      ensureShoppingListContainer: async () => (calls.push("ensureShoppingListContainer"), shoppingListContainer),
+      openShoppingListContainer: async () => (calls.push("openShoppingListContainer"), shoppingListContainer),
       ensurePhotoContainer: async (c) => (calls.push("ensurePhotoContainer"), c),
       openPhotoContainer: async (c) => (calls.push("openPhotoContainer"), c),
     },
@@ -36,8 +40,8 @@ describe("openStorage", () => {
 
     const result = await openStorage({ local: false, cosmos: cosmosNames }, cosmos, photos, openers);
 
-    expect(calls.sort()).toEqual(["openPhotoContainer", "openRecipeContainer"]);
-    expect(result).toEqual({ recipeContainer, photoContainer: photos });
+    expect(calls.sort()).toEqual(["openPhotoContainer", "openRecipeContainer", "openShoppingListContainer"]);
+    expect(result).toEqual({ recipeContainer, shoppingListContainer, photoContainer: photos });
   });
 
   it("in local development creates the emulators' containers if missing", async () => {
@@ -45,8 +49,8 @@ describe("openStorage", () => {
 
     const result = await openStorage({ local: true, cosmos: cosmosNames }, cosmos, photos, openers);
 
-    expect(calls.sort()).toEqual(["ensurePhotoContainer", "ensureRecipeContainer"]);
-    expect(result).toEqual({ recipeContainer, photoContainer: photos });
+    expect(calls.sort()).toEqual(["ensurePhotoContainer", "ensureRecipeContainer", "ensureShoppingListContainer"]);
+    expect(result).toEqual({ recipeContainer, shoppingListContainer, photoContainer: photos });
   });
 });
 
@@ -54,7 +58,7 @@ describe("entry points", () => {
   it.each(["../src/main.ts", "../src/jobs/cleanup.ts"])("%s opens storage only through openStorage", (path) => {
     const source = readFileSync(new URL(path, import.meta.url), "utf8");
     expect(source).toMatch(/\bopenStorage\(/);
-    expect(source).not.toMatch(/\b(ensure|open)(Recipe|Photo)Container\b|createIfNotExists/);
+    expect(source).not.toMatch(/\b(ensure|open)(Recipe|ShoppingList|Photo)Container\b|createIfNotExists/);
   });
 });
 

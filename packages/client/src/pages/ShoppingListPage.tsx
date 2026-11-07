@@ -1,29 +1,23 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import type { ShoppingItem } from "@recipebox/shared";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { shoppingListKeys } from "../api/query-keys.js";
 import { fetchShoppingList } from "../api/recipes.js";
+import { sendShoppingList, sharedListUrl } from "../api/shopping-lists.js";
+import { formatWeekdayDate } from "../recipes/dates.js";
+import { changeErrorMessage } from "../recipes/recipe-changes.js";
+import { ShoppingItems, summary, useTicks } from "../recipes/ShoppingItems.js";
 
 /**
  * The shopping list at /plan/shopping (PLAN-8, docs/mockups/ShoppingList.dc.html): every ingredient of every recipe on the
  * to-make list, in the server's order (the domain sorts it, X-13), each with its recipe's name. Editor-only (X-1), behind
- * EditorOnly in routes.tsx. Sending the list is out of scope.
+ * EditorOnly in routes.tsx. "Send" makes a link anyone can open for 7 days (PLAN-9).
  */
 export function ShoppingListPage() {
   const list = useQuery({ queryKey: shoppingListKeys.all, queryFn: ({ signal }) => fetchShoppingList(signal) });
   const items = list.data;
-  // PLAN-8: ticks live only on this page, never saved or sent, so they go when the editor leaves it. Held here rather than in
-  // the list, so they survive the list being dropped and reloaded while the page stays open (recipe-changes.ts).
-  const [ticks, setTicks] = useState<ReadonlySet<string>>(() => new Set());
-
-  function toggle(key: string) {
-    setTicks((current) => {
-      const next = new Set(current);
-      if (!next.delete(key)) next.add(key);
-      return next;
-    });
-  }
+  const { ticks, toggle } = useTicks();
+  const hasItems = items !== undefined && items.length > 0;
 
   return (
     <div className="shopping-page">
@@ -34,8 +28,12 @@ export function ShoppingListPage() {
           </svg>
           Plan
         </Link>
-        <h1>Shopping list</h1>
-        {items !== undefined && items.length > 0 && <p className="muted">{summary(items)}</p>}
+        {/* PLAN-9: with nothing on the list there is nothing to send. */}
+        {hasItems ? (
+          <SendableHeading summary={summary(items)} />
+        ) : (
+          <h1>Shopping list</h1>
+        )}
       </header>
       {items === undefined ? (
         list.isError ? (
@@ -57,16 +55,6 @@ export function ShoppingListPage() {
   );
 }
 
-/** "18 items from 4 recipes", or "1 item from 1 recipe". */
-export function summary(items: readonly ShoppingItem[]): string {
-  const recipes = new Set(items.map((item) => item.recipeId)).size;
-  return `${plural(items.length, "item")} from ${plural(recipes, "recipe")}`;
-}
-
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
-}
-
 /** PLAN-8: with nothing on the to-make list there is no shopping list. */
 function NothingToShopFor() {
   return (
@@ -81,48 +69,145 @@ function NothingToShopFor() {
 }
 
 /**
- * Identifies a line by its recipe, its text and which of that recipe's identical lines it is, so a tick stays on its line when
- * the list reloads with lines added or removed around it.
+ * How the link reached the editor besides being shown: the share sheet, or copied (or not). "notSharedOrCopied": the device
+ * refused both after Send, as Safari can once the wait for the server has used up the tap; the Share button then offers the
+ * share sheet again on a fresh tap. "notShared": that button's share failed.
  */
-function lineKeys(items: readonly ShoppingItem[]): string[] {
-  const seen = new Map<string, number>();
-  return items.map((item) => {
-    const base = JSON.stringify([item.recipeId, item.text]);
-    const occurrence = seen.get(base) ?? 0;
-    seen.set(base, occurrence + 1);
-    return `${base}#${occurrence}`;
-  });
+type Delivery = "shared" | "copied" | "notCopied" | "notSharedOrCopied" | "notShared";
+
+const DELIVERY_MESSAGES: Partial<Record<Delivery, string>> = {
+  copied: "Link copied.",
+  notCopied: "Couldn't copy. Select the link and copy it instead.",
+  notSharedOrCopied: "Couldn't share or copy the link yet. Tap Share to send it.",
+  notShared: "Couldn't share. Copy the link instead.",
+};
+
+function canShare(): boolean {
+  return typeof navigator.share === "function";
 }
 
-interface ShoppingItemsProps {
-  items: readonly ShoppingItem[];
-  ticks: ReadonlySet<string>;
-  toggle: (key: string) => void;
+interface SentLink {
+  url: string;
+  expiresAt: string;
+  delivery?: Delivery;
 }
 
-/** The lines, each a checkbox like the recipe view's ingredients (REC-19), ticked by line key (lineKeys). */
-function ShoppingItems({ items, ticks, toggle }: ShoppingItemsProps) {
-  const keys = lineKeys(items);
+/** Whether `error` is the share sheet being closed without sharing, which is the editor's choice, not a failure. */
+function isCancelled(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+async function copyText(text: string): Promise<Delivery> {
+  try {
+    // Unavailable outside secure contexts or when the browser refuses; the link stays on screen to select by hand.
+    await navigator.clipboard.writeText(text);
+    return "copied";
+  } catch {
+    return "notCopied";
+  }
+}
+
+/**
+ * The heading, the count and "Send" (PLAN-9). Send asks the server for a new link to the list as it is now, then offers it
+ * through the device's share function, or copies it where there is none. Either way the link and the date it stops working
+ * stay on screen, with "Copy link". Each Send makes a new link; earlier ones keep working.
+ */
+function SendableHeading({ summary: count }: { summary: string }) {
+  const send = useMutation({ mutationFn: sendShoppingList });
+  const [sent, setSent] = useState<SentLink>();
+
+  async function onSend() {
+    if (send.isPending) return;
+    setSent(undefined);
+    let link;
+    try {
+      link = await send.mutateAsync();
+    } catch {
+      return; // Shown below from send.error.
+    }
+    const url = sharedListUrl(link.token);
+    const shown: SentLink = { url, expiresAt: link.expiresAt };
+    setSent(shown);
+    if (canShare()) {
+      try {
+        await navigator.share({ title: "Shopping list", url });
+        setSent({ ...shown, delivery: "shared" });
+        return;
+      } catch (error) {
+        if (isCancelled(error)) return;
+        // Refused, such as when the wait for the server used up the tap that allows sharing: copy it instead.
+        const copied = await copyText(url);
+        setSent({ ...shown, delivery: copied === "copied" ? copied : "notSharedOrCopied" });
+        return;
+      }
+    }
+    setSent({ ...shown, delivery: await copyText(url) });
+  }
 
   return (
-    <ul className="shopping-items" aria-label="Shopping list">
-      {items.map((item, index) => {
-        const key = keys[index] ?? String(index);
-        const ticked = ticks.has(key);
-        return (
-          <li key={key}>
-            <label className={ticked ? "shopping-item ticked" : "shopping-item"}>
-              <input type="checkbox" checked={ticked} onChange={() => toggle(key)} />
-              <span className="shopping-item-text">
-                <span className="shopping-item-name">{item.text}</span>
-                {/* So the checkbox is read as "6 eggs, Shakshuka" rather than run together. */}
-                <span className="visually-hidden">,</span>{" "}
-                <span className="shopping-item-recipe">{item.recipeName}</span>
-              </span>
-            </label>
-          </li>
-        );
-      })}
-    </ul>
+    <>
+      <div className="heading-with-action">
+        <div className="list-page-heading">
+          <h1>Shopping list</h1>
+          <p className="muted">{count}</p>
+        </div>
+        <button type="button" className="pill-button" disabled={send.isPending} onClick={() => void onSend()}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 15V3" />
+            <path d="M7 8l5-5 5 5" />
+            <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
+          </svg>
+          Send
+        </button>
+      </div>
+      {send.isError && (
+        <p className="form-error" role="alert">
+          Couldn't make a link. {changeErrorMessage(send.error)}
+        </p>
+      )}
+      {send.isPending && <p role="status">Making a link…</p>}
+      {sent !== undefined && <SentLinkPanel key={sent.url} link={sent} />}
+    </>
+  );
+}
+
+/**
+ * "Link created." with the date it stops working, in the device's time zone (X-12), the link and "Copy link", and "Share" where
+ * the device has a share function: tapped, it opens the share sheet on that fresh tap (PLAN-9).
+ */
+function SentLinkPanel({ link }: { link: SentLink }) {
+  const [latest, setLatest] = useState<Delivery>();
+  const delivery = latest ?? link.delivery;
+  const message = delivery === undefined ? undefined : DELIVERY_MESSAGES[delivery];
+
+  async function share() {
+    try {
+      await navigator.share({ title: "Shopping list", url: link.url });
+      setLatest("shared");
+    } catch (error) {
+      // Closing the share sheet is the editor's choice, not a failure; whatever was said before stays.
+      if (!isCancelled(error)) setLatest("notShared");
+    }
+  }
+
+  return (
+    <div role="status" className="sent-link">
+      <p>
+        <strong>Link created.</strong> Anyone with it can see this list, without signing in, until{" "}
+        {formatWeekdayDate(link.expiresAt)}. Then it stops working.
+      </p>
+      <div className="sent-link-address">
+        <code>{link.url}</code>
+        <button type="button" className="link-button" onClick={() => void copyText(link.url).then(setLatest)}>
+          Copy link
+        </button>
+        {canShare() && (
+          <button type="button" className="link-button" onClick={() => void share()}>
+            Share
+          </button>
+        )}
+      </div>
+      {message !== undefined && <p className="sent-link-copied">{message}</p>}
+    </div>
   );
 }

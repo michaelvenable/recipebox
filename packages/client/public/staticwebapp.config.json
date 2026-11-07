@@ -8,6 +8,7 @@
     { "route": "/", "headers": { "Cache-Control": "no-cache" } },
     { "route": "/index.html", "headers": { "Cache-Control": "no-cache" } },
     { "route": "/manifest.webmanifest", "headers": { "Cache-Control": "no-cache" } },
+    { "route": "/list/*", "headers": { "Cache-Control": "no-cache", "Referrer-Policy": "no-referrer" } },
     { "route": "/assets/*", "headers": { "Cache-Control": "public, max-age=31536000, immutable" } }
   ],
   "globalHeaders": {
