@@ -106,13 +106,14 @@ export async function apiChange<T>(method: ChangeMethod, path: string, schema: S
 }
 
 /**
- * `PUT path` with one file as `multipart/form-data`, an upload, the exception to the JSON rule (docs/api.md, Conventions), with
- * the `X-Requested-By` header every upload needs. The server accepts it only with exactly one file part and nothing else.
+ * `PUT path` (or `POST`, for `POST /imports`) with one file as `multipart/form-data`, an upload, the exception to the JSON rule
+ * (docs/api.md, Conventions), with the `X-Requested-By` header every upload needs. The server accepts it only with exactly one
+ * file part and nothing else.
  */
-export async function apiUpload<T>(path: string, schema: Schema<T>, file: File): Promise<T> {
+export async function apiUpload<T>(path: string, schema: Schema<T>, file: File, method: "PUT" | "POST" = "PUT"): Promise<T> {
   const form = new FormData();
   form.append("photo", file);
-  const response = await send("PUT", path, { form });
+  const response = await send(method, path, { form });
   return schema.parse(await response.json());
 }
 

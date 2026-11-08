@@ -5,6 +5,9 @@ import { useLocation, useNavigate } from "react-router";
 import { ApiError } from "../api/client.js";
 import { recipeKeys } from "../api/query-keys.js";
 import { createRecipe, removePhoto, saveRecipeContent, uploadPhoto } from "../api/recipes.js";
+import { ImportPanel } from "../imports/ImportPanel.js";
+import { useStartImport } from "../imports/imports.js";
+import { useNotices } from "../layout/notices.js";
 import { TopBar } from "../layout/top-bar.js";
 import { EntriesField } from "./EntriesField.js";
 import { photoChanged } from "./photo-version.js";
@@ -93,12 +96,13 @@ function recipePath(id: string): string {
 /**
  * Creating a recipe (REC-1) at /recipes/new, or editing one (REC-5) at /recipes/:id/edit. Cancel and Save take the place of the
  * navigation row, so a stray tap can't leave the form (docs/mockups/README.md, "Edit form"). Leaving, by Cancel or any other
- * way, drops unsaved changes without asking.
+ * way, drops unsaved changes without asking. A new recipe can instead be imported from a photo (IMP-1); editing can't.
  */
 export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
+  const notices = useNotices();
   const id = useId();
 
   const [initial] = useState(() => formFrom(recipe));
@@ -120,7 +124,12 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
   // The recipe's own key, so its view waits while this saves, and this waits for a change made there (COOK-1).
   const mutationKey = saved.id === undefined ? recipeKeys.create() : recipeKeys.change(saved.id);
   const mutation = useMutation({ mutationKey, mutationFn: (plan: SavePlan) => save(queryClient, plan) });
-  const busy = useIsMutating({ mutationKey }) > 0;
+  const saving = useIsMutating({ mutationKey }) > 0;
+  const importing = useStartImport();
+  const [importError, setImportError] = useState<string>();
+  // Uploading a photo to import counts as busy too: Save, Cancel and the fields wait, so the upload's outcome has a form to
+  // come back to (IMP-4), and a save can't run alongside it.
+  const busy = saving || importing.isPending;
 
   const summary = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -159,6 +168,22 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
     setProblem({ errors: photoErrorsOf(result.photoError), contentSaved: true, photo });
   }
 
+  /** IMP-4: once uploaded, to the Catalog with a message; if the upload fails, stay here and say so. */
+  async function importPhoto(file: File) {
+    if (busy) return;
+    setImportError(undefined);
+    try {
+      await importing.mutateAsync(file);
+    } catch (error) {
+      // The server's photo.* message when it refused the photo (IMP-2), otherwise why it didn't get through.
+      if (mounted.current) setImportError(`The photo wasn't uploaded. ${changeErrorMessage(error)}`);
+      return;
+    }
+    if (!mounted.current) return;
+    notices.uploaded();
+    void navigate("/", { replace: true });
+  }
+
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     void submit();
@@ -193,7 +218,7 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
           </button>
           <h1>{saved.id === undefined ? "New recipe" : "Edit recipe"}</h1>
           <button type="button" className="form-bar-save" disabled={busy} onClick={() => void submit()}>
-            {busy ? "Saving…" : "Save"}
+            {saving ? "Saving…" : "Save"}
           </button>
         </header>
       </TopBar>
@@ -202,6 +227,8 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
 
       <form id={`${id}-form`} className="recipe-form" onSubmit={onSubmit} noValidate>
         <fieldset className="form-fields" disabled={busy}>
+          {saved.id === undefined && <ImportPanel uploading={importing.isPending} error={importError} onPick={(file) => void importPhoto(file)} />}
+
           <div className="field">
             <label htmlFor={`${id}-name`} className="field-title">
               Name

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Outlet } from "react-router";
+import { ImportsProvider } from "../imports/imports.js";
 import { NavBar } from "./NavBar.js";
 import { NoticeProvider, NoticeRegion } from "./notices.js";
 import { OfflineBanner } from "./OfflineBanner.js";
@@ -7,7 +8,8 @@ import { TopBarContext, type TopBarSlot } from "./top-bar.js";
 
 /**
  * Every page: the navigation row, or the page's own top row in its place (TopBar), then the page itself. Messages such as Undo
- * after deleting (REC-6) live here too, so they stay when the app goes to another page, as does "You're offline".
+ * after deleting (REC-6) live here too, so they stay when the app goes to another page, as does "You're offline". So does the
+ * checking of imports in progress, so "‹name› imported" shows on any page (IMP-10).
  */
 export function Layout() {
   const [element, setElement] = useState<HTMLElement | null>(null);
@@ -22,13 +24,15 @@ export function Layout() {
     <div className="app">
       <TopBarContext value={slot}>
         <NoticeProvider>
-          {claims === 0 && <NavBar />}
-          <div ref={setElement} className="top-bar-slot" />
-          <OfflineBanner />
-          <NoticeRegion />
-          <main className="page">
-            <Outlet />
-          </main>
+          <ImportsProvider>
+            {claims === 0 && <NavBar />}
+            <div ref={setElement} className="top-bar-slot" />
+            <OfflineBanner />
+            <NoticeRegion />
+            <main className="page">
+              <Outlet />
+            </main>
+          </ImportsProvider>
         </NoticeProvider>
       </TopBarContext>
     </div>

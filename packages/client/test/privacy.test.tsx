@@ -49,6 +49,10 @@ describe("X-15 privacy page", () => {
     expect(text).toMatch(/Microsoft or Google account/);
     expect(text).toMatch(/permanent account ID/);
     expect(text).toMatch(/doesn't keep your name or email address/);
+    // IMP-1, IMP-12: a photo uploaded to import a recipe goes to an AI service in the app's own Azure account, is used for
+    // nothing else, and is deleted once the import ends.
+    expect(text).toMatch(/photo is sent to an AI service in the app's own Microsoft\s+Azure account, which reads the recipe/);
+    expect(text).toMatch(/The photo is used for nothing else, and it is deleted once the import\s+ends/);
     // X-9: cookies only for staying signed in.
     expect(text).toMatch(/The only cookies are the ones signing in sets, to keep you signed in/);
     // Server logs: network address, used only to run the app, and how long they are kept (infra/main.bicep).

@@ -1,6 +1,7 @@
 // Short messages that outlive the page that started them, such as "Pad Thai moved to trash" with Undo after deleting, which is
 // shown on the recipe list the app goes to (REC-6, docs/mockups/DeletedUndo.dc.html). The layout keeps them, above the routes.
-// "A new version is available" (X-4) shows here too, below any of those.
+// "A new version is available" (X-4) shows here too, below any of those. "‹name› imported" (IMP-10) waits its turn instead of
+// replacing what is shown, so when several imports finish close together each message is seen, one after another.
 import {
   type FocusEvent,
   type MouseEvent,
@@ -36,11 +37,37 @@ export interface Notices {
   deleted: (recipe: NamedRecipe) => void;
   /** "‹name› restored", with a link to it (REC-15). `takeFocus` moves focus to the link, for when the pressed control is gone. */
   restored: (recipe: NamedRecipe, options: { takeFocus: boolean }) => void;
+  /** "Photo uploaded. …", after starting an import (IMP-4). Replaces any message shown. */
+  uploaded: () => void;
+  /** "‹name› imported", with Open (IMP-10). Shown after the message on screen, and after any other import's before it. */
+  imported: (recipe: NamedRecipe) => void;
 }
 
-type Notice = NamedRecipe & { seq: number } & ({ kind: "deleted" } | { kind: "restored"; takeFocus: boolean });
+type Imported = NamedRecipe & { seq: number; kind: "imported" };
+type Notice =
+  | (NamedRecipe & { seq: number } & ({ kind: "deleted" } | { kind: "restored"; takeFocus: boolean }))
+  | { seq: number; kind: "uploaded" }
+  | Imported;
 
-const NoticesContext = createContext<Notices>({ deleted: () => {}, restored: () => {} });
+interface NoticeState {
+  /** The message shown. */
+  current: Notice | undefined;
+  /** "‹name› imported" messages waiting to be shown, oldest first (IMP-10). */
+  waiting: readonly Imported[];
+}
+
+/**
+ * Another message in place of the one shown. An import's message it pushes aside goes back to the front of the queue, so it
+ * is still seen (IMP-10); any other is replaced, as before.
+ */
+function replaced(state: NoticeState, notice: Notice): NoticeState {
+  const waiting = state.current?.kind === "imported" ? [state.current, ...state.waiting] : state.waiting;
+  return { current: notice, waiting };
+}
+
+const NO_NOTICES: NoticeState = { current: undefined, waiting: [] };
+
+const NoticesContext = createContext<Notices>({ deleted: () => {}, restored: () => {}, uploaded: () => {}, imported: () => {} });
 const NoticeStateContext = createContext<{ notice: Notice | undefined; dismiss: (seq: number) => void } | null>(null);
 
 /** Shows messages that outlive the page that asked for them. */
@@ -50,17 +77,29 @@ export function useNotices(): Notices {
 
 /** Keeps the message being shown; NoticeRegion shows it. In the layout, so it survives going to another page. */
 export function NoticeProvider({ children }: { children: ReactNode }) {
-  const [notice, setNotice] = useState<Notice>();
+  const [shown, setShown] = useState<NoticeState>(NO_NOTICES);
   const seq = useRef(0);
-  const notices = useMemo<Notices>(
-    () => ({
-      deleted: ({ id, name }) => setNotice({ kind: "deleted", id, name, seq: ++seq.current }),
-      restored: ({ id, name }, { takeFocus }) => setNotice({ kind: "restored", id, name, takeFocus, seq: ++seq.current }),
-    }),
+  const notices = useMemo<Notices>(() => {
+    const show = (notice: Notice) => setShown((state) => replaced(state, notice));
+    return {
+      deleted: ({ id, name }) => show({ kind: "deleted", id, name, seq: ++seq.current }),
+      restored: ({ id, name }, { takeFocus }) => show({ kind: "restored", id, name, takeFocus, seq: ++seq.current }),
+      uploaded: () => show({ kind: "uploaded", seq: ++seq.current }),
+      imported: ({ id, name }) => {
+        const notice: Imported = { kind: "imported", id, name, seq: ++seq.current };
+        setShown((state) =>
+          state.current === undefined ? { current: notice, waiting: state.waiting } : { ...state, waiting: [...state.waiting, notice] },
+        );
+      },
+    };
+  }, []);
+  // Only the message it was for: a newer one stays. The next waiting one, if any, takes its place.
+  const dismiss = useCallback(
+    (done: number) =>
+      setShown((state) => (state.current?.seq === done ? { current: state.waiting[0], waiting: state.waiting.slice(1) } : state)),
     [],
   );
-  // Only the message it was for: a newer one stays.
-  const dismiss = useCallback((done: number) => setNotice((current) => (current?.seq === done ? undefined : current)), []);
+  const notice = shown.current;
   const state = useMemo(() => ({ notice, dismiss }), [notice, dismiss]);
   return (
     <NoticesContext value={notices}>
@@ -81,6 +120,8 @@ export function NoticeRegion() {
     <div role="status" className="notice-region">
       {notice?.kind === "deleted" && <DeletedNotice key={notice.seq} notice={notice} dismiss={dismiss} />}
       {notice?.kind === "restored" && <RestoredNotice key={notice.seq} notice={notice} dismiss={dismiss} />}
+      {notice?.kind === "uploaded" && <UploadedNotice key={notice.seq} notice={notice} dismiss={dismiss} />}
+      {notice?.kind === "imported" && <ImportedNotice key={notice.seq} notice={notice} dismiss={dismiss} />}
       <UpdateNotice />
     </div>
   );
@@ -184,6 +225,33 @@ function RestoredNotice({ notice, dismiss }: NoticeProps<"restored">) {
       <span className="notice-text">{notice.name} restored</span>
       <Link ref={link} to={`/recipes/${encodeURIComponent(notice.id)}`} className="notice-action" onClick={close}>
         Open recipe
+      </Link>
+    </div>
+  );
+}
+
+/** IMP-4, docs/mockups/ImportReading.dc.html: no action, so there is nothing to reach for but the text. */
+function UploadedNotice({ notice, dismiss }: NoticeProps<"uploaded">) {
+  const { held, handlers } = useHeld();
+  const close = useCallback(() => dismiss(notice.seq), [dismiss, notice.seq]);
+  useAutoDismiss(close, held);
+  return (
+    <div className="notice notice-plain" {...handlers}>
+      <span className="notice-text">Photo uploaded. Your recipe will be added to the Catalog in a minute or two.</span>
+    </div>
+  );
+}
+
+/** IMP-10, docs/mockups/ImportReady.dc.html. Open goes to the recipe; closing, either way, lets the next one show. */
+function ImportedNotice({ notice, dismiss }: NoticeProps<"imported">) {
+  const { held, handlers } = useHeld();
+  const close = useCallback(() => dismiss(notice.seq), [dismiss, notice.seq]);
+  useAutoDismiss(close, held);
+  return (
+    <div className="notice" {...handlers}>
+      <span className="notice-text">{notice.name} imported</span>
+      <Link to={`/recipes/${encodeURIComponent(notice.id)}`} className="notice-action" onClick={close}>
+        Open
       </Link>
     </div>
   );

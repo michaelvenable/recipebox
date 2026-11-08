@@ -44,6 +44,20 @@ export function PrivacyPage() {
       </section>
 
       {/*
+        IMP-1, IMP-12. The model is a deployment in the app's own Azure AI Foundry resource (docs/architecture.md, "Recipe
+        import"; server/src/imports/recipe-reader.ts); the page photo is deleted when the import ends
+        (server/src/imports/process-import.ts), and a leftover one by the storage lifecycle rule within a day.
+      */}
+      <section aria-labelledby="privacy-import">
+        <h2 id="privacy-import">Importing a recipe from a photo</h2>
+        <p>
+          When an editor uploads a photo of a recipe to import it, the photo is sent to an AI service in the app's own Microsoft
+          Azure account, which reads the recipe from it. The photo is used for nothing else, and it is deleted once the import
+          ends.
+        </p>
+      </section>
+
+      {/*
         X-9. The app sets no cookies and uses no localStorage or sessionStorage; the service worker caches only the app's own
         files (pwa.config.ts). No third-party scripts or fonts.
       */}

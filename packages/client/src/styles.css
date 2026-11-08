@@ -1620,3 +1620,162 @@ button.pill-button:disabled {
     font-size: 22px;
   }
 }
+
+/*
+ * Importing a recipe from a photo (IMP-1, IMP-4; docs/mockups/ImportNewRecipe.dc.html): a panel at the top of the New recipe
+ * form, then "or type it in" above the usual fields.
+ */
+
+.import-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: 14px;
+}
+
+.import-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.import-panel-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.import-panel-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch);
+  height: var(--touch);
+  border-radius: 22px;
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+}
+
+.import-panel p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.import-panel .field-error {
+  font-size: 14px;
+}
+
+.button.import-button {
+  gap: 8px;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.button.import-button:hover {
+  border-color: var(--accent-hover);
+  color: var(--accent-hover);
+}
+
+.button.import-button[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.form-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.form-divider::before,
+.form-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* A message with no action, such as "Photo uploaded. …" (IMP-4), is as tall as one with an action. */
+.notice-plain {
+  padding: 14px 18px;
+  line-height: 1.4;
+}
+
+/* Imports in progress on the Catalog (IMP-5; docs/mockups/ImportReading.dc.html): a dashed card each, above the recipes. */
+
+.import-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.import-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: 14px;
+}
+
+/* A drawing of a recipe card, not the uploaded photo, which is never shown (IMP-12). */
+.import-card-page {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 52px;
+  height: 64px;
+  padding: 7px 6px;
+  border-radius: 6px;
+  background: #fbf7ec;
+  border: 1px solid #e4dfd0;
+}
+
+.import-card-page span {
+  height: 3px;
+  border-radius: 2px;
+  background: #cfc8b6;
+}
+
+.import-card-page span:nth-child(1) {
+  height: 5px;
+  width: 70%;
+  background: #8a8170;
+}
+
+.import-card-page span:nth-child(2) {
+  height: 14px;
+  width: 60%;
+  background: #e3cfa0;
+}
+
+.import-card-page span:nth-child(4) {
+  width: 85%;
+}
+
+.import-card-spinner {
+  flex: none;
+  animation: import-spin 1s linear infinite;
+}
+
+@keyframes import-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .import-card-spinner {
+    animation: none;
+  }
+}

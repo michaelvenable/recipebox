@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { recipeKeys, tagKeys } from "../api/query-keys.js";
 import { type ListedRecipe, type RecipeFilter, fetchRecipes, fetchTags } from "../api/recipes.js";
 import { useViewer } from "../auth/sign-in.js";
+import { ImportCards } from "../imports/ImportCards.js";
 import { describeResults, isFiltering } from "../recipes/format.js";
 import { useListFilter } from "../recipes/list-filter.js";
 import { RecipeCard } from "../recipes/RecipeCard.js";
@@ -11,7 +12,7 @@ import { TagChips } from "../recipes/TagChips.js";
 
 /**
  * The recipe list at "/" (REC-8), with search by name (REC-9) and tag filter (REC-13). Public (X-1): visitors see it without
- * editing controls (X-8); editors also get "Add recipe" and the to-make mark (PLAN-7).
+ * editing controls (X-8); editors also get "Add recipe", the to-make mark (PLAN-7) and the imports in progress (IMP-5).
  */
 export function RecipeListPage() {
   const { viewer } = useViewer();
@@ -76,6 +77,9 @@ export function RecipeListPage() {
           />
         </div>
       </form>
+
+      {/* X-1: only for editors, so nobody else's app asks for imports. */}
+      {isEditor && <ImportCards />}
 
       <TagChips
         tags={tags.data}

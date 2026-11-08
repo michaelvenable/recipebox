@@ -70,6 +70,16 @@ export const trashKeys = {
 };
 
 /**
+ * GET /imports, the imports of the last day (IMP-5, IMP-10). Editors only (X-1): only read for an editor. Starting an import
+ * (IMP-4) puts it here at once, and a finished one makes the recipe lists and tags stale (imports/imports.tsx).
+ */
+export const importKeys = {
+  all: ["imports"] as const,
+  /** The mutation key of POST /imports, starting an import (IMP-1). */
+  start: () => [...importKeys.all, "start"] as const,
+};
+
+/**
  * GET /shopping-lists/{token}, a shopping list link's page (PLAN-9): the current shopping list, the same for every caller. The
  * page reloads it when the person comes back to it (SharedListPage), so no change here invalidates it.
  */
