@@ -29,19 +29,25 @@ a{color:#2E6A4F}a:hover{color:#1F4D38}
         </div>
         <h2 id="import-title" style="margin: 0; font-size: 17px; font-weight: 700">Have it on paper?</h2>
       </div>
-      <p style="margin: 0; font-size: 15px; line-height: 1.45">Add each side or page of this recipe, in order. Up to 4 photos.</p>
-      <ol aria-label="Photos of this recipe" style="list-style: none; margin: 0; padding: 0; display: flex; gap: 12px">
+      <p style="margin: 0; font-size: 15px; line-height: 1.45">Add each side or page of this recipe, in order. Up to 4 photos. Turn each one so the writing reads the right way up.</p>
+      <ol aria-label="Photos of this recipe" style="list-style: none; margin: 0; padding: 0; display: flex; gap: 16px">
         <sc-for list="{{pages}}" as="p" hint-placeholder-count="2">
-          <li style="position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px">
-            <div role="img" aria-label="{{p.label}}" style="width: 72px; height: 92px; box-sizing: border-box; padding: 9px 8px; border-radius: 8px; background: #FBF7EC; border: 1px solid #E4DFD0; display: flex; flex-direction: column; gap: 5px">
+          <li style="position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px">
+            <div style="width: 96px; height: 96px; display: flex; align-items: center; justify-content: center">
+            <div role="img" aria-label="{{p.label}}, {{p.turnLabel}}" style="width: 72px; height: 92px; box-sizing: border-box; padding: 9px 8px; border-radius: 8px; background: #FBF7EC; border: 1px solid #E4DFD0; display: flex; flex-direction: column; gap: 5px; transform: rotate({{p.turn}}deg) scale({{p.scale}})">
               <div style="height: 6px; width: 70%; border-radius: 2px; background: #8A8170"></div>
               <div style="height: 16px; width: 60%; border-radius: 2px; background: {{p.tint}}"></div>
               <div style="height: 3px; width: 100%; border-radius: 2px; background: #CFC8B6"></div>
               <div style="height: 3px; width: 85%; border-radius: 2px; background: #CFC8B6"></div>
               <div style="height: 3px; width: 92%; border-radius: 2px; background: #CFC8B6"></div>
             </div>
+            </div>
             <span style="font-size: 13px; color: #59615C">{{p.label}}</span>
-            <button type="button" aria-label="Remove {{p.label}}" style="position: absolute; top: -12px; right: -14px; width: 44px; height: 44px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; padding: 0">
+            <button type="button" aria-label="Rotate {{p.label}}" style="display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 10px; border: 1px solid #C9CEC8; border-radius: 22px; background: #FFFFFF; color: #1D2420; font: inherit; font-size: 14px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1D2420" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"></path><path d="M20 4v5h-5"></path></svg>
+              Rotate
+            </button>
+            <button type="button" aria-label="Remove {{p.label}}" style="position: absolute; top: -10px; right: -12px; width: 44px; height: 44px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; padding: 0">
               <span style="width: 24px; height: 24px; border-radius: 12px; background: #1D2420; display: flex; align-items: center; justify-content: center">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
               </span>
@@ -92,8 +98,8 @@ class Component extends DCLogic {
   renderVals() {
     return {
       pages: [
-        { label: 'Photo 1', tint: '#E3CFA0' },
-        { label: 'Photo 2', tint: '#F1ECDF' }
+        { label: 'Photo 1', tint: '#E3CFA0', turn: 0, scale: 1, turnLabel: 'upright' },
+        { label: 'Photo 2', tint: '#F1ECDF', turn: 90, scale: 0.9, turnLabel: 'turned a quarter turn' }
       ]
     };
   }

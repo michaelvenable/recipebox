@@ -13,8 +13,10 @@ Screens: `docs/mockups/Import*.dc.html`, from the "Importing a recipe from a pho
 
 - **IMP-1. Start from the New recipe form.** At the top of the New recipe form (REC-1), above the fields, an editor can choose
   "Import from a photo" and pick or take a photo. The photo is shown in the panel, and "Add another photo" adds the next side or
-  page of the same recipe, one at a time, up to 4 photos. Any photo can be removed before the import starts. "Import recipe"
-  starts one import with the photos in the order they were added. There is no separate import page, and the Edit recipe form
+  page of the same recipe, one at a time, up to 4 photos. Each photo has a "Rotate" button that turns it a quarter turn
+  clockwise, so a card photographed sideways or upside down can be shown with its writing the right way up; the panel asks for
+  that. Any photo can be removed before the import starts. "Import recipe" starts one import with the photos in the order they
+  were added, each turned as shown. There is no separate import page, and the Edit recipe form
   (REC-5) has no import option.
 - **IMP-2. Accepted photos.** Each photo follows the same rules as a recipe photo (REC-7): JPEG, PNG or WebP, up to 15 MB. Any
   other file is refused at once with the same message as REC-7 and isn't added; photos already added stay. When 4 photos have
@@ -34,6 +36,8 @@ Screens: `docs/mockups/Import*.dc.html`, from the "Importing a recipe from a pho
   sides or pages of one recipe in the order they were added.
   - Text is kept as written on the page: not reworded, shortened, translated or converted to other units. A name written in
     capitals only is given ordinary capitalization.
+  - When the page gives amounts for different numbers of servings side by side, such as "1 | 2" for 2 and 4 people, only the
+    first amount is kept (owner decision, 2026-11-07).
   - Ingredients, prep entries and steps keep the page's order (REC-3), one entry per ingredient or step.
   - Prep is filled only when the page lists preparation separately from the steps (REC-20); otherwise the recipe has no prep.
   - Total time is set only when the page states it, or states preparation and cooking times that add up to it. It is never
@@ -85,6 +89,8 @@ Screens: `docs/mockups/Import*.dc.html`, from the "Importing a recipe from a pho
 | Card front has the ingredients, the back the steps; both added  | One recipe with the ingredients and steps    |
 | A HEIC file added after one good photo                          | Refused (REC-7); the first photo stays       |
 | 4 photos added                                                  | No more can be added                         |
+| A card photographed upside down; Rotate pressed twice           | Read the right way up                        |
+| A card lists "Tomato 1 \| 2" for 2 and 4 people                 | Ingredient "1 Tomato"                        |
 | An upload of 5 photos sent to the server                        | Refused; no import starts                    |
 | "Pad Thai" exists; a Pad Thai card is imported                  | A second "Pad Thai" is added                 |
 | A visitor opens the Catalog during an import                    | No card; nothing about the import            |

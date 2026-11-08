@@ -90,10 +90,13 @@ Cooking history:
 
 Import from a photo:
 - `POST /imports` — start an import of one recipe from 1 to 4 photos (IMP-1 to IMP-4). Body: the photos as
-  `multipart/form-data` with `X-Requested-By`, one file part per photo, in the order added; field names don't matter and any
-  other part is refused. Each photo gets the same checks and `photo.*` errors as `PUT /recipes/{id}/photo` (IMP-2), with `field`
-  `photos[i]` (from 0) naming the photo. No file part: 400 `photo.required`. More than 4: 400 `photo.tooMany`, before any
-  photo is processed. The server makes the import ID and takes the start time from its clock (X-12), stores the photos without
+  `multipart/form-data` with `X-Requested-By`, one file part per photo, in the order added; field names don't matter. Before
+  the files, an optional text part named `rotations` gives how far to turn each photo clockwise (IMP-1), as JSON: one of 0, 90,
+  180 or 270 per photo, in the same order, such as `[0,180]`. Without it, no photo is turned. A `rotations` part that isn't
+  such a list, or whose length doesn't match the number of photos: 400 `photo.rotations`. Any other part is refused. Each
+  photo gets the same checks and `photo.*` errors as `PUT /recipes/{id}/photo` (IMP-2), with `field` `photos[i]` (from 0)
+  naming the photo. No file part: 400 `photo.required`. More than 4: 400 `photo.tooMany`, before any photo is processed. The
+  server makes the import ID and takes the start time from its clock (X-12), stores the photos turned as asked and without
   their metadata, and queues the import.
   Returns 202 with `ImportStatus` (`status` `reading`). Other imports in progress don't matter (IMP-3). If the import can't be
   queued, nothing is left in progress and the answer is 500 (docs/architecture.md, "Recipe import").

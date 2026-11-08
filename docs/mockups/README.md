@@ -57,4 +57,4 @@ Added 2026-11-07 (owner request): importing a recipe from a photo (IMP, `docs/sp
 - `ImportReady.dc.html`: the imported recipe in the list, with a "‹name› imported" message and Open. There is no step to check
   the recipe first, and no screen for a failed import: the card just goes away and the failure is logged.
 - `ImportPhotos.dc.html` (added later the same day, owner request): photos of one recipe in the panel, such as the front and
-  back of a card, with "Add another photo" (up to 4), a remove button on each, and "Import recipe".
+  back of a card, with "Add another photo" (up to 4), a Rotate and a remove button on each, and "Import recipe".

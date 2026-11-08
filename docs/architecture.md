@@ -268,8 +268,10 @@ Container Apps job (started by the queue) <--------+
 ```
 
 - Starting (`POST /imports`): editor check (X-6), then at most 4 file parts, then the same type and size checks as a recipe
-  photo for each (IMP-2, REC-7). Each image goes through the existing decode worker, one after another, which removes all
-  metadata and scales it to at most 2048 px on the long side, so no location reaches the AI service and the call stays small.
+  photo for each (IMP-2, REC-7). Each image goes through the existing decode worker, one after another, which applies the
+  camera's rotation and then the editor's `rotations` turn (IMP-1), removes all metadata and scales it to at most 2048 px on
+  the long side, so the model gets upright pages, no location reaches the AI service, and the call stays small. The client
+  only shows the turn (a CSS rotation of the preview) and sends the numbers; it never re-encodes a photo.
   They are stored as `imports/{importId}/{n}.jpg` (n from 1, in the order added) in the photo container. If any photo is
   refused or can't be stored, the ones already stored are deleted and no import starts. The photo route serves only recipe
   photos by recipe ID, so these are never served (IMP-12). Like every upload, it must carry the `X-Requested-By` header (see
@@ -301,10 +303,17 @@ Container Apps job (started by the queue) <--------+
 - Failures (IMP-11) are one pino line at level `error`: `{ "event": "recipe-import-failed", "importId", "reason", "detail"? }`,
   with no image, recipe text or identity. To find them, query `ContainerAppConsoleLogs_CL` in `log-recipebox` for
   `recipe-import-failed` (`infra/README.md`). No alert rule (owner decision, 2026-11-07).
-- The model: one model deployment in an Azure AI Foundry resource in `infra/main.bicep`, called with the managed identity (no
-  key), with structured output so the answer always has the expected shape. The schema is built for each call, and its tags
-  field allows only the tags in use, as an enum. The prompt and schema live in one server file; the model is behind an
-  interface, so tests use a fake and never call Azure. Which model to deploy is chosen by trying a few on real recipe cards.
+- The model: `gpt-5.4-mini` (version 2026-03-17), one deployment in an Azure AI Foundry resource in `infra/main.bicep`, SKU
+  `DataZoneStandard` (US data zone; the subscription has no global quota for it), called through the OpenAI-compatible v1
+  endpoint with the `openai` client and the managed identity (no key), with strict structured output so the answer always
+  has the expected shape. The schema is built for each call, and its tags field allows only the tags in use, as an enum. The
+  prompt and schema live in one server file; the model is behind an interface, so tests use a fake and never call Azure.
+- Model choice (owner decision, 2026-11-07, from a trial on 6 real recipes): upright, `gpt-5.4-mini` read cards almost word
+  for word in 6 to 14 seconds, with about 2,000 to 3,000 input and under 1,000 output tokens per recipe. Sideways or upside
+  down, it invented or garbled recipes, and asking it to reason harder or to say which way a photo was turned didn't fix that
+  reliably. Hence the Rotate button (IMP-1). Its dish-picture boxes found the right picture but cropped loosely. Claude
+  models couldn't be compared: the subscription has no Claude quota. If one is used later, its structured output needs
+  "or null" written as `anyOf`, not `type: [..., "null"]`.
 - The client: `GET /imports` (editor-only, X-1) lists the imports of the last day. The Catalog shows one card per import that
   is `reading` (IMP-5) and, while there is one, checks again every 5 seconds. The device that started an import keeps its
   `importId`; when that import turns `done`, it shows "‹name› imported" with Open (IMP-10). A `failed` import's card just goes
@@ -356,5 +365,5 @@ storage code itself is tested against the emulators with `npm run test:int`.
 3. Microsoft account IDs: confirm which identifier the built-in auth passes for personal Microsoft accounts and that it stays the
    same if the app registration is ever recreated. The Account page makes this easy to check.
 4. Cosmos free tier: must be chosen when the account is created; only one free-tier account is allowed per subscription.
-5. Import model (IMP-6): try a few Foundry models on a handful of real recipe cards, including handwritten ones, and pick
-   the cheapest that reads them reliably. Check how close its dish-picture boxes are (IMP-9).
+5. Import model (IMP-6): `gpt-5.4-mini` was chosen ("Recipe import"). Compare a stronger model (Claude Sonnet 5.5 or
+   GPT-5.4) once the subscription has quota for one, especially on handwritten cards, which the trial didn't include.
