@@ -15,17 +15,21 @@ Bicep for RecipeBox in Azure, as described in `docs/architecture.md`, and the ow
 What `main.bicep` creates, all in `southcentralus` except the Static Web App (`centralus`; the Free plan isn't offered in
 `southcentralus`):
 
-| Resource                       | Name                         | Notes                                                       |
-| ------------------------------ | ---------------------------- | ----------------------------------------------------------- |
-| User-assigned identity         | `id-recipebox`               | The API and the cleanup job; data roles only.               |
-| Cosmos DB (free tier)          | `cosmos-recipebox-<suffix>`  | DB `recipebox` (1000 RU/s): `recipes`, `shopping-lists`.    |
-| Storage account                | `strecipebox<suffix>`        | Private container `photos`; blob soft delete 7 days.        |
-| Key Vault                      | `kv-recipebox-<suffix>`      | Sign-in provider client secrets, added by hand.             |
-| Log Analytics                  | `log-recipebox`              | 30 days; 0.15 GB a day cap.                                 |
-| Container Apps environment     | `cae-recipebox`              | Consumption only.                                           |
-| Container app                  | `ca-recipebox-api`           | The API; 1 CPU, 2 GiB; 0 to 1 replica.                      |
-| Container Apps job             | `caj-recipebox-cleanup`      | Daily trash cleanup at 09:00 UTC.                           |
-| Static Web App (Free)          | `swa-recipebox`              | The client.                                                 |
+| Resource                   | Name                        | Notes                                                                |
+| -------------------------- | --------------------------- | -------------------------------------------------------------------- |
+| User-assigned identity     | `id-recipebox`              | The API and both jobs; data roles only.                              |
+| Cosmos DB (free tier)      | `cosmos-recipebox-<suffix>` | DB `recipebox` (1000 RU/s): `recipes`, `shopping-lists`, `imports`.  |
+| Storage account            | `strecipebox<suffix>`       | Private container `photos`; soft delete 7 days; queue `imports`.     |
+|                            |                             | Lifecycle rule: `photos/imports/` blobs deleted after a day.         |
+| Azure AI Foundry           | `aif-recipebox-<suffix>`    | Keys off. Deployment `gpt-5.4-mini` (2026-03-17), DataZoneStandard,  |
+|                            |                             | 50,000 tokens a minute.                                              |
+| Key Vault                  | `kv-recipebox-<suffix>`     | Sign-in provider client secrets, added by hand.                      |
+| Log Analytics              | `log-recipebox`             | 30 days; 0.15 GB a day cap.                                          |
+| Container Apps environment | `cae-recipebox`             | Consumption only.                                                    |
+| Container app              | `ca-recipebox-api`          | The API; 1 CPU, 2 GiB; 0 to 1 replica.                               |
+| Container Apps job         | `caj-recipebox-cleanup`     | Daily trash cleanup at 09:00 UTC.                                    |
+| Container Apps job         | `caj-recipebox-import`      | Recipe import: one execution per queued import, at most 5 at once.   |
+| Static Web App (Free)      | `swa-recipebox`             | The client.                                                          |
 
 `<suffix>` is derived from the resource group and stays the same on every deployment.
 
@@ -44,7 +48,9 @@ Box"; on a new subscription this is needed once, with your own sign-in, because 
 az login --tenant fbbd2f68-561d-464d-9599-e8050edbfa20
 az account set --subscription c0b1d89e-4d9b-4e4c-a8ca-3e59fa697013
 foreach ($p in "Microsoft.App", "Microsoft.DocumentDB", "Microsoft.Storage", "Microsoft.Web", "Microsoft.OperationalInsights",
-  "Microsoft.ManagedIdentity", "Microsoft.KeyVault") { az provider register --namespace $p --wait }
+  "Microsoft.ManagedIdentity", "Microsoft.KeyVault", "Microsoft.CognitiveServices") {
+  az provider register --namespace $p --wait
+}
 az deployment sub create --name recipebox-bootstrap --location southcentralus --template-file infra/bootstrap.bicep `
   --query properties.outputs
 ```
@@ -57,9 +63,16 @@ It creates:
   It sits in its own resource group so it can't change its own sign-in rule.
 - The custom role "RecipeBox Photo Container Data", assignable only within `rg-recipebox-prod`.
 - The deploy identity's roles on `rg-recipebox-prod`: Contributor, and Role Based Access Control Administrator limited to
-  assigning or removing only the photo role and Key Vault Secrets User, only to managed identities or other service principals.
+  assigning or removing only the roles `main.bicep` gives the app identity, and only to managed identities or other service
+  principals: the photo role, Key Vault Secrets User, Storage Queue Data Message Sender, Storage Queue Data Message Processor,
+  Storage Queue Data Reader and Cognitive Services OpenAI User.
 
 Running it again is safe. Note the three outputs for step 2.
+
+Run it again whenever that list of roles changes, before pushing the change that assigns a new role; otherwise the
+deployment fails when it tries to assign it. The recipe import added the three queue roles and Cognitive Services OpenAI
+User, so on a subscription bootstrapped before it, run the `az deployment sub create` line above once, signed in as above,
+before pushing the import's infrastructure to `master`.
 
 ## 2. GitHub variables
 
@@ -197,6 +210,30 @@ gh workflow run deploy.yml --repo michaelvenable/recipebox
 `EDITORS` is configuration (X-7): editors are identified by provider and account ID, never by email. List several separated by
 commas, e.g. `aad:<id>,aad:<id>`; once Google is added, `google:<id>` entries work too.
 
+## Failed imports
+
+A failed import (IMP-11) is one log line from `caj-recipebox-import` with `"event": "recipe-import-failed"`, the import's ID,
+the reason and, for `service-error`, the reading service's message. Nothing alerts on it (owner decision). To list them, run
+this query in `log-recipebox` (portal: the Log Analytics workspace, Logs):
+
+```
+ContainerAppConsoleLogs_CL
+| where Log_s has "recipe-import-failed"
+| extend line = parse_json(Log_s)
+| project TimeGenerated, importId = tostring(line.importId), reason = tostring(line.reason), detail = tostring(line.detail)
+| order by TimeGenerated desc
+```
+
+Or from the command line, with the workspace's ID from
+`az monitor log-analytics workspace show --resource-group rg-recipebox-prod --name log-recipebox --query customerId -o tsv`:
+
+```
+az monitor log-analytics query --workspace <workspace ID> --timespan P7D `
+  --analytics-query "ContainerAppConsoleLogs_CL | where Log_s has 'recipe-import-failed' | project TimeGenerated, Log_s"
+```
+
+Log lines arrive a few minutes after they are written.
+
 ## Deploying by hand
 
 The workflow is the normal path. To deploy `main.bicep` yourself, pass the same parameters it does, including
@@ -219,3 +256,8 @@ az bicep lint --file infra/bootstrap.bicep
 - Deleted Key Vaults are kept for 90 days. Recreating the resource group within that time needs the old vault purged or
   recovered first.
 - The $5 budget on the subscription is not managed here.
+- The model deployment uses the subscription's DataZoneStandard quota for `gpt-5.4-mini` (50 of the 200 thousand tokens a
+  minute available). A deployment fails if the quota isn't there. The model version stays at 2026-03-17 until Azure retires
+  it, then moves to the default version.
+- A deleted Foundry resource is kept, soft-deleted, for 48 hours with its name reserved. Recreating it within that time needs
+  it purged first (`az cognitiveservices account purge`).

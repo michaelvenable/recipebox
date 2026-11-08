@@ -5,6 +5,7 @@ import {
   AZURITE_CONNECTION_STRING,
   DEV_CLIENT_ORIGIN,
   loadConfig,
+  loadReadingServiceConfig,
   parseEditors,
 } from "../src/config.js";
 
@@ -333,6 +334,63 @@ describe("docs/architecture.md, Access to Cosmos DB and Blob Storage", () => {
 
     expect(config.cosmos.access).toEqual({ kind: "key", key: COSMOS_EMULATOR_KEY });
     expect(config.storage.access).toEqual({ kind: "connectionString", connectionString: AZURITE_CONNECTION_STRING });
+  });
+});
+
+describe("docs/architecture.md, Recipe import: the reading service settings (MODEL_ENDPOINT, MODEL_DEPLOYMENT)", () => {
+  const model = { MODEL_ENDPOINT: "https://aif-recipebox.openai.azure.com", MODEL_DEPLOYMENT: "gpt-5.4-mini" };
+  const deployed = loadConfig(allSettings);
+
+  it("are read with the managed identity when deployed", () => {
+    expect(loadReadingServiceConfig(deployed, model)).toEqual({
+      endpoint: model.MODEL_ENDPOINT,
+      deployment: "gpt-5.4-mini",
+      clientId: allSettings.AZURE_CLIENT_ID,
+    });
+  });
+
+  it("trims the settings", () => {
+    expect(
+      loadReadingServiceConfig(deployed, { MODEL_ENDPOINT: ` ${model.MODEL_ENDPOINT} `, MODEL_DEPLOYMENT: " gpt-5.4-mini " }),
+    ).toMatchObject({ endpoint: model.MODEL_ENDPOINT, deployment: "gpt-5.4-mini" });
+  });
+
+  it("are not needed by the API: loadConfig succeeds without them when deployed", () => {
+    expect(() => loadConfig(allSettings)).not.toThrow();
+  });
+
+  it.each([
+    [{}, "MODEL_ENDPOINT, MODEL_DEPLOYMENT"],
+    [{ MODEL_DEPLOYMENT: "gpt-5.4-mini" }, "MODEL_ENDPOINT"],
+    [{ MODEL_ENDPOINT: "https://aif-recipebox.openai.azure.com", MODEL_DEPLOYMENT: "  " }, "MODEL_DEPLOYMENT"],
+  ])("are required for the import job when deployed: %j misses %s", (env, names) => {
+    expect(() => loadReadingServiceConfig(deployed, env)).toThrow(`Missing required settings for the import job: ${names}.`);
+  });
+
+  it.each(["development", "test"])("are not used when APP_ENV=%s, where the development reader answers", (appEnv) => {
+    expect(loadReadingServiceConfig(loadConfig({ APP_ENV: appEnv }), {})).toBeUndefined();
+    expect(loadReadingServiceConfig(loadConfig({ APP_ENV: appEnv }), model)).toBeUndefined();
+  });
+
+  const badModelEndpoints = [
+    ["http", "http://aif-recipebox.openai.azure.com"],
+    ["a Cognitive Services host", "https://aif-recipebox.cognitiveservices.azure.com"],
+    ["the public OpenAI API", "https://api.openai.com"],
+    ["a look-alike with the domain inside another host", "https://evil-openai.azure.com.attacker.net"],
+    ["the domain followed by another domain", "https://openai.azure.com.evil.net"],
+    ["a host merely ending in the domain's text", "https://xopenai.azure.com"],
+    ["the bare domain", "https://openai.azure.com"],
+    ["a nested subdomain", "https://a.aif-recipebox.openai.azure.com"],
+    ["a trailing slash", "https://aif-recipebox.openai.azure.com/"],
+    ["the v1 path", "https://aif-recipebox.openai.azure.com/openai/v1/"],
+    ["credentials", "https://user@aif-recipebox.openai.azure.com"],
+    ["an explicit :443 port", "https://aif-recipebox.openai.azure.com:443"],
+  ] as const;
+
+  it.each(badModelEndpoints)("refuses a MODEL_ENDPOINT with %s when deployed", (_case, endpoint) => {
+    expect(() => loadReadingServiceConfig(deployed, { ...model, MODEL_ENDPOINT: endpoint })).toThrow(
+      "MODEL_ENDPOINT must be an https origin on openai.azure.com, such as https://<account>.openai.azure.com",
+    );
   });
 });
 

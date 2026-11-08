@@ -1,6 +1,7 @@
-// RecipeBox in Azure (docs/architecture.md): the API and the daily trash cleanup on Container Apps, Cosmos DB, Blob Storage,
-// the client on Static Web Apps. Deployed by .github/workflows/deploy.yml into the resource group bootstrap.bicep creates; the
-// owner's steps are in infra/README.md.
+// RecipeBox in Azure (docs/architecture.md): the API, the daily trash cleanup and the queue-started recipe import on Container
+// Apps, Cosmos DB, Blob Storage and Queue Storage, the reading model in Azure AI Foundry, the client on Static Web Apps.
+// Deployed by .github/workflows/deploy.yml into the resource group bootstrap.bicep creates; the owner's steps are in
+// infra/README.md.
 //
 // Two switches are off on the first deployment and turned on later, by the owner, through GitHub variables:
 // - bindCustomDomains: binds recipes.mikevenable.net and api.recipes.mikevenable.net with free managed certificates. It needs
@@ -9,7 +10,13 @@
 //   needs the Microsoft registration and its client secret in the Key Vault first. Google (X-7) is
 //   added only when googleClientId is set, and then needs its registration and secret too.
 
-import { photoRoleDefinitionName } from 'shared.bicep'
+import {
+  openAiUserRoleId
+  photoRoleDefinitionName
+  queueDataReaderRoleId
+  queueMessageProcessorRoleId
+  queueMessageSenderRoleId
+} from 'shared.bicep'
 
 @description('Region for everything except the Static Web App.')
 param location string = resourceGroup().location
@@ -72,9 +79,12 @@ var logAnalyticsName = 'log-recipebox'
 var environmentName = 'cae-recipebox'
 var apiAppName = 'ca-recipebox-api'
 var cleanupJobName = 'caj-recipebox-cleanup'
+var importJobName = 'caj-recipebox-import'
 var cosmosAccountName = 'cosmos-recipebox-${suffix}'
 var storageAccountName = 'strecipebox${suffix}'
 var keyVaultName = 'kv-recipebox-${suffix}'
+// Also its custom subdomain, which is global.
+var foundryName = 'aif-recipebox-${suffix}'
 var staticWebAppName = 'swa-recipebox'
 // Named here and in the workflow, which checks whether it has been issued.
 var apiCertificateName = 'cert-api-recipebox'
@@ -83,7 +93,14 @@ var apiCertificateName = 'cert-api-recipebox'
 var cosmosDatabaseName = 'recipebox'
 var cosmosContainerName = 'recipes'
 var cosmosShoppingListContainerName = 'shopping-lists'
+var cosmosImportContainerName = 'imports'
 var photoContainerName = 'photos'
+var importQueueName = 'imports'
+// The reading model (docs/architecture.md, "Recipe import": owner decision, 2026-11-07). The deployment is named after the
+// model; its name is what the import job sends as the model (MODEL_DEPLOYMENT).
+var modelName = 'gpt-5.4-mini'
+var modelVersion = '2026-03-17'
+var modelDeploymentName = modelName
 var apiPort = 3000
 var clientOrigin = 'https://${clientHostname}'
 var image = '${imageRepository}:${imageTag}'
@@ -92,6 +109,9 @@ var image = '${imageRepository}:${imageTag}'
 // DB's documentEndpoint property has ":443/", so it isn't used.
 var cosmosEndpoint = 'https://${cosmosAccount.name}.documents.azure.com'
 var blobEndpoint = 'https://${storageAccount.name}.blob.${environment().suffixes.storage}'
+var queueEndpoint = 'https://${storageAccount.name}.queue.${environment().suffixes.storage}'
+// The OpenAI endpoint of the Foundry resource; the job adds /openai/v1/ (azure-openai-recipe-reader.ts).
+var modelEndpoint = 'https://${foundry.properties.customSubDomainName}.openai.azure.com'
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // Identity and data (docs/architecture.md, "Access to Cosmos DB and Blob Storage")
@@ -190,6 +210,25 @@ resource cosmosShoppingListContainer 'Microsoft.DocumentDB/databaseAccounts/sqlD
   }
 }
 
+// Imports (IMP-3; docs/architecture.md, "Recipe import"), one per document, partitioned by /id (the import's id) as
+// ensureImportContainer creates it locally. Time to live is on with no default (-1), as for shopping lists: the server gives
+// each record a ttl of one day, so finished imports disappear on their own. Shares the database's free throughput.
+resource cosmosImportContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-04-15' = {
+  parent: cosmosDatabase
+  name: cosmosImportContainerName
+  properties: {
+    resource: {
+      id: cosmosImportContainerName
+      partitionKey: {
+        paths: ['/id']
+        kind: 'Hash'
+        version: 2
+      }
+      defaultTtl: -1
+    }
+  }
+}
+
 // Cosmos DB Built-in Data Contributor, a data-plane role: read and write items, read metadata; no database or container
 // management.
 resource cosmosDataContributor 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2025-04-15' = {
@@ -254,7 +293,131 @@ resource photoContainerData 'Microsoft.Authorization/roleAssignments@2022-04-01'
     roleDefinitionId: photoRoleDefinitionId
     principalId: identity.properties.principalId
     principalType: 'ServicePrincipal'
-    description: 'RecipeBox API and trash cleanup: photos.'
+    description: 'RecipeBox API, trash cleanup and import job: photos.'
+  }
+}
+
+// IMP-12: the page photos of an import, `imports/{importId}/{n}.jpg` in the photo container, are deleted by the import job
+// when it ends. This rule deletes any left behind by a job that stopped partway, once they are more than a day old (the
+// policy runs about once a day, so in practice within a day after that). The prefix includes the container and the trailing
+// slash, so it can't match recipe photos, which are `photos/{recipeId}/...` in the same container, nor any other container.
+resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2025-01-01' = {
+  parent: storageAccount
+  name: 'default'
+  properties: {
+    policy: {
+      rules: [
+        {
+          name: 'delete-import-page-photos'
+          enabled: true
+          type: 'Lifecycle'
+          definition: {
+            filters: {
+              blobTypes: ['blockBlob']
+              prefixMatch: ['${photoContainerName}/imports/']
+            }
+            actions: {
+              baseBlob: {
+                delete: {
+                  daysAfterCreationGreaterThan: 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+  dependsOn: [
+    photoContainer
+  ]
+}
+
+// The queue that starts the import job (docs/architecture.md, "Recipe import"). Messages keep the default time to live.
+resource queueService 'Microsoft.Storage/storageAccounts/queueServices@2025-01-01' = {
+  parent: storageAccount
+  name: 'default'
+  properties: {}
+}
+
+resource importQueue 'Microsoft.Storage/storageAccounts/queueServices/queues@2025-01-01' = {
+  parent: queueService
+  name: importQueueName
+  properties: {
+    metadata: {}
+  }
+}
+
+// The identity's roles on the import queue only (docs/architecture.md, "Recipe import"): the API sends a message for each
+// import started; the import job takes and deletes one; the job's KEDA scaler reads how many are waiting, which needs
+// Get Queue Metadata (queues/read) and Peek Messages, which neither message role allows.
+var queueRoleIds = {
+  sender: queueMessageSenderRoleId
+  processor: queueMessageProcessorRoleId
+  reader: queueDataReaderRoleId
+}
+
+resource importQueueRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for role in items(queueRoleIds): {
+    name: guid(importQueue.id, identity.id, role.value)
+    scope: importQueue
+    properties: {
+      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', role.value)
+      principalId: identity.properties.principalId
+      principalType: 'ServicePrincipal'
+      description: 'RecipeBox API and import job: the imports queue (${role.key}).'
+    }
+  }
+]
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Reading model (docs/architecture.md, "Recipe import")
+// ---------------------------------------------------------------------------------------------------------------------------
+
+// An Azure AI Foundry resource with one model deployment. Local auth (keys) is off: the import job signs in with the managed
+// identity. The custom subdomain gives the https://<name>.openai.azure.com endpoint the job calls.
+resource foundry 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
+  name: foundryName
+  location: location
+  kind: 'AIServices'
+  sku: {
+    name: 'S0'
+  }
+  properties: {
+    customSubDomainName: foundryName
+    disableLocalAuth: true
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+// DataZoneStandard: US data zone; the subscription has no global quota for this model. 50 = 50,000 tokens a minute, enough
+// for 5 imports at once at about 3,000 to 4,000 tokens each (docs/architecture.md, "Recipe import", model choice). The
+// version is the one the owner tried; it is kept until Azure retires it, then upgraded to the default.
+resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
+  parent: foundry
+  name: modelDeploymentName
+  sku: {
+    name: 'DataZoneStandard'
+    capacity: 50
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: modelName
+      version: modelVersion
+    }
+    versionUpgradeOption: 'OnceCurrentVersionExpired'
+  }
+}
+
+resource openAiUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(foundry.id, identity.id, openAiUserRoleId)
+  scope: foundry
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', openAiUserRoleId)
+    principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
+    description: 'RecipeBox import job: read recipes with the model deployment.'
   }
 }
 
@@ -348,7 +511,7 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2025-01-01'
   }
 }
 
-// Settings for both the API and the job (packages/server/src/config.ts). APP_ENV is deliberately unset: deployed mode, where
+// Settings for the API and both jobs (packages/server/src/config.ts). APP_ENV is deliberately unset: deployed mode, where
 // every setting is required and keys are refused. CLIENT_ORIGIN is required in deployed mode even though the job doesn't
 // serve requests.
 var dataSettings = [
@@ -357,8 +520,11 @@ var dataSettings = [
   { name: 'COSMOS_DATABASE', value: cosmosDatabaseName }
   { name: 'COSMOS_CONTAINER', value: cosmosContainerName }
   { name: 'COSMOS_SHOPPING_LIST_CONTAINER', value: cosmosShoppingListContainerName }
+  { name: 'COSMOS_IMPORT_CONTAINER', value: cosmosImportContainerName }
   { name: 'STORAGE_BLOB_ENDPOINT', value: blobEndpoint }
+  { name: 'STORAGE_QUEUE_ENDPOINT', value: queueEndpoint }
   { name: 'STORAGE_PHOTO_CONTAINER', value: photoContainerName }
+  { name: 'STORAGE_IMPORT_QUEUE', value: importQueueName }
   { name: 'CLIENT_ORIGIN', value: clientOrigin }
 ]
 
@@ -366,6 +532,12 @@ var dataSettings = [
 var editorSettings = empty(trim(editors)) ? [] : [{ name: 'EDITORS', value: trim(editors) }]
 
 var apiSettings = concat(dataSettings, editorSettings, [{ name: 'PORT', value: string(apiPort) }])
+
+// The import job also calls the model (loadReadingServiceConfig in config.ts); the API and the cleanup don't.
+var importSettings = concat(dataSettings, [
+  { name: 'MODEL_ENDPOINT', value: modelEndpoint }
+  { name: 'MODEL_DEPLOYMENT', value: modelDeployment.name }
+])
 
 // The API trusts X-MS-CLIENT-PRINCIPAL-* headers only with this set, and only while the auth layer is on, since otherwise
 // anyone could send them (docs/architecture.md, "Sign-in").
@@ -415,6 +587,8 @@ module apiAppPrepare 'modules/api-app.bicep' = if (prepareApiApp) {
     keyVaultSecretsUser
     cosmosContainer
     cosmosShoppingListContainer
+    cosmosImportContainer
+    importQueueRoles
   ]
 }
 
@@ -504,6 +678,8 @@ module apiApp 'modules/api-app.bicep' = {
     keyVaultSecretsUser
     cosmosContainer
     cosmosShoppingListContainer
+    cosmosImportContainer
+    importQueueRoles
     apiCertificate
     authConfig
   ]
@@ -558,6 +734,77 @@ resource cleanupJob 'Microsoft.App/jobs@2025-01-01' = {
     photoContainerData
     cosmosContainer
     cosmosShoppingListContainer
+    cosmosImportContainer
+  ]
+}
+
+// Recipe import (docs/architecture.md, "Recipe import"; IMP-6 to IMP-12): the same image with the import command from the
+// Dockerfile, started by KEDA's Azure Queue scaler, which signs in with the same identity (no connection string). One
+// execution per message, at most 5 at a time. Each execution takes one message and exits; an import ends within its 10
+// minutes (IMP-11), so the replica timeout matches, and a failed import is never retried.
+resource importJob 'Microsoft.App/jobs@2025-01-01' = {
+  name: importJobName
+  location: location
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${identity.id}': {}
+    }
+  }
+  properties: {
+    environmentId: containerAppsEnvironment.id
+    configuration: {
+      triggerType: 'Event'
+      eventTriggerConfig: {
+        parallelism: 1
+        replicaCompletionCount: 1
+        scale: {
+          minExecutions: 0
+          maxExecutions: 5
+          rules: [
+            {
+              name: 'imports-queue'
+              type: 'azure-queue'
+              metadata: {
+                accountName: storageAccount.name
+                queueName: importQueue.name
+                queueLength: '1'
+              }
+              identity: identity.id
+            }
+          ]
+        }
+      }
+      replicaTimeout: 600
+      replicaRetryLimit: 0
+    }
+    template: {
+      containers: [
+        {
+          name: 'import'
+          image: image
+          command: [
+            'node'
+            '--enable-source-maps'
+            'dist/import.js'
+          ]
+          // Pages are at most 2048 px, so the dish picture's decode needs far less than the API's uploads.
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+          env: importSettings
+        }
+      ]
+    }
+  }
+  dependsOn: [
+    cosmosDataContributor
+    photoContainerData
+    importQueueRoles
+    openAiUser
+    cosmosContainer
+    cosmosImportContainer
   ]
 }
 
@@ -603,3 +850,5 @@ output keyVaultName string = keyVault.name
 output cosmosAccountName string = cosmosAccount.name
 output storageAccountName string = storageAccount.name
 output cleanupJobName string = cleanupJob.name
+output importJobName string = importJob.name
+output foundryName string = foundry.name

@@ -66,8 +66,7 @@ export async function openStorage(
 
 /**
  * The import queue for the API (docs/architecture.md, "Recipe import"). Only locally is Azurite's queue created on first run.
- * Anywhere else it comes from the infrastructure scripts and is not checked here: the identity may send messages but not read
- * the queue's properties (storage-import-queue.ts).
+ * Anywhere else it comes from the infrastructure scripts and is not checked here (storage-import-queue.ts).
  */
 export async function openImportQueue(
   config: Pick<Config, "local">,

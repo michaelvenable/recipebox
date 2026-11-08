@@ -1,9 +1,9 @@
 import { pino } from "pino";
 import { systemClock } from "../clock.js";
-import { type Config, loadConfig } from "../config.js";
+import { loadConfig } from "../config.js";
+import { createRecipeReader } from "../imports/azure-openai-recipe-reader.js";
 import { CosmosImportRepository } from "../imports/cosmos-import-repository.js";
 import { processImport } from "../imports/process-import.js";
-import { DevelopmentRecipeReader, type RecipeReader } from "../imports/recipe-reader.js";
 import { createImportQueueClient, StorageImportQueue } from "../imports/storage-import-queue.js";
 import { openImportQueue, openStorage } from "../open-storage.js";
 import { BlobPhotoStore, createPhotoContainerClient } from "../photos/blob-photo-store.js";
@@ -17,22 +17,17 @@ import { type ImportJobResult, runImportJob } from "./run-import.js";
  * logged as `recipe-import-failed` (IMP-11).
  *
  * `npm run import` runs it with the environment as it is, as deployed: every setting is required (config.ts) and a missing
- * database or container is an error. `npm run import:dev` sets APP_ENV=development and processes every queued message, one
- * after another, against the emulators with the development reader.
+ * database or container is an error, and the model deployment (MODEL_ENDPOINT, MODEL_DEPLOYMENT) reads the photos.
+ * `npm run import:dev` sets APP_ENV=development and processes every queued message, one after another, against the emulators
+ * with the development reader.
  */
 const logger = pino();
-
-/** The reading service. Only the development reader exists so far, and it is refused outside development and test. */
-function createReader(config: Config): RecipeReader {
-  if (config.local) return new DevelopmentRecipeReader(config);
-  throw new Error("No reading service is configured for deployed runs yet; the import job can't run outside development.");
-}
 
 try {
   const config = loadConfig();
   const untilEmpty = process.argv.includes("--until-empty");
   if (untilEmpty && !config.local) throw new Error("--until-empty is for local runs only.");
-  const reader = createReader(config);
+  const reader = createRecipeReader(config);
   const cosmos = createCosmosClient(config.cosmos);
   try {
     // Outside local development a missing database, container or queue is an error, never created (open-storage.ts).

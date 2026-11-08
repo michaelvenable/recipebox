@@ -65,9 +65,9 @@ export function createImportQueueClient(
  * Creates the import queue if it doesn't exist, for local development and tests. Production resources come from the
  * infrastructure scripts.
  *
- * Outside local runs the queue is not checked at startup, unlike the containers: the identity's roles on it (Storage Queue Data
- * Message Sender and Processor, docs/architecture.md, "Recipe import") allow sending and processing messages but not reading
- * the queue's properties. A missing queue fails the first start of an import instead, which is then ended (import-routes.ts).
+ * Outside local runs the queue is not checked at startup, unlike the containers: it comes from the infrastructure scripts
+ * (infra/main.bicep), and the identity's roles on it are for its messages and for the import job's scaler, not for the app to
+ * look at the queue itself. A missing queue fails the first start of an import instead, which is then ended (import-routes.ts).
  */
 export async function ensureImportQueue(queue: QueueClient): Promise<QueueClient> {
   await queue.createIfNotExists();

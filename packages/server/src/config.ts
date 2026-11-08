@@ -208,9 +208,9 @@ function parseOrigin(value: string): string {
 }
 
 /**
- * Checks a deployed Cosmos DB, Blob Storage or Queue Storage endpoint: `https://<account>.<domain>` exactly, so a mistyped setting can't send
- * the managed identity's token to another host (docs/architecture.md, "Access to Cosmos DB and Blob Storage"). The account
- * must be a single DNS label, so look-alikes such as `xdocuments.azure.com` or `documents.azure.com.evil.net` are refused. No
+ * Checks a deployed Cosmos DB, Blob Storage, Queue Storage or Azure OpenAI endpoint: `https://<account>.<domain>` exactly, so a
+ * mistyped setting can't send the managed identity's token to another host (docs/architecture.md, "Access to Cosmos DB and
+ * Blob Storage"). The account must be a single DNS label, so look-alikes such as `xdocuments.azure.com` or `documents.azure.com.evil.net` are refused. No
  * port is accepted, not even `:443`: the origin form is what the scripts set, and one exact form leaves nothing to interpret.
  */
 function parseAzureEndpoint(name: string, value: string, domain: string): string {
@@ -307,5 +307,48 @@ export function loadConfig(env: Env = process.env): Config {
     trustAuthHeaders: (env.CONTAINER_APP_NAME?.trim() ?? "") !== "" && env.TRUST_AUTH_HEADERS === "true",
     editors: parseEditors(env.EDITORS),
     clientOrigin: parseOrigin(clientOrigin),
+  };
+}
+
+/**
+ * The reading service (IMP-6; docs/architecture.md, "Recipe import"): the `gpt-5.4-mini` deployment in the Azure AI Foundry
+ * resource, reached with the managed identity through the OpenAI-compatible v1 endpoint. Only the import job uses it, so its
+ * settings are read by `loadReadingServiceConfig`, not `loadConfig`, and the API doesn't need them.
+ */
+export interface ReadingServiceConfig {
+  /** `MODEL_ENDPOINT`: the resource's origin, `https://<account>.openai.azure.com`. */
+  endpoint: string;
+  /** `MODEL_DEPLOYMENT`: the deployment's name, sent as the model. */
+  deployment: string;
+  /** The managed identity the job signs in with (`AZURE_CLIENT_ID`). */
+  clientId: string;
+}
+
+/**
+ * The import job's reading service settings: undefined locally, where the development reader answers instead (recipe-reader.ts).
+ * When deployed, `MODEL_ENDPOINT` and `MODEL_DEPLOYMENT` are required, and `MODEL_ENDPOINT` must be an https origin on
+ * `openai.azure.com`, so the identity's token can't be sent to another host.
+ */
+export function loadReadingServiceConfig(
+  config: Pick<Config, "local" | "cosmos">,
+  env: Env = process.env,
+): ReadingServiceConfig | undefined {
+  if (config.local) return undefined;
+  // Deployed, loadConfig has already made this the managed identity.
+  if (config.cosmos.access.kind !== "managedIdentity") {
+    throw new Error("A deployed import job reaches the reading service only with the managed identity (AZURE_CLIENT_ID).");
+  }
+  const endpoint = env.MODEL_ENDPOINT?.trim() ?? "";
+  const deployment = env.MODEL_DEPLOYMENT?.trim() ?? "";
+  const missing: string[] = [];
+  if (endpoint === "") missing.push("MODEL_ENDPOINT");
+  if (deployment === "") missing.push("MODEL_DEPLOYMENT");
+  if (missing.length > 0) {
+    throw new Error(`Missing required settings for the import job: ${missing.join(", ")}.`);
+  }
+  return {
+    endpoint: parseAzureEndpoint("MODEL_ENDPOINT", endpoint, "openai.azure.com"),
+    deployment,
+    clientId: config.cosmos.access.clientId,
   };
 }

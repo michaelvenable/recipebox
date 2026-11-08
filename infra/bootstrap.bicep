@@ -7,7 +7,14 @@
 
 targetScope = 'subscription'
 
-import { keyVaultSecretsUserRoleId, photoRoleDefinitionName } from 'shared.bicep'
+import {
+  keyVaultSecretsUserRoleId
+  openAiUserRoleId
+  photoRoleDefinitionName
+  queueDataReaderRoleId
+  queueMessageProcessorRoleId
+  queueMessageSenderRoleId
+} from 'shared.bicep'
 
 @description('Region of the resource groups and the deploy identity.')
 param location string = 'southcentralus'
@@ -97,9 +104,15 @@ module deployAccess 'modules/deploy-access.bicep' = {
   scope: appResourceGroup
   params: {
     principalId: deployIdentity.outputs.principalId
+    // The roles infra/main.bicep assigns to the app identity, and only those. Adding one here means the owner runs this
+    // template again before the workflow can deploy it (infra/README.md).
     assignableRoleIds: [
       photoRole.name
       keyVaultSecretsUserRoleId
+      queueMessageSenderRoleId
+      queueMessageProcessorRoleId
+      queueDataReaderRoleId
+      openAiUserRoleId
     ]
   }
 }
