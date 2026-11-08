@@ -248,7 +248,9 @@ describe("REC-6, X-8 Delete on the recipe view", () => {
 
     await screen.findByText("Pad Thai moved to trash");
     expect(router.state.location.pathname).toBe("/");
-    const list = screen.getByRole("list", { name: "Recipes" });
+    // The message shows before the router has rendered the list (a navigation is a transition), so wait for it. The list
+    // never answers again, so whatever list appears is the cache.
+    const list = await screen.findByRole("list", { name: "Recipes" });
     expect(within(list).queryByText("Pad Thai")).not.toBeInTheDocument();
     expect(within(list).getByText("Beef Stew")).toBeInTheDocument();
     // The tags were asked for again, and are still waiting for the answer.
@@ -282,7 +284,8 @@ describe("REC-6, X-8 Delete on the recipe view", () => {
     hold = true;
 
     await screen.findByText("Pad Thai moved to trash");
-    const after = screen.getByRole("list", { name: "Recently added" });
+    // As above: wait for the list page to render; the list never answers again, so the row is from the cache.
+    const after = await screen.findByRole("list", { name: "Recently added" });
     expect(within(after).queryByText("Pad Thai")).not.toBeInTheDocument();
     expect(within(after).getByText("Beef Stew")).toBeInTheDocument();
   });
