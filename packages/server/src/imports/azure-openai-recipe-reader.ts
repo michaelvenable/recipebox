@@ -111,7 +111,11 @@ function answerText(completion: ChatCompletion): string {
     case "length":
       throw new ReadingServiceError("The reading service's answer was cut off (finish_reason length).");
     case "content_filter":
-      throw new ReadingServiceError("The reading service's content filter stopped the answer (finish_reason content_filter).");
+      throw new ReadingServiceError(
+        shorten(
+          `The reading service's content filter stopped the answer (finish_reason content_filter; ${filterFindings(choice)}).`,
+        ),
+      );
     default:
       throw new ReadingServiceError(
         `The reading service stopped without an answer (finish_reason ${String(choice.finish_reason)}).`,
@@ -123,6 +127,32 @@ function answerText(completion: ChatCompletion): string {
   }
   if (content === null || content === "") throw new ReadingServiceError("The reading service returned an empty answer.");
   return content;
+}
+
+/**
+ * Which of Azure's content filter categories stopped the answer, such as `protected_material_text` or `violence (medium)`,
+ * from the choice's `content_filter_results`, which the `openai` types don't know. Only category names, severities and the
+ * filter's error code are kept, never a citation or message, so nothing read from the photos reaches the log (IMP-11).
+ */
+function filterFindings(choice: object): string {
+  const results: unknown = (choice as { content_filter_results?: unknown }).content_filter_results;
+  if (typeof results !== "object" || results === null) return "no filter results given";
+  const filtered: string[] = [];
+  for (const [category, result] of Object.entries(results)) {
+    if (typeof result !== "object" || result === null || !isName(category)) continue;
+    const { filtered: stopped, severity, code } = result as { filtered?: unknown; severity?: unknown; code?: unknown };
+    if (category === "error") {
+      filtered.push(isName(code) ? `filter error ${code}` : "filter error");
+    } else if (stopped === true) {
+      filtered.push(isName(severity) && severity !== "safe" ? `${category} (${severity})` : category);
+    }
+  }
+  return filtered.length === 0 ? "no category marked as filtered" : `filtered: ${filtered.join(", ")}`;
+}
+
+/** A category, severity or error code as Azure writes them, so that only such names are logged. */
+function isName(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z_]{1,64}$/.test(value);
 }
 
 /**

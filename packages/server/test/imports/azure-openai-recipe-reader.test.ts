@@ -36,7 +36,12 @@ interface SentRequest {
 type Reply = { status: number; body: unknown; headers?: Record<string, string> };
 
 /** A chat completion with one choice. */
-function completion(choice: { content?: string | null; refusal?: string | null; finish_reason?: string }): unknown {
+function completion(choice: {
+  content?: string | null;
+  refusal?: string | null;
+  finish_reason?: string;
+  content_filter_results?: unknown;
+}): unknown {
   return {
     id: "chatcmpl-1",
     object: "chat.completion",
@@ -47,10 +52,21 @@ function completion(choice: { content?: string | null; refusal?: string | null; 
         index: 0,
         finish_reason: choice.finish_reason ?? "stop",
         message: { role: "assistant", content: choice.content ?? null, refusal: choice.refusal ?? null },
+        ...(choice.content_filter_results === undefined ? {} : { content_filter_results: choice.content_filter_results }),
       },
     ],
   };
 }
+
+/** Azure's content filter results with nothing filtered, as on every answer. */
+const NOTHING_FILTERED = {
+  hate: { filtered: false, severity: "safe" },
+  self_harm: { filtered: false, severity: "safe" },
+  sexual: { filtered: false, severity: "safe" },
+  violence: { filtered: false, severity: "safe" },
+  protected_material_code: { filtered: false, detected: false },
+  protected_material_text: { filtered: false, detected: false },
+};
 
 let sent: SentRequest[];
 let replies: Reply[];
@@ -215,6 +231,103 @@ describe("IMP-11 a failing reading service surfaces as an error with a short det
 
     expect(error.message).toContain("content filter");
     expect(error.message).not.toContain("Banana");
+  });
+
+  it("names the filter categories that stopped the answer, with their severity", async () => {
+    replies.push({
+      status: 200,
+      body: completion({
+        content: "Banana",
+        finish_reason: "content_filter",
+        content_filter_results: {
+          ...NOTHING_FILTERED,
+          violence: { filtered: true, severity: "medium" },
+          protected_material_text: { filtered: true, detected: true },
+        },
+      }),
+    });
+
+    const error = await failure(reader().read(PAGES, [], new AbortController().signal));
+
+    expect(error.message).toBe(
+      "The reading service's content filter stopped the answer " +
+        "(finish_reason content_filter; filtered: violence (medium), protected_material_text).",
+    );
+  });
+
+  it("keeps no citation or other text from the filter results", async () => {
+    replies.push({
+      status: 200,
+      body: completion({
+        content: "Banana",
+        finish_reason: "content_filter",
+        content_filter_results: {
+          ...NOTHING_FILTERED,
+          protected_material_code: {
+            filtered: true,
+            detected: true,
+            citation: { URL: "https://example.com/banana-bread", license: "Banana" },
+          },
+          "Banana Bread": { filtered: true },
+          hate: { filtered: true, severity: "Banana Bread with walnuts" },
+        },
+      }),
+    });
+
+    const error = await failure(reader().read(PAGES, [], new AbortController().signal));
+
+    expect(error.message).toContain("filtered: hate, protected_material_code");
+    expect(error.message).not.toContain("Banana");
+    expect(error.message).not.toContain("example.com");
+  });
+
+  it("says when no category is marked, when the filter had an error, and when there are no results", async () => {
+    replies.push({
+      status: 200,
+      body: completion({ content: "Banana", finish_reason: "content_filter", content_filter_results: NOTHING_FILTERED }),
+    });
+    replies.push({
+      status: 200,
+      body: completion({
+        finish_reason: "content_filter",
+        content_filter_results: { error: { code: "content_filter_error", message: "Banana" } },
+      }),
+    });
+    replies.push({ status: 200, body: completion({ finish_reason: "content_filter" }) });
+
+    const messages = [];
+    for (let i = 0; i < 3; i++) messages.push((await failure(reader().read(PAGES, [], new AbortController().signal))).message);
+
+    expect(messages).toEqual([
+      expect.stringContaining("(finish_reason content_filter; no category marked as filtered)."),
+      expect.stringContaining("(finish_reason content_filter; filtered: filter error content_filter_error)."),
+      expect.stringContaining("(finish_reason content_filter; no filter results given)."),
+    ]);
+    expect(messages.join(" ")).not.toContain("Banana");
+  });
+
+  it("the job logs a filtered answer's categories in the service-error detail", async () => {
+    const job = new ImportJobFixture();
+    const id = await job.startImport();
+    replies.push({
+      status: 200,
+      body: completion({
+        content: "Banana",
+        finish_reason: "content_filter",
+        content_filter_results: { ...NOTHING_FILTERED, protected_material_text: { filtered: true, detected: true } },
+      }),
+    });
+
+    expect(await job.process(id, { reader: reader() })).toBe("service-error");
+
+    expect(job.failures()).toEqual([
+      expect.objectContaining({
+        importId: id.value,
+        reason: "service-error",
+        detail: expect.stringContaining("filtered: protected_material_text") as unknown,
+      }),
+    ]);
+    expect(JSON.stringify(job.lines)).not.toContain("Banana");
   });
 
   it("an empty answer, or none", async () => {
