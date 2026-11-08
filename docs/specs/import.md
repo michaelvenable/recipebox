@@ -67,7 +67,8 @@ Screens: `docs/mockups/Import*.dc.html`, from the "Importing a recipe from a pho
   progress carry on.
 - **IMP-12. The uploaded photos aren't kept.** The photos of the pages are used only to read the recipe. They are never shown in
   the app after the upload, and they are deleted when the import ends, whether it succeeds or fails. Photos left behind by an
-  import that was interrupted are deleted within one day. The recipe's photo (IMP-9) is a separate image cut from one of them.
+  import that was interrupted are deleted within two days (owner decision, 2026-11-07: storage cleanup runs once a day on
+  whole days). The recipe's photo (IMP-9) is a separate image cut from one of them.
 
 ## Examples
 

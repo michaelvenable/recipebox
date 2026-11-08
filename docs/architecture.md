@@ -318,9 +318,11 @@ Container Apps job (started by the queue) <--------+
   is `reading` (IMP-5) and, while there is one, checks again every 5 seconds. The device that started an import keeps its
   `importId`; when that import turns `done`, it shows "‹name› imported" with Open (IMP-10). A `failed` import's card just goes
   away.
-- Access: the identity also needs Storage Queue Data Message Sender and Processor on the `imports` queue and a role that can
-  call the model deployment. The deploy identity may assign only the roles listed in `bootstrap.bicep`, so the owner reruns
-  the bootstrap once to allow these.
+- Access: the identity also needs Storage Queue Data Message Sender, Processor and Reader on the `imports` queue, and
+  Cognitive Services OpenAI User on the Foundry resource to call the model. Reader is for the job's KEDA trigger: its
+  default count of waiting messages reads the queue's metadata, which the other two roles don't allow (owner decision,
+  2026-11-07). The deploy identity may assign only the roles listed in `bootstrap.bicep`, so the owner reruns the bootstrap
+  once to allow these.
 - Locally: Azurite provides the queue, and a development-only fake model returns a fixed recipe, so the whole flow runs
   without Azure.
 
