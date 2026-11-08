@@ -11,6 +11,7 @@ import {
   expectErrors,
   get,
   recipeApp,
+  SEEDED_AT,
   seed,
   storedSnapshots,
 } from "./recipe-route-helpers.js";
@@ -122,9 +123,9 @@ describe("COOK-6 haven't made in a while", () => {
     const b = await seed(repository, content("B"), { cookedAt: ["2026-01-10T18:00:00.000Z"] });
 
     expect(await recommendations(app)).toEqual([
-      { id: a.id.value, name: "A", tags: [], hasPhoto: false },
-      { id: b.id.value, name: "B", tags: [], hasPhoto: false, lastCookedAt: "2026-01-10T18:00:00.000Z" },
-      { id: c.id.value, name: "C", tags: ["dinner"], hasPhoto: false, lastCookedAt: "2026-08-02T18:00:00.000Z" },
+      { id: a.id.value, name: "A", tags: [], hasPhoto: false, createdAt: SEEDED_AT },
+      { id: b.id.value, name: "B", tags: [], hasPhoto: false, createdAt: SEEDED_AT, lastCookedAt: "2026-01-10T18:00:00.000Z" },
+      { id: c.id.value, name: "C", tags: ["dinner"], hasPhoto: false, createdAt: SEEDED_AT, lastCookedAt: "2026-08-02T18:00:00.000Z" },
     ]);
   });
 

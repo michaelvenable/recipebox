@@ -24,7 +24,7 @@ export function isEditor(caller: Caller): boolean {
   return caller.signedIn && caller.isEditor;
 }
 
-/** A recipe in the list, as a visitor sees it (X-1). */
+/** A recipe in the list, as a visitor sees it (X-1). The added time is public (REC-22). */
 export function toRecipeSummary(recipe: Recipe): RecipeSummary {
   const content = recipe.content;
   return {
@@ -33,6 +33,7 @@ export function toRecipeSummary(recipe: Recipe): RecipeSummary {
     tags: content.tags.map((t) => t.value),
     totalTimeMinutes: content.totalTime?.value,
     hasPhoto: recipe.photo !== undefined,
+    createdAt: recipe.createdAt?.toIso(),
   };
 }
 

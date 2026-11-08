@@ -129,7 +129,7 @@ export class ImportJobFixture {
 
   /** Stores a recipe with `tags`, deleted if `trashed`. */
   async storeRecipe(name: string, tags: string[] = [], trashed = false): Promise<Recipe> {
-    const created = Recipe.create(recipeId(randomUUID()), content(name, { tags }));
+    const created = Recipe.create(recipeId(randomUUID()), content(name, { tags }), instant(STARTED));
     if (!created.ok) throw new Error("invalid recipe");
     if (trashed) created.value.delete(instant(STARTED));
     await this.recipes.save(created.value);

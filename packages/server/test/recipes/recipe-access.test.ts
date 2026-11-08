@@ -23,14 +23,19 @@ import {
   storedSnapshots,
 } from "./recipe-route-helpers.js";
 
+/** The added time of the recipe that isn't in the trash: public (REC-22). */
+const ADDED = "2026-06-15T10:00:00.000Z";
+
 /** A recipe on the to-make list with cooking history, plus one in the trash: every kind of private data there is. */
 async function appWithPrivateData(): Promise<Awaited<ReturnType<typeof recipeApp>> & { id: string; trashedId: string }> {
   const setup = await recipeApp("2026-10-10T09:00:00.000Z");
   const recipe = await seed(setup.repository, content("Pad Thai", { tags: ["dinner"] }), {
+    createdAt: ADDED,
     cookedAt: ["2026-08-01T18:00:00.000Z", "2026-09-01T18:00:00.000Z"],
     toMakeAt: "2026-09-20T08:00:00.000Z",
   });
   const trashed = await seed(setup.repository, content("Trashed Curry", { tags: ["secret"] }), {
+    createdAt: "2026-06-20T10:00:00.000Z",
     cookedAt: ["2026-07-01T18:00:00.000Z"],
     deletedAt: "2026-10-01T08:00:00.000Z",
   });
@@ -50,8 +55,10 @@ function publicEndpoints(id: string): [string, { safeParse(v: unknown): { succes
 
 function expectNoPrivateFields(body: string): void {
   for (const field of PRIVATE_FIELDS) expect(body).not.toContain(`"${field}"`);
-  // Times appear only in private data here: history, to-make and trash dates.
-  expect(body).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+  // The one public time is a listed recipe's added time (REC-22). Every other time here is private: history, to-make and
+  // trash dates, and the added time of the recipe in the trash.
+  const times = body.match(/\d{4}-\d{2}-\d{2}T[^"]*/g) ?? [];
+  expect(times.filter((t) => t !== ADDED)).toEqual([]);
 }
 
 describe("X-1 recipes are public; the rest is private", () => {
@@ -95,7 +102,9 @@ describe("X-1 recipes are public; the rest is private", () => {
     const { app, id } = await appWithPrivateData();
 
     const list = EditorRecipeSummary.array().parse((await get(app, "/recipes", AS_EDITOR)).json());
-    expect(list).toEqual([{ id, name: "Pad Thai", tags: ["dinner"], hasPhoto: false, onToMakeList: true }]);
+    expect(list).toEqual([
+      { id, name: "Pad Thai", tags: ["dinner"], hasPhoto: false, createdAt: ADDED, onToMakeList: true },
+    ]);
 
     const recipe = EditorRecipe.parse((await get(app, `/recipes/${id}`, AS_EDITOR)).json());
     expect(recipe).toMatchObject({

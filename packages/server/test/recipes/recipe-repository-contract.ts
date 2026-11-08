@@ -42,7 +42,7 @@ export function recipeRepositoryContract(name: string, createRepository: () => P
       it("leaves an existing recipe with the same id as it is and says so", async () => {
         const first = newRecipe("Pancakes");
         await repository.save(first);
-        const again = valueOf(Recipe.create(first.id, content("Waffles")));
+        const again = valueOf(Recipe.create(first.id, content("Waffles"), at("2026-10-02T09:00:00Z")));
 
         expect(await repository.add(again)).toBe(false);
 
@@ -247,7 +247,7 @@ function content(name: string): RecipeContentInput {
 }
 
 function newRecipe(name: string): Recipe {
-  return valueOf(Recipe.create(newId(), content(name)));
+  return valueOf(Recipe.create(newId(), content(name), at("2026-09-01T09:00:00.000Z")));
 }
 
 /** A recipe using every optional part of the snapshot, so a round trip checks them all. */
@@ -259,7 +259,7 @@ function fullRecipe(): Recipe {
       steps: ["Butter the bread.", "Add toppings."],
       totalTimeMinutes: 15,
       tags: ["lunch", "danish"],
-    }),
+    }, at("2026-08-15T10:00:00.250Z")),
   );
   valueOf(recipe.setPhoto(valueOf(PhotoRef.create({ blobName: "recipes/photo.jpg", contentType: "image/jpeg" }))));
   valueOf(recipe.markCooked(at("2026-09-01T12:00:00Z")));

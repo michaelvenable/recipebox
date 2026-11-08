@@ -203,7 +203,9 @@ agree with the domain.
 
 X-12 in short: every stored time comes from the server's clock. The server passes its current time to domain methods as an
 `Instant`; no request field is ever used as a time. The client formats stored times in the device's time zone and computes
-relative labels ("3 months ago", "10 days left") and whether a recipe was cooked today (COOK-8).
+relative labels ("3 months ago", "10 days left"), whether a recipe was cooked today (COOK-8), and which recipes belong in the
+"Recently added" row (REC-22): those added today or in the 30 calendar days before it, by local date, from the added times in
+the recipe list. Local dates, not 30 x 24 hours, so a daylight saving change in between doesn't move the first day.
 
 ## Trash cleanup
 
@@ -290,8 +292,9 @@ Container Apps job (started by the queue) <--------+
   It reads the record and the photos (every `imports/{importId}/` blob, in order), sends them to the model in one request,
   and turns the answer into a recipe:
   - The answer is untrusted input, like a request body: it is parsed against the expected shape, then the recipe is made with
-    the same domain method as `POST /recipes`, with the server's time. Tags are filtered by a domain function to tags already in
-    use, at most 5 (IMP-8). A domain refusal ends the import as `invalid-recipe` (IMP-7). The model's JSON is never stored.
+    the same domain method as `POST /recipes`, with the server's time when the import succeeds, which becomes the recipe's
+    added time (REC-22). Tags are filtered by a domain function to tags already in use, at most 5 (IMP-8). A domain refusal
+    ends the import as `invalid-recipe` (IMP-7). The model's JSON is never stored.
   - The recipe's ID is derived from the import ID and the recipe is written with `create`, so a message delivered twice can't
     add the recipe twice.
   - The dish picture (IMP-9): the model returns which photo it is on (from 1) and a box around it as fractions of that image.

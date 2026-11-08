@@ -19,7 +19,7 @@ let nextId = 0;
 function planned(name: string, content: Partial<RecipeContentInput> = {}, addedAt = "2026-10-01T12:00:00Z"): Recipe {
   nextId += 1;
   const id = valueOf(RecipeId.create(`00000000-0000-4000-8000-${String(nextId).padStart(12, "0")}`));
-  const r = valueOf(Recipe.create(id, { name, ingredients: ["Something"], steps: ["Cook it."], ...content }));
+  const r = valueOf(Recipe.create(id, { name, ingredients: ["Something"], steps: ["Cook it."], ...content }, at("2026-09-01T12:00:00Z")));
   valueOf(r.addToMakeList(at(addedAt)));
   return r;
 }

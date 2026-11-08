@@ -9,6 +9,7 @@ import {
   expectErrors,
   get,
   recipeApp,
+  SEEDED_AT,
   seed,
   storedSnapshots,
 } from "./recipe-route-helpers.js";
@@ -53,6 +54,7 @@ describe("PLAN-1 add", () => {
         tags: ["dinner"],
         totalTimeMinutes: 30,
         hasPhoto: false,
+        createdAt: SEEDED_AT,
         addedAt: "2026-10-02T17:30:00.000Z",
       },
     ]);

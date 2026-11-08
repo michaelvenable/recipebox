@@ -190,9 +190,10 @@ export class RecipeImport {
  * Builds the recipe that was read from a photo (IMP-7), through `Recipe.create` so every content rule applies (REC-1,
  * REC-2, REC-11) and its errors come back unchanged. Only tags already in use are kept (IMP-8): each read tag is read like
  * tag input (REC-11); one that is invalid or not in `tagsInUse` is dropped, as are duplicates; the first 5 left, in the
- * order read, are kept. Dropped tags are never an error, and an import never creates a tag (REC-12).
+ * order read, are kept. Dropped tags are never an error, and an import never creates a tag (REC-12). `at` is the server's
+ * time when the recipe is added to the collection (IMP-10, X-12), and becomes its added time (REC-22).
  */
-export function importedRecipe(id: RecipeId, read: ReadRecipe, tagsInUse: readonly Tag[]): Result<Recipe> {
+export function importedRecipe(id: RecipeId, read: ReadRecipe, tagsInUse: readonly Tag[], at: Instant): Result<Recipe> {
   const kept: Tag[] = [];
   for (const raw of read.tags) {
     if (kept.length === MAX_IMPORTED_TAGS) break;
@@ -202,14 +203,18 @@ export function importedRecipe(id: RecipeId, read: ReadRecipe, tagsInUse: readon
     if (kept.some((t) => t.equals(tag.value))) continue;
     kept.push(tag.value);
   }
-  return Recipe.create(id, {
-    name: read.name,
-    ingredients: read.ingredients,
-    prep: read.prep,
-    steps: read.steps,
-    totalTimeMinutes: read.totalTimeMinutes,
-    tags: kept.map((t) => t.value),
-  });
+  return Recipe.create(
+    id,
+    {
+      name: read.name,
+      ingredients: read.ingredients,
+      prep: read.prep,
+      steps: read.steps,
+      totalTimeMinutes: read.totalTimeMinutes,
+      tags: kept.map((t) => t.value),
+    },
+    at,
+  );
 }
 
 function orThrow<T>(part: string, result: Result<T>): T {

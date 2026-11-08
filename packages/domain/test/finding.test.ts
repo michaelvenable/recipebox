@@ -15,10 +15,11 @@ import { valueOf } from "./helpers.js";
 
 let nextId = 0;
 const at = (iso: string) => valueOf(Instant.fromIso(iso));
+const CREATED = at("2026-09-01T12:00:00Z");
 function recipe(name: string, tags: string[] = [], content: Partial<RecipeContentInput> = {}): Recipe {
   nextId += 1;
   const id = valueOf(RecipeId.create(`00000000-0000-4000-8000-${String(nextId).padStart(12, "0")}`));
-  return valueOf(Recipe.create(id, { name, ingredients: ["Something"], steps: ["Cook it."], tags, ...content }));
+  return valueOf(Recipe.create(id, { name, ingredients: ["Something"], steps: ["Cook it."], tags, ...content }, CREATED));
 }
 function deleted(r: Recipe, iso = "2026-10-01T12:00:00Z"): Recipe {
   r.delete(at(iso));

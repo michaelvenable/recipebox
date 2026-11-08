@@ -98,7 +98,7 @@ export function startedImport(iso = "2026-11-07T09:00:00Z"): RecipeImport {
 
 function bananaBread(): Recipe {
   const id = valueOf(RecipeId.create(randomUUID()));
-  return valueOf(Recipe.create(id, { name: "Banana Bread", ingredients: ["3 bananas"], steps: ["Bake."] }));
+  return valueOf(Recipe.create(id, { name: "Banana Bread", ingredients: ["3 bananas"], steps: ["Bake."] }, at("2026-09-01T09:00:00.000Z")));
 }
 
 function at(iso: string): Instant {

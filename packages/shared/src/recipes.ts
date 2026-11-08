@@ -46,6 +46,11 @@ export const RecipeSummary = z.strictObject({
   tags: z.array(z.string()),
   totalTimeMinutes: z.number().optional(),
   hasPhoto: z.boolean(),
+  /**
+   * When the recipe was added, for "Recently added" (REC-22); public, like the recipe (X-1). Absent for recipes stored before
+   * added times were recorded. Named `createdAt` because `addedAt` on the to-make list's entries (PLAN-3) is another time.
+   */
+  createdAt: z.string().optional(),
 });
 export type RecipeSummary = z.infer<typeof RecipeSummary>;
 

@@ -399,6 +399,40 @@ describe("IMP-10 done: the import keeps the recipe's id and name", () => {
   });
 });
 
+describe("REC-22 an imported recipe's added time", () => {
+  it("is when it is added to the collection (IMP-10), by the server's clock (X-12): not when the import started", async () => {
+    const id = await job.startImport();
+    job.reader.answer = async () => {
+      job.clock.set("2026-11-07T09:04:00.000Z");
+      return answer();
+    };
+
+    expect(await job.process(id)).toBe("done");
+
+    expect((await job.recipes.get(importedRecipeId(id)))?.createdAt?.toIso()).toBe("2026-11-07T09:04:00.000Z");
+  });
+
+  it("is taken after the dish picture is stored, at the moment the import succeeds", async () => {
+    const id = await job.startImport(await jpeg(800, 600));
+    job.reader.answer = async () => {
+      job.clock.set("2026-11-07T09:04:00.000Z");
+      return answer({ dishPhoto: { photo: 1, left: 0.5, top: 0, width: 0.5, height: 1 } });
+    };
+    const photos = photosOf({
+      put: async (...args) => {
+        job.clock.set("2026-11-07T09:06:00.000Z");
+        return job.photos.put(...args);
+      },
+    });
+
+    expect(await job.process(id, { photos })).toBe("done");
+
+    const recipe = await job.recipes.get(importedRecipeId(id));
+    expect(recipe?.photo).toBeDefined();
+    expect(recipe?.createdAt?.toIso()).toBe("2026-11-07T09:06:00.000Z");
+  });
+});
+
 describe("IMP-11 failure", () => {
   it("'A photo of a shopping receipt': nothing added; logged no-recipe-found", async () => {
     const id = await job.startImport();
@@ -726,7 +760,7 @@ describe("IMP-11 a run that stopped after adding the recipe, seen again after 10
   it("ends the record as failed, logs an ordinary error rather than timed-out, and deletes the page photo", async () => {
     const id = await job.startImport();
     // The earlier run added the recipe, then stopped before ending the import.
-    const recipe = Recipe.create(importedRecipeId(id), content("Banana Bread"));
+    const recipe = Recipe.create(importedRecipeId(id), content("Banana Bread"), job.clock.now());
     if (!recipe.ok) throw new Error("invalid recipe");
     expect(await job.recipes.add(recipe.value)).toBe(true);
     job.clock.set("2026-11-07T09:10:00.000Z");

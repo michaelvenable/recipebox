@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Container, CosmosClient } from "@azure/cosmos";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { Recipe, RecipeId, type Result } from "@recipebox/domain";
+import { Instant, Recipe, RecipeId, type Result } from "@recipebox/domain";
 import { emulatorCosmosConfig } from "../emulator.js";
 import {
   CosmosRecipeRepository,
@@ -45,7 +45,7 @@ describe("CosmosRecipeRepository document shape", () => {
       ingredients: ["Eggs"],
       steps: ["Cook."],
       tags: [],
-    }));
+    }, valueOf(Instant.fromIso("2026-09-01T09:00:00.000Z"))));
     await new CosmosRecipeRepository(container).save(recipe);
 
     const { resource } = await container.item(recipe.id.value, recipe.id.value).read<RecipeDocument>();

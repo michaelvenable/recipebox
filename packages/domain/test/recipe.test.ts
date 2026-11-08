@@ -18,9 +18,11 @@ const padThai: RecipeContentInput = {
 };
 
 const at = (iso: string) => valueOf(Instant.fromIso(iso));
+/** When the recipes below were created, by the server's clock (REC-22, X-12). */
+const CREATED = "2026-08-01T10:00:00.000Z";
 const photo = (blobName: string) => valueOf(PhotoRef.create({ blobName, contentType: "image/jpeg" }));
 const recipe = (content: Partial<RecipeContentInput> = {}) =>
-  valueOf(Recipe.create(valueOf(RecipeId.create(ID)), { ...padThai, ...content }));
+  valueOf(Recipe.create(valueOf(RecipeId.create(ID)), { ...padThai, ...content }, at(CREATED)));
 const tagNames = (r: Recipe) => r.tags.map((t) => t.value);
 const isoList = (instants: readonly Instant[]) => instants.map((i) => i.toIso());
 const twentyTags = Array.from({ length: 20 }, (_, i) => `tag${String(i).padStart(2, "0")}`);
@@ -47,7 +49,7 @@ describe("Recipe.create", () => {
   });
 
   it("returns every content error and creates nothing", () => {
-    const result = Recipe.create(valueOf(RecipeId.create(ID)), { name: " ", ingredients: ["   "], steps: ["Boil."] });
+    const result = Recipe.create(valueOf(RecipeId.create(ID)), { name: " ", ingredients: ["   "], steps: ["Boil."] }, at(CREATED));
     expect(errorKeys(result)).toEqual([
       { code: "name.required", field: "name" },
       { code: "ingredients.required", field: "ingredients" },
@@ -461,6 +463,80 @@ describe("COOK-5 history on the recipe", () => {
   });
 });
 
+describe("REC-22 added time", () => {
+  /** A recipe stored before added times were recorded: its document has no `createdAt`. */
+  function storedBeforeAddedTimes(): Recipe {
+    const { createdAt: _, ...stored } = recipe().toSnapshot();
+    return Recipe.fromSnapshot(stored);
+  }
+
+  it("is the server's time passed to create (REC-1, X-12)", () => {
+    const r = valueOf(Recipe.create(valueOf(RecipeId.create(ID)), padThai, at("2026-11-08T14:30:00Z")));
+    expect(r.createdAt?.toIso()).toBe("2026-11-08T14:30:00.000Z");
+  });
+
+  it('spec example: "Pad Thai" added Oct 20, edited Nov 7, is still added Oct 20', () => {
+    const r = valueOf(Recipe.create(valueOf(RecipeId.create(ID)), padThai, at("2026-10-20T12:00:00Z")));
+    valueOf(r.revise({ ...padThai, name: "Pad Thai with Shrimp", tags: ["dinner"] }));
+    expect(r.createdAt?.toIso()).toBe("2026-10-20T12:00:00.000Z");
+  });
+
+  it("is kept when the photo is set, replaced or removed", () => {
+    const r = recipe();
+    valueOf(r.setPhoto(photo("a.jpg")));
+    valueOf(r.setPhoto(photo("b.jpg")));
+    valueOf(r.removePhoto());
+    expect(r.createdAt?.toIso()).toBe(CREATED);
+  });
+
+  it("is kept by every other change: tags, the to-make list and cooking", () => {
+    const r = recipe();
+    valueOf(r.attachTag("quick"));
+    valueOf(r.removeTag("quick"));
+    valueOf(r.addToMakeList(at("2026-10-20T08:00:00Z")));
+    valueOf(r.removeFromMakeList());
+    valueOf(r.markCooked(at("2026-10-21T18:00:00Z")));
+    expect(r.createdAt?.toIso()).toBe(CREATED);
+  });
+
+  it('spec example: "Pad Thai" added Nov 1, deleted, restored Nov 6, is still added Nov 1 (REC-15)', () => {
+    const r = valueOf(Recipe.create(valueOf(RecipeId.create(ID)), padThai, at("2026-11-01T12:00:00Z")));
+    r.delete(at("2026-11-03T09:00:00Z"));
+    expect(r.createdAt?.toIso()).toBe("2026-11-01T12:00:00.000Z");
+    valueOf(r.restore(at("2026-11-06T09:00:00Z")));
+    expect(r.createdAt?.toIso()).toBe("2026-11-01T12:00:00.000Z");
+  });
+
+  it("is stored, and read back unchanged", () => {
+    const r = recipe();
+    expect(r.toSnapshot().createdAt).toBe(CREATED);
+    expect(Recipe.fromSnapshot(r.toSnapshot()).createdAt?.toIso()).toBe(CREATED);
+  });
+
+  it("is kept through the trash as stored: a deleted document read back still has it", () => {
+    const r = recipe();
+    r.delete(at("2026-11-03T09:00:00Z"));
+    const read = Recipe.fromSnapshot(r.toSnapshot());
+    valueOf(read.restore(at("2026-11-06T09:00:00Z")));
+    expect(read.toSnapshot().createdAt).toBe(CREATED);
+  });
+
+  it("a recipe stored before added times were recorded loads, and has none", () => {
+    expect(storedBeforeAddedTimes().createdAt).toBeUndefined();
+  });
+
+  it("is never made up for such a recipe: changing and saving it again still stores none", () => {
+    const r = storedBeforeAddedTimes();
+    valueOf(r.revise({ ...padThai, name: "Pad Thai with Shrimp" }));
+    valueOf(r.setPhoto(photo("a.jpg")));
+    valueOf(r.markCooked(at("2026-11-08T18:00:00Z")));
+    r.delete(at("2026-11-08T19:00:00Z"));
+    valueOf(r.restore(at("2026-11-08T20:00:00Z")));
+    expect(r.createdAt).toBeUndefined();
+    expect("createdAt" in r.toSnapshot()).toBe(false);
+  });
+});
+
 describe("snapshot", () => {
   it("has the documented shape", () => {
     const r = fullRecipe();
@@ -476,6 +552,7 @@ describe("snapshot", () => {
       photo: { blobName: "pad-thai.jpg", contentType: "image/jpeg" },
       cookedAt: ["2026-10-15T18:00:00.000Z", "2026-09-01T18:00:00.000Z"],
       deletedAt: "2026-10-21T09:00:00.000Z",
+      createdAt: CREATED,
       schemaVersion: 1,
     });
   });
@@ -498,7 +575,7 @@ describe("snapshot", () => {
 
   it("omits optional fields that aren't set", () => {
     expect(Object.keys(recipe().toSnapshot()).sort()).toEqual(
-      ["cookedAt", "id", "ingredients", "name", "schemaVersion", "steps", "tags"].sort(),
+      ["cookedAt", "createdAt", "id", "ingredients", "name", "schemaVersion", "steps", "tags"].sort(),
     );
   });
 
@@ -574,6 +651,8 @@ describe("snapshot", () => {
           s.deletedAt = "2026-10-01T09:00:00.123999Z";
         },
       ],
+      ["an invalid added time", (s) => (s.createdAt = "2026-08-01")],
+      ["a non-canonical added time", (s) => (s.createdAt = "2026-08-01T10:00:00Z")],
       ["an unknown schema version", (s) => ((s as { schemaVersion: number }).schemaVersion = 2)],
     ];
 

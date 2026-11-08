@@ -8,10 +8,11 @@
 //    a run that stopped partway already added its recipe, ended as failed and logged as an ordinary error).
 // 2. The reading service is called with a deadline (READING_MARGIN_MS before the 10 minutes; stopped there, it is
 //    `timed-out`), and its answer parsed.
-// 3. The recipe is built by the domain (importedRecipe); the dish picture is cut from the photo it is on and stored under
+// 3. The recipe is checked by the domain (importedRecipe); the dish picture is cut from the photo it is on and stored under
 //    fresh names.
-// 4. `succeed` is called on the import with the server's time, before the recipe is written. If it refuses (the 10 minutes
-//    passed while reading), nothing has been added: the stored images are deleted and the import ends as `timed-out`.
+// 4. The recipe is built with the server's time, its added time (REC-22), and `succeed` is called on the import with the
+//    same time, before the recipe is written. If it refuses (the 10 minutes passed while reading), nothing has been added:
+//    the stored images are deleted and the import ends as `timed-out`.
 // 5. The recipe is written with create; its id comes from the import id, so a second delivery of the same message finds it
 //    there and treats the import as done, deleting the images it stored itself.
 // 6. The record is saved as done, tried again a few times if the write fails.
@@ -22,9 +23,12 @@ import {
   IMPORT_MINUTES,
   type ImportId,
   importedRecipe,
+  type Instant,
   PhotoRef,
   type Recipe,
+  type RecipeId,
   RecipeImport,
+  type Result,
   type Tag,
   tagsInUse,
 } from "@recipebox/domain";
@@ -157,14 +161,24 @@ async function processLoaded(recipeImport: RecipeImport, deps: ImportProcessingD
     if (!parsed.ok) return await endAsFailed(recipeImport, "service-error", parsed.detail, deps);
     if (!parsed.value.found) return await endAsFailed(recipeImport, "no-recipe-found", undefined, deps);
 
-    // IMP-7, IMP-8: the same rules as a typed recipe, and only tags in use.
-    const built = importedRecipe(importedRecipeId(recipeImport.id), parsed.value.recipe, tags);
-    if (!built.ok) return await endAsFailed(recipeImport, "invalid-recipe", undefined, deps);
-    const recipe = built.value;
-    storedImages = await attachDishPhoto(recipe, pages, parsed.value.dishPhoto, importId, deps);
+    // IMP-7, IMP-8: the same rules as a typed recipe, and only tags in use. Checked before any work on the photo; the recipe
+    // is built below, once the time it is added is known.
+    const recipeId = importedRecipeId(recipeImport.id);
+    const read = parsed.value.recipe;
+    const build = (at: Instant): Result<Recipe> => importedRecipe(recipeId, read, tags, at);
+    if (!build(now).ok) return await endAsFailed(recipeImport, "invalid-recipe", undefined, deps);
+    const photo = await storeDishPhoto(recipeId, pages, parsed.value.dishPhoto, importId, deps);
+    storedImages = photo === undefined ? [] : imageNamesOf(photo);
 
-    // Decided before the recipe is written, so a recipe read too late is never added (IMP-11, X-12).
-    const succeeded = recipeImport.succeed(recipe, clock());
+    // Decided before the recipe is written, so a recipe read too late is never added (IMP-11, X-12). The same time is the
+    // recipe's added time: it is added to the collection now (IMP-10, REC-22).
+    const at = clock();
+    const recipe = builtAgain(build(at));
+    if (photo !== undefined) {
+      const set = recipe.setPhoto(photo);
+      if (!set.ok) throw new Error(`A new recipe refused its photo: ${set.errors.map((e) => e.code).join(", ")}`);
+    }
+    const succeeded = recipeImport.succeed(recipe, at);
     if (!succeeded.ok) {
       if (!succeeded.errors.some((e) => e.code === "import.timedOut")) {
         throw new Error(`An import in progress refused to succeed: ${succeeded.errors.map((e) => e.code).join(", ")}`);
@@ -281,32 +295,32 @@ async function readWithDeadline(
 
 /**
  * IMP-9: cuts the dish picture from the page photo the box names and stores it as an uploaded recipe photo is stored
- * (photo-routes.ts): a display image and a thumbnail under fresh names, oriented and without metadata, then attached with the
- * domain's `setPhoto`.
- * Returns the names stored, for cleaning up if the recipe isn't added. No box, a box on a photo that doesn't exist, a box too
- * small, or a picture that can't be cut leaves the recipe without a photo.
+ * (photo-routes.ts): a display image and a thumbnail under fresh names, oriented and without metadata.
+ * Returns the photo stored, for the caller to attach with the domain's `setPhoto`, or to clean up if the recipe isn't added.
+ * No box, a box on a photo that doesn't exist, a box too small, or a picture that can't be cut leaves the recipe without a
+ * photo.
  */
-async function attachDishPhoto(
-  recipe: Recipe,
+async function storeDishPhoto(
+  recipeId: RecipeId,
   pages: readonly Buffer[],
   box: DishPhotoBox | undefined,
   importId: string,
   { photos, logger, photoProcessing = {} }: ImportProcessingDependencies,
-): Promise<string[]> {
+): Promise<PhotoRef | undefined> {
   const page = dishPhotoPage(box, pages);
-  if (box === undefined || page === undefined) return [];
+  if (box === undefined || page === undefined) return undefined;
   // The page photo is the API's own output (an oriented JPEG without metadata), so reading its size here is safe; it is
   // decoded only in the worker.
   // The size as displayed, which is what the box describes and what the worker cuts from.
   const { autoOrient } = await sharp(page).metadata();
   const area = dishPhotoArea(box, autoOrient);
-  if (area === undefined) return [];
+  if (area === undefined) return undefined;
   const processed = await processDishPhoto(page, area, { ...photoProcessing, log: logger });
   if (!processed.ok) {
     logger.warn({ importId, reason: processed.reason }, "could not cut the dish picture; the recipe has no photo");
-    return [];
+    return undefined;
   }
-  const created = PhotoRef.create({ blobName: newPhotoName(recipe.id), contentType: processed.value.contentType });
+  const created = PhotoRef.create({ blobName: newPhotoName(recipeId), contentType: processed.value.contentType });
   if (!created.ok) throw new Error(`Invalid photo reference: ${JSON.stringify(created.errors)}`);
   const photo = created.value;
   const names = imageNamesOf(photo);
@@ -317,9 +331,13 @@ async function attachDishPhoto(
     await deleteImages(names, importId, { photos, logger });
     throw error;
   }
-  const set = recipe.setPhoto(photo);
-  if (!set.ok) throw new Error(`A new recipe refused its photo: ${set.errors.map((e) => e.code).join(", ")}`);
-  return names;
+  return photo;
+}
+
+/** The recipe built again from content that was already accepted: only the added time differs, so it can't be refused. */
+function builtAgain(built: Result<Recipe>): Recipe {
+  if (!built.ok) throw new Error(`An accepted imported recipe was refused: ${built.errors.map((e) => e.code).join(", ")}`);
+  return built.value;
 }
 
 /** Deletes images no recipe will refer to. A failure is logged; the trash cleanup's orphan sweep deletes them later. */

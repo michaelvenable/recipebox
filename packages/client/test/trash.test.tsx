@@ -258,6 +258,35 @@ describe("REC-6, X-8 Delete on the recipe view", () => {
     expect(screen.queryByRole("button", { name: /noodles/ })).not.toBeInTheDocument();
   });
 
+  it("takes the recipe out of the Recently added row at once, before the list reloads (REC-22)", async () => {
+    // Both added yesterday, by the device's clock; after the delete the list doesn't answer, so what shows is the cache.
+    const yesterday = new Date(Date.now() - DAY).toISOString();
+    let hold = false;
+    const { live } = mockServer({
+      list: () =>
+        hold
+          ? new Promise<Response>(() => {})
+          : jsonResponse(
+              200,
+              [...live].sort((a, b) => a.name.localeCompare(b.name)).map((r) => ({ ...summary(r), createdAt: yesterday })),
+            ),
+    });
+    renderAt("/");
+    const row = await screen.findByRole("list", { name: "Recently added" });
+    expect(within(row).getAllByRole("link").map((link) => link.querySelector(".recent-card-name")?.textContent)).toEqual([
+      "Beef Stew",
+      "Pad Thai",
+    ]);
+    await userEvent.click(within(row).getByRole("link", { name: /Pad Thai/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    hold = true;
+
+    await screen.findByText("Pad Thai moved to trash");
+    const after = screen.getByRole("list", { name: "Recently added" });
+    expect(within(after).queryByText("Pad Thai")).not.toBeInTheDocument();
+    expect(within(after).getByText("Beef Stew")).toBeInTheDocument();
+  });
+
   it("marks the to-make list, rediscovery and the trash stale (PLAN-6)", async () => {
     const { queryClient } = await openRecipe();
     queryClient.setQueryData(planKeys.all, [{ ...summary(PAD_THAI), addedAt: "2026-10-01T12:00:00.000Z" }]);

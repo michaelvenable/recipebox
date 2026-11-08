@@ -81,7 +81,8 @@ Rules:
 
 ```ts
 class Recipe {
-  static create(id: RecipeId, content: RecipeContentInput): Result<Recipe>;
+  static create(id: RecipeId, content: RecipeContentInput, at: Instant): Result<Recipe>;  // REC-1, REC-22
+  get createdAt(): Instant | undefined;  // the added time      // REC-22
 
   // Content
   revise(content: RecipeContentInput): Result<void>;            // REC-5
@@ -135,11 +136,18 @@ Behavior rules:
 | All changes except `restore`  | Fail with `recipe.inTrash` on a deleted recipe; nothing changes.           | REC-17         |
 | `restore`                     | Fails with `trash.expired` if `at` is at or after `removalDueAt`.          | REC-16         |
 | `restore`                     | Not deleted: does nothing.                                                 | REC-15         |
+| `create`                      | `at` becomes `createdAt`, the added time. No method ever changes it.       | REC-22         |
 
 Deleting a recipe (REC-6) moves it to the trash by marking it deleted and recording when. It also takes the recipe off the to-make
 list (PLAN-6); nothing else inside it is cleared. `restore` clears the deleted mark, and the content, photo, tags and history are
 all still there (REC-15). Because the to-make status and history live inside the document, no other data can be left pointing at a
 deleted recipe.
+
+A recipe's added time (REC-22) is the `at` given to `create`: when it was created (REC-1), or when an import added it
+(IMP-10). It is stored as `createdAt`, not `addedAt`, which on the to-make list (PLAN-3) means something else. Editing,
+photo changes, deleting and restoring all keep it. Recipes stored before it was recorded have none, and none is made up
+for them, so they never show as recently added. Which recipes count as recently added is not decided here: the device
+counts today and the 30 calendar days before it, by local date (X-12), from the added times in the recipe list.
 
 The 30-day retention period is a domain rule, so `removalDueAt` is computed here. Carrying out the removal is not: the
 infrastructure removes the document and its photo once `removalDueAt` has passed (REC-16).
@@ -221,7 +229,7 @@ interface ReadRecipe {            // what was read from the photos, after the se
   tags: string[];
 }
 
-function importedRecipe(id: RecipeId, read: ReadRecipe, tagsInUse: readonly Tag[]): Result<Recipe>;   // IMP-7, IMP-8
+function importedRecipe(id: RecipeId, read: ReadRecipe, tagsInUse: readonly Tag[], at: Instant): Result<Recipe>;  // IMP-7, IMP-8
 ```
 
 - The 10 minutes are a domain rule (`IMPORT_MINUTES`), counted from `startedAt` by the server's clock (X-12). An import is in
@@ -231,7 +239,8 @@ function importedRecipe(id: RecipeId, read: ReadRecipe, tagsInUse: readonly Tag[
   deadline, so a recipe read too late is not added. A finished import doesn't change again: `fail` on one does nothing, and
   `succeed` fails with `import.finished`.
 - `importedRecipe` builds the recipe with `Recipe.create`, so every content rule applies (REC-1, REC-2, REC-11) and its errors
-  come back unchanged (IMP-7). Before that, it keeps only tags that are already in use: each read tag is read like tag input
+  come back unchanged (IMP-7). `at` is the server's time when the recipe is added to the collection (IMP-10), and becomes
+  its added time (REC-22). Before that, it keeps only tags that are already in use: each read tag is read like tag input
   (REC-11), one not in `tagsInUse` or invalid is dropped, duplicates are dropped, and only the first 5 are kept, in the order
   read (IMP-8). Dropped tags are never an error.
 - `ImportId` is a UUID made by the server, like `RecipeId`. The recipe's id is also made by the server, from the import's id,
@@ -275,6 +284,7 @@ interface RecipeSnapshot {
   toMake?: { addedAt: string };   // ISO 8601 timestamp
   cookedAt: string[];             // ISO 8601 timestamps, newest first; duplicates allowed
   deletedAt?: string;             // ISO 8601 timestamp; present only while in the trash
+  createdAt?: string;             // ISO 8601 timestamp, the added time (REC-22); documents from before REC-22 have none
   schemaVersion: 1;
 }
 ```

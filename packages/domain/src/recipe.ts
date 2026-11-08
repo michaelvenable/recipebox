@@ -27,6 +27,8 @@ export interface RecipeSnapshot {
   cookedAt: string[];
   /** ISO 8601 timestamp; present only while in the trash. */
   deletedAt?: string;
+  /** ISO 8601 timestamp: the recipe's added time (REC-22). Documents stored before it was recorded have none. */
+  createdAt?: string;
   schemaVersion: 1;
 }
 
@@ -43,12 +45,18 @@ export class Recipe {
     /** Newest first (COOK-5). */
     private cookings: Instant[],
     private deletedTime: Instant | undefined,
+    /** Set once, by `create`; nothing changes it (REC-22). Undefined for recipes stored before it was recorded. */
+    private readonly createdTime: Instant | undefined,
   ) {}
 
-  static create(id: RecipeId, content: RecipeContentInput): Result<Recipe> {
+  /**
+   * A new recipe (REC-1), or one an import adds to the collection (IMP-10). `at` is the server's current time (X-12) and
+   * becomes the recipe's added time (REC-22).
+   */
+  static create(id: RecipeId, content: RecipeContentInput, at: Instant): Result<Recipe> {
     const created = RecipeContent.create(content);
     if (!created.ok) return created;
-    return ok(new Recipe(id, created.value, undefined, undefined, [], undefined));
+    return ok(new Recipe(id, created.value, undefined, undefined, [], undefined, at));
   }
 
   get id(): RecipeId {
@@ -61,6 +69,14 @@ export class Recipe {
 
   get photo(): PhotoRef | undefined {
     return this.photoRef;
+  }
+
+  /**
+   * When the recipe was added (REC-22). It never changes: edits, photo changes, deleting and restoring keep it. Undefined
+   * for a recipe stored before added times were recorded; such a recipe never shows as recently added.
+   */
+  get createdAt(): Instant | undefined {
+    return this.createdTime;
   }
 
   // Content
@@ -241,6 +257,7 @@ export class Recipe {
     }
     if (this.toMakeAddedAt !== undefined) snapshot.toMake = { addedAt: this.toMakeAddedAt.toIso() };
     if (this.deletedTime !== undefined) snapshot.deletedAt = this.deletedTime.toIso();
+    if (this.createdTime !== undefined) snapshot.createdAt = this.createdTime.toIso();
     return snapshot;
   }
 
@@ -289,7 +306,9 @@ export class Recipe {
     if (deletedAt !== undefined && addedAt !== undefined) {
       throw invalidSnapshot(s, "a deleted recipe can't be on the to-make list (PLAN-6)");
     }
-    return new Recipe(id, content, photo, addedAt, cookedAt, deletedAt);
+    // Optional: documents stored before REC-22 have no added time, and none is made up for them.
+    const createdAt = s.createdAt === undefined ? undefined : storedInstant(s, "createdAt", s.createdAt);
+    return new Recipe(id, content, photo, addedAt, cookedAt, deletedAt, createdAt);
   }
 
   /** REC-17: every change except `restore` is refused while the recipe is in the trash, and nothing changes. */

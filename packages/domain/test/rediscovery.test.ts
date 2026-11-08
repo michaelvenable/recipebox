@@ -10,7 +10,7 @@ function recipe(name: string, ...cooked: string[]): Recipe {
 function tagged(name: string, tags: string[], ...cooked: string[]): Recipe {
   nextId += 1;
   const id = valueOf(RecipeId.create(`00000000-0000-4000-8000-${String(nextId).padStart(12, "0")}`));
-  const r = valueOf(Recipe.create(id, { name, ingredients: ["Something"], steps: ["Cook it."], tags }));
+  const r = valueOf(Recipe.create(id, { name, ingredients: ["Something"], steps: ["Cook it."], tags }, at("2025-01-01T12:00:00Z")));
   for (const iso of cooked) valueOf(r.markCooked(at(iso)));
   return r;
 }

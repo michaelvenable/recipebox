@@ -53,7 +53,7 @@ export function madeLink(iso = "2026-11-07T09:00:00Z"): ShoppingListLink {
 
 function planItems() {
   const id = valueOf(RecipeId.create(randomUUID()));
-  const recipe = valueOf(Recipe.create(id, { name: "Shakshuka", ingredients: ["6 eggs", "1 can tomatoes"], steps: ["Cook."] }));
+  const recipe = valueOf(Recipe.create(id, { name: "Shakshuka", ingredients: ["6 eggs", "1 can tomatoes"], steps: ["Cook."] }, at("2026-09-01T09:00:00.000Z")));
   valueOf(recipe.addToMakeList(at("2026-11-01T09:00:00Z")));
   return shoppingList([recipe]);
 }

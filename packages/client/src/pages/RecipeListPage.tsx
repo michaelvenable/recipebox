@@ -7,12 +7,16 @@ import { useViewer } from "../auth/sign-in.js";
 import { ImportCards } from "../imports/ImportCards.js";
 import { describeResults, isFiltering } from "../recipes/format.js";
 import { useListFilter } from "../recipes/list-filter.js";
+import { RecentlyAdded } from "../recipes/RecentlyAdded.js";
+import { recentlyAdded } from "../recipes/recently-added.js";
 import { RecipeCard } from "../recipes/RecipeCard.js";
 import { TagChips } from "../recipes/TagChips.js";
+import { useNow } from "../recipes/use-now.js";
 
 /**
- * The recipe list at "/" (REC-8), with search by name (REC-9) and tag filter (REC-13). Public (X-1): visitors see it without
- * editing controls (X-8); editors also get "Add recipe", the to-make mark (PLAN-7) and the imports in progress (IMP-5).
+ * The recipe list at "/" (REC-8), with search by name (REC-9) and tag filter (REC-13), and the "Recently added" row above it
+ * (REC-22). Public (X-1): visitors see it without editing controls (X-8); editors also get "Add recipe", the to-make mark
+ * (PLAN-7) and the imports in progress (IMP-5).
  */
 export function RecipeListPage() {
   const { viewer } = useViewer();
@@ -27,6 +31,13 @@ export function RecipeListPage() {
     placeholderData: keepPreviousData,
   });
   const tags = useQuery({ queryKey: tagKeys.all, queryFn: ({ signal }) => fetchTags(signal) });
+  const now = useNow();
+
+  // REC-22: not while a search term is typed, even before it is applied, or tags are picked. Otherwise worked out from the
+  // unfiltered list, never from a filtered one still shown while it loads; empty, the row isn't shown.
+  const searching = filter.term.trim() !== "" || isFiltering(filter.applied);
+  const recent =
+    searching || recipes.isPlaceholderData || recipes.data === undefined ? [] : recentlyAdded(recipes.data, now);
 
   function showAll() {
     filter.clear();
@@ -88,6 +99,13 @@ export function RecipeListPage() {
         picked={filter.applied.tags}
         toggle={filter.toggleTag}
       />
+
+      {recent.length > 0 && (
+        <>
+          <RecentlyAdded recipes={recent} />
+          <h2 className="list-heading">All recipes</h2>
+        </>
+      )}
 
       <Results
         recipes={recipes.data}

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { Recipe, RecipeId, type Result } from "@recipebox/domain";
+import { Instant, Recipe, RecipeId, type Result } from "@recipebox/domain";
 import { InMemoryRecipeRepository } from "../../src/recipes/in-memory-recipe-repository.js";
 import { recipeRepositoryContract } from "./recipe-repository-contract.js";
 
@@ -20,7 +20,7 @@ describe("InMemoryRecipeRepository list order", () => {
 
 function newRecipe(name: string): Recipe {
   const id = valueOf(RecipeId.create(randomUUID()));
-  return valueOf(Recipe.create(id, { name, ingredients: ["Eggs"], steps: ["Cook."], tags: [] }));
+  return valueOf(Recipe.create(id, { name, ingredients: ["Eggs"], steps: ["Cook."], tags: [] }, valueOf(Instant.fromIso("2026-09-01T09:00:00.000Z"))));
 }
 
 function valueOf<T>(result: Result<T>): T {

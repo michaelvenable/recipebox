@@ -203,11 +203,11 @@ export function registerRecipeRoutes(app: FastifyInstance, { recipes, clock, new
     return toRecipeFor(request.caller, recipe);
   });
 
-  // REC-1: the id comes from the server; the content from the request.
+  // REC-1: the id comes from the server; the content from the request. The added time is the server's clock (REC-22, X-12).
   app.post("/recipes", { preHandler: requireEditor }, async (request, reply): Promise<EditorRecipe | FastifyReply> => {
     const input = parseBody(RecipeContentInput, request.body);
     if (!input.ok) return reply.code(400).send({ errors: input.errors } satisfies ErrorResponse);
-    const created = Recipe.create(newRecipeId(), input.value);
+    const created = Recipe.create(newRecipeId(), input.value, clock());
     if (!created.ok) return sendErrors(reply, statusFor(created.errors), created.errors);
     await recipes.save(created.value);
     return reply.code(201).send(toEditorRecipe(created.value));

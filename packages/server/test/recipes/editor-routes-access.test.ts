@@ -11,6 +11,7 @@ import {
   expectErrors,
   get,
   recipeApp,
+  SEEDED_AT,
   seed,
   storedSnapshots,
 } from "./recipe-route-helpers.js";
@@ -93,7 +94,7 @@ describe("X-1 recipes are public; the rest is private", () => {
       expect(res.body, url).not.toContain("secret");
     }
     expect(ToMakeEntry.array().parse((await get(app, "/plan", AS_EDITOR)).json())).toEqual([
-      { id, name: "Pad Thai", tags: ["dinner"], hasPhoto: false, addedAt: "2026-09-20T08:00:00.000Z" },
+      { id, name: "Pad Thai", tags: ["dinner"], hasPhoto: false, createdAt: SEEDED_AT, addedAt: "2026-09-20T08:00:00.000Z" },
     ]);
     // PLAN-8: only the planned recipe's ingredients, never the trashed one's.
     expect(ShoppingItem.array().parse((await get(app, "/plan/shopping-list", AS_EDITOR)).json())).toEqual([

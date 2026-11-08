@@ -573,12 +573,84 @@ code {
   white-space: nowrap;
 }
 
+/*
+ * "Recently added" (REC-22; docs/mockups/NewestStrip.dc.html): a row of small cards between the tag chips and the list,
+ * scrolling sideways edge to edge on phones like the chips. Colors come from the tokens, so the dark theme follows.
+ */
+.recently-added {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recently-added h2,
+.list-heading {
+  margin: 6px 0 0;
+  font-size: 17px;
+}
+
+.recently-added-list {
+  list-style: none;
+  margin: 0 -20px;
+  padding: 0 20px 4px;
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.recently-added-list > li {
+  flex: none;
+  width: 128px;
+}
+
+.recent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.recent-card:hover {
+  color: var(--text);
+}
+
+.recent-card:hover .recent-card-name {
+  text-decoration: underline;
+}
+
+.recent-card .thumb {
+  width: 128px;
+  height: 96px;
+  border-radius: 12px;
+}
+
+.recent-card-name {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.recent-card-added {
+  font-size: 13px;
+  color: var(--muted);
+}
+
 @media (min-width: 700px) {
   .tag-chips {
     flex-wrap: wrap;
     margin: 2px 0 0;
     padding: 0;
     overflow-x: visible;
+  }
+
+  /* No edge-to-edge bleed beside the page's margin; a thin scrollbar for a mouse, as there is no swipe. */
+  .recently-added-list {
+    margin: 0;
+    padding: 0 0 6px;
+    scrollbar-width: thin;
   }
 
   .recipe-list {

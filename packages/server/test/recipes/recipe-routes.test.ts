@@ -19,6 +19,7 @@ import {
   expectErrors,
   get,
   recipeApp,
+  SEEDED_AT,
   seed,
   storedSnapshots,
 } from "./recipe-route-helpers.js";
@@ -401,11 +402,11 @@ describe("REC-8 list", () => {
     expect(await listNames(app)).toEqual(["apple pie", "Éclair", "Zucchini Bread"]);
   });
 
-  it("returns summaries: id, name, tags, total time and whether there is a photo", async () => {
+  it("returns summaries: id, name, tags, total time, whether there is a photo and the added time (REC-22)", async () => {
     const { app, repository } = await recipeApp();
     const recipe = await seed(repository, content("Pad Thai", { totalTimeMinutes: 30, tags: ["dinner"] }));
     expect(RecipeSummary.array().parse((await get(app, "/recipes")).json())).toEqual([
-      { id: recipe.id.value, name: "Pad Thai", tags: ["dinner"], totalTimeMinutes: 30, hasPhoto: false },
+      { id: recipe.id.value, name: "Pad Thai", tags: ["dinner"], totalTimeMinutes: 30, hasPhoto: false, createdAt: SEEDED_AT },
     ]);
   });
 
@@ -523,6 +524,7 @@ describe("REC-14 trash", () => {
         name: "Newer",
         tags: ["dinner"],
         hasPhoto: false,
+        createdAt: SEEDED_AT,
         deletedAt: "2026-09-28T08:00:00.000Z",
         removalDueAt: "2026-10-28T08:00:00.000Z",
       },
@@ -531,6 +533,7 @@ describe("REC-14 trash", () => {
         name: "Older",
         tags: [],
         hasPhoto: false,
+        createdAt: SEEDED_AT,
         deletedAt: "2026-09-25T08:00:00.000Z",
         removalDueAt: "2026-10-25T08:00:00.000Z",
       },
@@ -691,5 +694,68 @@ describe("REC-17 trashed recipes can't be changed", () => {
 
     expect(res.statusCode).toBe(204);
     expect(await storedSnapshots(repository)).toEqual(before);
+  });
+});
+
+describe("REC-22 added time", () => {
+  /** The list as a visitor gets it: name and added time of each recipe, in list order. */
+  async function addedTimes(app: Awaited<ReturnType<typeof recipeApp>>["app"]): Promise<[string, string | undefined][]> {
+    const res = await get(app, "/recipes", AS_VISITOR);
+    expect(res.statusCode, res.body).toBe(200);
+    return RecipeSummary.array()
+      .parse(res.json())
+      .map((r) => [r.name, r.createdAt]);
+  }
+
+  it("a new recipe's added time is the server's clock when it is created (REC-1, X-12)", async () => {
+    const { app, repository } = await recipeApp("2026-11-08T14:30:00.000Z");
+    const created = await createRecipe(app, content("Pad Thai"));
+    expect((await storedSnapshots(repository))[created.id]).toMatchObject({ createdAt: "2026-11-08T14:30:00.000Z" });
+    expect(await addedTimes(app)).toEqual([["Pad Thai", "2026-11-08T14:30:00.000Z"]]);
+  });
+
+  it("a time sent with the recipe is refused, never stored (X-12)", async () => {
+    const { app, repository } = await recipeApp("2026-11-08T14:30:00.000Z");
+    const res = await change(app, "POST", "/recipes", { ...content("Pad Thai"), createdAt: "2026-01-01T00:00:00.000Z" });
+    expect(res.statusCode).toBe(400);
+    expect(await storedSnapshots(repository)).toEqual({});
+  });
+
+  it('spec example: "Pad Thai" added Oct 20, edited Nov 7: still "Added Oct 20"', async () => {
+    const { app, clock } = await recipeApp("2026-10-20T12:00:00.000Z");
+    const created = await createRecipe(app, content("Pad Thai"));
+    clock.set("2026-11-07T12:00:00.000Z");
+    const edited = await change(app, "PUT", `/recipes/${created.id}/content`, content("Pad Thai", { tags: ["dinner"] }));
+    expect(edited.statusCode, edited.body).toBe(200);
+    expect(await addedTimes(app)).toEqual([["Pad Thai", "2026-10-20T12:00:00.000Z"]]);
+  });
+
+  it('spec example: "Pad Thai" added Nov 1, deleted, restored Nov 6: back with its added time of Nov 1 (REC-15)', async () => {
+    const { app, clock } = await recipeApp("2026-11-01T12:00:00.000Z");
+    const created = await createRecipe(app, content("Pad Thai"));
+    clock.set("2026-11-03T12:00:00.000Z");
+    expect((await change(app, "DELETE", `/recipes/${created.id}`)).statusCode).toBe(204);
+    expect(await addedTimes(app)).toEqual([]);
+    clock.set("2026-11-06T12:00:00.000Z");
+    expect((await change(app, "POST", `/trash/${created.id}/restore`)).statusCode).toBe(200);
+    expect(await addedTimes(app)).toEqual([["Pad Thai", "2026-11-01T12:00:00.000Z"]]);
+  });
+
+  it("a recipe stored before added times were recorded is listed without one", async () => {
+    const { app, repository } = await recipeApp();
+    await seed(repository, content("Old Favourite"), { createdAt: null });
+    const res = await get(app, "/recipes", AS_VISITOR);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual([expect.not.objectContaining({ createdAt: expect.anything() })]);
+    expect(res.body).not.toContain("createdAt");
+  });
+
+  it("is public: visitors, non-editors and editors all get it in the list (X-1)", async () => {
+    const { app, repository } = await recipeApp();
+    await seed(repository, content("Pad Thai"), { createdAt: "2026-11-05T10:00:00.000Z" });
+    for (const as of [AS_VISITOR, AS_NON_EDITOR, AS_EDITOR]) {
+      const listed = EditorRecipeSummary.or(RecipeSummary).array().parse((await get(app, "/recipes", as)).json());
+      expect(listed.map((r) => r.createdAt)).toEqual(["2026-11-05T10:00:00.000Z"]);
+    }
   });
 });

@@ -25,7 +25,14 @@ const ID = "3f2b8c1e-0d4a-4b6e-9a51-7c2d9e0f1a23";
 const T1 = "2026-10-30T22:15:03.120Z";
 const T2 = "2026-09-01T18:00:00.000Z";
 
-const summary: RecipeSummary = { id: ID, name: "Pancakes", tags: ["breakfast"], totalTimeMinutes: 20, hasPhoto: true };
+const summary: RecipeSummary = {
+  id: ID,
+  name: "Pancakes",
+  tags: ["breakfast"],
+  totalTimeMinutes: 20,
+  hasPhoto: true,
+  createdAt: T2,
+};
 const publicRecipe: PublicRecipe = {
   id: ID,
   name: "Pancakes",
@@ -132,9 +139,9 @@ describe("api.md Shapes: RecipeSummary and EditorRecipeSummary", () => {
   it("parses a valid summary", () => {
     expect(RecipeSummary.parse(summary)).toEqual(summary);
   });
-  it("requires id, name, tags and hasPhoto; totalTimeMinutes is optional", () => {
+  it("requires id, name, tags and hasPhoto; totalTimeMinutes and createdAt are optional", () => {
     expectRequired(RecipeSummary, summary, ["id", "name", "tags", "hasPhoto"]);
-    expectOptional(RecipeSummary, summary, ["totalTimeMinutes"]);
+    expectOptional(RecipeSummary, summary, ["totalTimeMinutes", "createdAt"]);
   });
   it("EditorRecipeSummary adds a required onToMakeList", () => {
     const editor = { ...summary, onToMakeList: true };
@@ -292,6 +299,9 @@ describe("X-1 public shapes reject private fields", () => {
   it("an editor response is not a valid public response", () => {
     expect(PublicRecipe.safeParse(editorRecipe).success).toBe(false);
     expect(RecipeSummary.safeParse({ ...summary, onToMakeList: false }).success).toBe(false);
+  });
+  it("REC-22: the added time is public, so a visitor's summary may carry it", () => {
+    expect(RecipeSummary.parse(summary).createdAt).toBe(T2);
   });
   it("a trash entry is not a valid public summary", () => {
     expect(RecipeSummary.safeParse({ ...summary, deletedAt: T2, removalDueAt: T1 }).success).toBe(false);

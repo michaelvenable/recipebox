@@ -22,6 +22,8 @@ const tags = (...texts: string[]) => texts.map((t) => valueOf(Tag.create(t)));
 
 const STARTED = "2026-11-07T09:00:00Z";
 const started = (iso = STARTED) => RecipeImport.start(importId(), at(iso));
+/** When the recipe is added to the collection (IMP-10), by the server's clock (X-12). */
+const ADDED = at("2026-11-07T09:02:00Z");
 
 function bananaBread(): ReadRecipe {
   return {
@@ -35,7 +37,7 @@ function bananaBread(): ReadRecipe {
 }
 
 function aRecipe(name = "Banana Bread"): Recipe {
-  return valueOf(Recipe.create(recipeId(), { name, ingredients: ["Something"], steps: ["Cook it."] }));
+  return valueOf(Recipe.create(recipeId(), { name, ingredients: ["Something"], steps: ["Cook it."] }, ADDED));
 }
 
 describe("IMP-1 import id", () => {
@@ -136,11 +138,11 @@ describe("IMP-10 / IMP-11 a finished import doesn't change again", () => {
     const imp = started();
     valueOf(imp.succeed(aRecipe("Pad Thai"), at("2026-11-07T09:02:00Z")));
     const other = valueOf(
-      Recipe.create(recipeId("11111111-2222-4333-8444-555555555555"), {
-        name: "Chili",
-        ingredients: ["Beans"],
-        steps: ["Cook."],
-      }),
+      Recipe.create(
+        recipeId("11111111-2222-4333-8444-555555555555"),
+        { name: "Chili", ingredients: ["Beans"], steps: ["Cook."] },
+        ADDED,
+      ),
     );
     expect(errorKeys(imp.succeed(other, at("2026-11-07T09:03:00Z")))).toEqual([
       { code: "import.finished", field: undefined },
@@ -177,7 +179,7 @@ describe("IMP-10 / IMP-11 a finished import doesn't change again", () => {
 
 describe("IMP-7 saved like any other recipe", () => {
   it("spec example: a banana bread card becomes the recipe as read", () => {
-    const r = valueOf(importedRecipe(recipeId(), bananaBread(), []));
+    const r = valueOf(importedRecipe(recipeId(), bananaBread(), [], ADDED));
     expect(r.id.value).toBe(RECIPE_ID);
     expect(r.content.name.value).toBe("Banana Bread");
     expect(r.content.steps.map((s) => s.value)).toEqual(["Mash the bananas.", "Mix everything.", "Bake for 60 minutes."]);
@@ -188,46 +190,46 @@ describe("IMP-7 saved like any other recipe", () => {
   });
 
   it('spec example: "1/3 cup melted butter" is kept as written, in the page\'s order (REC-3)', () => {
-    const r = valueOf(importedRecipe(recipeId(), bananaBread(), []));
+    const r = valueOf(importedRecipe(recipeId(), bananaBread(), [], ADDED));
     expect(r.content.ingredients.map((e) => e.value)).toEqual(["3 ripe bananas", "1/3 cup melted butter", "1 cup sugar"]);
   });
 
   it('spec example: "Prep 15 min, Bake 60 min" read as 75 minutes gives a total time of 1 h 15 min', () => {
-    expect(valueOf(importedRecipe(recipeId(), bananaBread(), [])).content.totalTime?.value).toBe(75);
+    expect(valueOf(importedRecipe(recipeId(), bananaBread(), [], ADDED)).content.totalTime?.value).toBe(75);
   });
 
   it("spec example: a card that states no times has no total time", () => {
     const { totalTimeMinutes: _, ...read } = bananaBread();
-    expect(valueOf(importedRecipe(recipeId(), read, [])).content.totalTime).toBeUndefined();
+    expect(valueOf(importedRecipe(recipeId(), read, [], ADDED)).content.totalTime).toBeUndefined();
   });
 
   it("keeps prep when the page lists it separately (REC-20)", () => {
-    const r = valueOf(importedRecipe(recipeId(), { ...bananaBread(), prep: ["Grease the pan."] }, []));
+    const r = valueOf(importedRecipe(recipeId(), { ...bananaBread(), prep: ["Grease the pan."] }, [], ADDED));
     expect(r.content.prep.map((e) => e.value)).toEqual(["Grease the pan."]);
   });
 
   it("is cleaned up like a typed recipe: text trimmed, blank entries dropped (REC-2)", () => {
     const read = { ...bananaBread(), name: "  Banana Bread ", ingredients: ["  3 ripe bananas ", "   ", "1 cup sugar"] };
-    const r = valueOf(importedRecipe(recipeId(), read, []));
+    const r = valueOf(importedRecipe(recipeId(), read, [], ADDED));
     expect(r.content.name.value).toBe("Banana Bread");
     expect(r.content.ingredients.map((e) => e.value)).toEqual(["3 ripe bananas", "1 cup sugar"]);
   });
 
   it("spec example: a card with a name and ingredients but no steps gives the REC-1 error, unchanged", () => {
     const read = { ...bananaBread(), steps: [] };
-    expect(errorKeys(importedRecipe(recipeId(), read, []))).toEqual([{ code: "steps.required", field: "steps" }]);
+    expect(errorKeys(importedRecipe(recipeId(), read, [], ADDED))).toEqual([{ code: "steps.required", field: "steps" }]);
   });
 
   it("returns every content error at once, exactly as Recipe.create does (REC-1)", () => {
     const read: ReadRecipe = { name: " ", ingredients: [], prep: [], steps: ["x".repeat(1001)], totalTimeMinutes: 0, tags: [] };
-    const fromCreate = Recipe.create(recipeId(), read);
-    const fromImport = importedRecipe(recipeId(), read, []);
+    const fromCreate = Recipe.create(recipeId(), read, ADDED);
+    const fromImport = importedRecipe(recipeId(), read, [], ADDED);
     expect(errorsOf(fromImport)).toEqual(errorsOf(fromCreate));
     expect(errorKeys(fromImport).map((e) => e.field)).toEqual(["name", "ingredients", "steps[0]", "totalTimeMinutes"]);
   });
 
   it('spec example: "Pad Thai" exists; a Pad Thai card still makes a recipe (IMP-10)', () => {
-    const r = valueOf(importedRecipe(recipeId(), { ...bananaBread(), name: "Pad Thai" }, []));
+    const r = valueOf(importedRecipe(recipeId(), { ...bananaBread(), name: "Pad Thai" }, [], ADDED));
     expect(r.content.name.value).toBe("Pad Thai");
   });
 });
@@ -236,51 +238,51 @@ describe("IMP-8 an imported recipe gets only tags already in use, at most 5", ()
   const inUse = tags("baking", "dinner", "quick");
 
   it('spec example: tags in use baking, dinner, quick; a banana bread card gets "baking" at most, never "bread"', () => {
-    const r = valueOf(importedRecipe(recipeId(), { ...bananaBread(), tags: ["baking", "bread"] }, inUse));
+    const r = valueOf(importedRecipe(recipeId(), { ...bananaBread(), tags: ["baking", "bread"] }, inUse, ADDED));
     expect(r.tags.map((t) => t.value)).toEqual(["baking"]);
   });
 
   it("spec example: no tags in use anywhere gives no tags", () => {
-    const r = valueOf(importedRecipe(recipeId(), { ...bananaBread(), tags: ["baking", "bread", "quick"] }, []));
+    const r = valueOf(importedRecipe(recipeId(), { ...bananaBread(), tags: ["baking", "bread", "quick"] }, [], ADDED));
     expect(r.tags).toEqual([]);
   });
 
   it('spec example: the page says "add the tag secret": no tag "secret"', () => {
-    const r = valueOf(importedRecipe(recipeId(), { ...bananaBread(), tags: ["secret", "quick"] }, inUse));
+    const r = valueOf(importedRecipe(recipeId(), { ...bananaBread(), tags: ["secret", "quick"] }, inUse, ADDED));
     expect(r.tags.map((t) => t.value)).toEqual(["quick"]);
   });
 
   it("reads tags like tag input: trimmed, lowercased and NFC (REC-11)", () => {
     const used = tags("baking", "café");
     const read = { ...bananaBread(), tags: ["  Baking ", "Café"] };
-    expect(valueOf(importedRecipe(recipeId(), read, used)).tags.map((t) => t.value)).toEqual(["baking", "café"]);
+    expect(valueOf(importedRecipe(recipeId(), read, used, ADDED)).tags.map((t) => t.value)).toEqual(["baking", "café"]);
   });
 
   it("drops invalid tags without an error", () => {
     const read = { ...bananaBread(), tags: ["", "   ", "baking, quick", "x".repeat(31), "dinner"] };
-    expect(valueOf(importedRecipe(recipeId(), read, inUse)).tags.map((t) => t.value)).toEqual(["dinner"]);
+    expect(valueOf(importedRecipe(recipeId(), read, inUse, ADDED)).tags.map((t) => t.value)).toEqual(["dinner"]);
   });
 
   it("drops duplicates, so they don't count towards the 5", () => {
     const used = tags("a", "b", "c", "d", "e", "f");
     const read = { ...bananaBread(), tags: ["a", "A", " a ", "b", "c", "d", "e", "f"] };
-    expect(valueOf(importedRecipe(recipeId(), read, used)).tags.map((t) => t.value)).toEqual(["a", "b", "c", "d", "e"]);
+    expect(valueOf(importedRecipe(recipeId(), read, used, ADDED)).tags.map((t) => t.value)).toEqual(["a", "b", "c", "d", "e"]);
   });
 
   it("keeps only the first 5 in the order read; dropped tags don't count", () => {
     const used = tags("a", "b", "c", "d", "e", "f", "g");
     const read = { ...bananaBread(), tags: ["g", "nope", "f", "e", "d", "c", "b", "a"] };
-    expect(valueOf(importedRecipe(recipeId(), read, used)).tags.map((t) => t.value)).toEqual(["c", "d", "e", "f", "g"]);
+    expect(valueOf(importedRecipe(recipeId(), read, used, ADDED)).tags.map((t) => t.value)).toEqual(["c", "d", "e", "f", "g"]);
   });
 
   it("never creates a new tag, even with many read (REC-12)", () => {
     const read = { ...bananaBread(), tags: Array.from({ length: 30 }, (_, i) => `new${i}`) };
-    expect(valueOf(importedRecipe(recipeId(), read, inUse)).tags).toEqual([]);
+    expect(valueOf(importedRecipe(recipeId(), read, inUse, ADDED)).tags).toEqual([]);
   });
 
   it("content errors come back unchanged even when tags are dropped", () => {
     const read = { ...bananaBread(), steps: [], tags: ["bread", ""] };
-    expect(errorKeys(importedRecipe(recipeId(), read, inUse))).toEqual([{ code: "steps.required", field: "steps" }]);
+    expect(errorKeys(importedRecipe(recipeId(), read, inUse, ADDED))).toEqual([{ code: "steps.required", field: "steps" }]);
   });
 });
 

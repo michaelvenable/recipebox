@@ -61,22 +61,32 @@ let seeded = 0;
 
 /**
  * Stores a recipe directly in the repository, with history and list state that endpoints of later tasks (cookings, to-make)
- * would otherwise set. Times are applied in order: cooked, added to the list, deleted.
+ * would otherwise set. Times are applied in order: cooked, added to the list, deleted. `createdAt` is its added time
+ * (REC-22), SEEDED_AT unless given; `null` stores it as a recipe from before added times were recorded, which has none.
  */
 export async function seed(
   repository: InMemoryRecipeRepository,
   input: RecipeContentInput,
-  state: { cookedAt?: string[]; toMakeAt?: string; deletedAt?: string } = {},
+  state: { createdAt?: string | null; cookedAt?: string[]; toMakeAt?: string; deletedAt?: string } = {},
 ): Promise<Recipe> {
   const id = recipeId(`aaaaaaaa-0000-4000-8000-${String(++seeded).padStart(12, "0")}`);
-  const created = Recipe.create(id, input);
+  const created = Recipe.create(id, input, instant(state.createdAt ?? SEEDED_AT));
   if (!created.ok) throw new Error(`Invalid seed recipe: ${JSON.stringify(created.errors)}`);
-  const recipe = created.value;
+  const recipe = state.createdAt === null ? withoutAddedTime(created.value) : created.value;
   for (const at of state.cookedAt ?? []) expectOk(recipe.markCooked(instant(at)));
   if (state.toMakeAt !== undefined) expectOk(recipe.addToMakeList(instant(state.toMakeAt)));
   if (state.deletedAt !== undefined) recipe.delete(instant(state.deletedAt));
   await repository.save(recipe);
   return recipe;
+}
+
+/** The added time of a seeded recipe when the test doesn't give one (REC-22). */
+export const SEEDED_AT = "2026-09-01T09:00:00.000Z";
+
+/** The recipe as it would be stored before added times were recorded (REC-22): the same document without `createdAt`. */
+function withoutAddedTime(recipe: Recipe): Recipe {
+  const { createdAt: _, ...stored } = recipe.toSnapshot();
+  return Recipe.fromSnapshot(stored);
 }
 
 function expectOk(result: { ok: boolean }): void {

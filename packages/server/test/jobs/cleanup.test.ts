@@ -50,7 +50,7 @@ async function storeImages(id: RecipeId): Promise<PhotoRef> {
 /** A stored recipe with a photo, deleted at `deletedAt` if given. */
 async function recipeWithPhoto(deletedAt?: string): Promise<Recipe> {
   const id = recipeId(randomUUID());
-  const created = Recipe.create(id, content(`Recipe ${id.value}`));
+  const created = Recipe.create(id, content(`Recipe ${id.value}`), instant("2026-09-01T09:00:00.000Z"));
   if (!created.ok) throw new Error("invalid recipe");
   const recipe = created.value;
   const set = recipe.setPhoto(await storeImages(id));
@@ -123,7 +123,7 @@ describe("REC-16 permanent removal", () => {
   });
 
   it("removes a due recipe without a photo", async () => {
-    const created = Recipe.create(recipeId(randomUUID()), content("No photo"));
+    const created = Recipe.create(recipeId(randomUUID()), content("No photo"), instant("2026-09-01T09:00:00.000Z"));
     if (!created.ok) throw new Error("invalid recipe");
     created.value.delete(instant(DELETED));
     await recipes.save(created.value);

@@ -48,7 +48,7 @@ async function appReading(): Promise<ImportTestApp> {
 async function storeEnded(setup: ImportTestApp, how: "done" | "failed", startedAt = START, id = OTHER_ID): Promise<void> {
   const recipeImport = RecipeImport.start(importId(id), instant(startedAt));
   if (how === "done") {
-    const created = Recipe.create(recipeId("aaaaaaaa-0000-4000-8000-0000000000bb"), content("Banana Bread"));
+    const created = Recipe.create(recipeId("aaaaaaaa-0000-4000-8000-0000000000bb"), content("Banana Bread"), instant(startedAt).plusMinutes(2));
     if (!created.ok) throw new Error("invalid recipe");
     const succeeded = recipeImport.succeed(created.value, instant(startedAt).plusMinutes(2));
     if (!succeeded.ok) throw new Error("could not succeed");

@@ -58,3 +58,10 @@ Added 2026-11-07 (owner request): importing a recipe from a photo (IMP, `docs/sp
   the recipe first, and no screen for a failed import: the card just goes away and the failure is logged.
 - `ImportPhotos.dc.html` (added later the same day, owner request): photos of one recipe in the panel, such as the front and
   back of a card, with "Add another photo" (up to 4), a Rotate and a remove button on each, and "Import recipe".
+
+Added 2026-11-08 (owner decision): a "Recently added" row on the Catalog (REC-22). Chosen over a sort switch, a "New" label,
+a "New" chip and a separate New page.
+- `NewestStrip.dc.html` (editor) and `NewestStripVisitor.dc.html` (visitor): below the tag chips, a "Recently added" heading
+  and a sideways-scrolling row of cards, each with the photo, the name and "Added ‹date›", then "All recipes" and the usual
+  A–Z list. The row holds recipes added in the last 30 days, newest first, at most 8. It is hidden when empty and while
+  searching or filtering by tag.

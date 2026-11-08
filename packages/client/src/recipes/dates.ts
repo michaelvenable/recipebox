@@ -103,3 +103,8 @@ const WEEKDAY_DATE = new Intl.DateTimeFormat("en", { weekday: "short", month: "s
 export function formatWeekdayDate(iso: string): string {
   return WEEKDAY_DATE.format(new Date(iso));
 }
+
+/** A day within the last few weeks, such as when a recipe was added (REC-22): "Nov 8", in the device's time zone (X-12). */
+export function formatMonthDay(iso: string): string {
+  return SHORT_DATE.format(new Date(iso));
+}
