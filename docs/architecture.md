@@ -256,43 +256,46 @@ the current shopping list, so only the link itself is stored.
 
 ## Recipe import
 
-IMP-1 to IMP-12: one photo becomes one recipe, read by an AI model in the background. Reading takes 30 seconds to 2 minutes,
-longer than a request should stay open, and the API scales to zero, so the work runs in a Container Apps job started by a
-queue message, not in the API.
+IMP-1 to IMP-12: 1 to 4 photos of one recipe become one recipe, read by an AI model in the background. Reading takes 30
+seconds to 2 minutes, longer than a request should stay open, and the API scales to zero, so the work runs in a Container
+Apps job started by a queue message, not in the API.
 
 ```
-client --POST /imports (photo)--> API --> Blob imports/{importId}.jpg, Cosmos import record, Storage queue message
+client --POST /imports (photos)--> API --> Blob imports/{importId}/{n}.jpg, Cosmos import record, Storage queue message
                                                    |
 Container Apps job (started by the queue) <--------+
-  read photo -> AI model (JSON) -> domain -> save recipe and its photo -> end the import, delete the page photo
+  read photos -> AI model (JSON) -> domain -> save recipe and its photo -> end the import, delete the page photos
 ```
 
-- Starting (`POST /imports`): editor check (X-6), then the same type and size checks as a recipe photo (IMP-2, REC-7). The
-  image goes through the existing decode worker, which removes all metadata and scales it to at most 2048 px on the long side,
-  so no location reaches the AI service and the call stays small. It is stored as `imports/{importId}.jpg` in the photo
-  container. The photo route serves only recipe photos by recipe ID, so these are never served (IMP-12). Like every upload, it
-  must carry the `X-Requested-By` header (see "Sign-in").
+- Starting (`POST /imports`): editor check (X-6), then at most 4 file parts, then the same type and size checks as a recipe
+  photo for each (IMP-2, REC-7). Each image goes through the existing decode worker, one after another, which removes all
+  metadata and scales it to at most 2048 px on the long side, so no location reaches the AI service and the call stays small.
+  They are stored as `imports/{importId}/{n}.jpg` (n from 1, in the order added) in the photo container. If any photo is
+  refused or can't be stored, the ones already stored are deleted and no import starts. The photo route serves only recipe
+  photos by recipe ID, so these are never served (IMP-12). Like every upload, it must carry the `X-Requested-By` header (see
+  "Sign-in"). The request body limit is 4 photos of 15 MB plus the form's overhead.
 - Records (IMP-3): each import is one document in a new `imports` container, partitioned by `/id` (the import ID): the
   `RecipeImport` snapshot (domain-model.md), written with `create`. Any number can be in progress at once. Each document also
   carries `ttl` (one day, with Cosmos DB time to live switched on and no default, as for shopping list links), so finished
   imports disappear on their own; `GET /imports` lists what is left.
-- Order when starting: the photo, then the record, then the queue message. If the photo or record can't be stored, nothing is
-  left behind and the API answers with an error, so the editor stays on the form (IMP-4). If the message can't be queued, the
-  record is marked failed, the photo is deleted, and the API answers 500, with the same result for the editor. That is logged
-  as an ordinary server error with the import ID, not as `recipe-import-failed`, since nothing was read (IMP-11).
+- Order when starting: the photos, then the record, then the queue message. If the photos or record can't be stored, nothing
+  is left behind and the API answers with an error, so the editor stays on the form (IMP-4). If the message can't be queued,
+  the record is marked failed, the photos are deleted, and the API answers 500, with the same result for the editor. That is
+  logged as an ordinary server error with the import ID, not as `recipe-import-failed`, since nothing was read (IMP-11).
 - The job (`caj-recipebox-import`) is event-driven: a KEDA Azure Queue scaler on the `imports` queue, signed in with the
   managed identity, one execution per message, at most 5 at a time, a 10-minute replica timeout and no retries (IMP-11,
   retrying is out of scope).
-  It reads the record and the photo, calls the model, and turns the answer into a recipe:
+  It reads the record and the photos (every `imports/{importId}/` blob, in order), sends them to the model in one request,
+  and turns the answer into a recipe:
   - The answer is untrusted input, like a request body: it is parsed against the expected shape, then the recipe is made with
     the same domain method as `POST /recipes`, with the server's time. Tags are filtered by a domain function to tags already in
     use, at most 5 (IMP-8). A domain refusal ends the import as `invalid-recipe` (IMP-7). The model's JSON is never stored.
   - The recipe's ID is derived from the import ID and the recipe is written with `create`, so a message delivered twice can't
     add the recipe twice.
-  - The dish picture (IMP-9): the model returns a box around it as fractions of the image. The job crops that area from the
-    page photo and stores it through the same code as an uploaded recipe photo. A box that is missing or too small for a
-    thumbnail means no photo.
-  - Then the record is set to `done` with the recipe's ID and name, or `failed`, and the page photo is deleted (IMP-12). A
+  - The dish picture (IMP-9): the model returns which photo it is on (from 1) and a box around it as fractions of that image.
+    The job crops that area from that page photo and stores it through the same code as an uploaded recipe photo. A box that
+    is missing, names a photo that doesn't exist, or is too small for a thumbnail means no photo.
+  - Then the record is set to `done` with the recipe's ID and name, or `failed`, and the page photos are deleted (IMP-12). A
     lifecycle rule on the storage account deletes any `imports/` blob older than one day, which covers a job that stopped
     partway. The trash cleanup's orphan sweep only considers `photos/{recipeId}/...`, so it never touches imports.
 - Failures (IMP-11) are one pino line at level `error`: `{ "event": "recipe-import-failed", "importId", "reason", "detail"? }`,

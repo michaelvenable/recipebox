@@ -212,7 +212,7 @@ class RecipeImport {
   static fromSnapshot(s: RecipeImportSnapshot): RecipeImport;
 }
 
-interface ReadRecipe {            // what was read from the photo, after the server has checked its shape
+interface ReadRecipe {            // what was read from the photos, after the server has checked its shape
   name: string;
   ingredients: string[];
   prep: string[];
@@ -238,7 +238,7 @@ function importedRecipe(id: RecipeId, read: ReadRecipe, tagsInUse: readonly Tag[
   so the same import always makes the same recipe id.
 - Each import is its own `RecipeImport`; any number can be in progress at once (IMP-3), so the domain has no rule across
   imports.
-- The failure reason (IMP-11) is not stored; it is logged by the server. The page photo, the AI service and the dish picture
+- The failure reason (IMP-11) is not stored; it is logged by the server. The page photos, the AI service and the dish picture
   are not in the domain.
 
 ### Rediscovery ordering

@@ -89,9 +89,12 @@ Cooking history:
   `GET /recipes`: comma-separated, only recipes with every one, still in the COOK-6 order. Returns `RediscoverEntry[]`.
 
 Import from a photo:
-- `POST /imports` — start an import of one photo (IMP-1 to IMP-4). Body: the photo, as for `PUT /recipes/{id}/photo`
-  (`multipart/form-data` with `X-Requested-By`; one file part; the same checks and `photo.*` errors, IMP-2). The server makes
-  the import ID and takes the start time from its clock (X-12), stores the photo without its metadata, and queues the import.
+- `POST /imports` — start an import of one recipe from 1 to 4 photos (IMP-1 to IMP-4). Body: the photos as
+  `multipart/form-data` with `X-Requested-By`, one file part per photo, in the order added; field names don't matter and any
+  other part is refused. Each photo gets the same checks and `photo.*` errors as `PUT /recipes/{id}/photo` (IMP-2), with `field`
+  `photos[i]` (from 0) naming the photo. No file part: 400 `photo.required`. More than 4: 400 `photo.tooMany`, before any
+  photo is processed. The server makes the import ID and takes the start time from its clock (X-12), stores the photos without
+  their metadata, and queues the import.
   Returns 202 with `ImportStatus` (`status` `reading`). Other imports in progress don't matter (IMP-3). If the import can't be
   queued, nothing is left in progress and the answer is 500 (docs/architecture.md, "Recipe import").
 - `GET /imports` — the imports of the last day, newest first (IMP-5, IMP-10). Returns `ImportStatus[]`, empty when there are
