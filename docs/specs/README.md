@@ -27,7 +27,8 @@ been cooked in a while.
 ## Cross-cutting requirements
 
 - **X-1. Recipes are public; the rest is private.** Anyone with the app's address can, without signing in, view recipes and their
-  photos, search by name (REC-9) and filter by tag with counts (REC-13). The "to make" list and cooking history are visible only
+  photos, search by name (REC-9), filter by tag with counts (REC-13) and see recently added recipes with their added dates
+  (REC-22). The "to make" list and cooking history are visible only
   to signed-in editors. That includes the "to make" indicator (PLAN-7), last-cooked date and count (COOK-5) and the "haven't made
   in a while" view (COOK-6). The trash (REC-14) is private too, including the photos of recipes in it, and so are imports in
   progress (IMP-5). The server never sends this data to a visitor; hiding it in the app is not enough on its own. The one
@@ -57,12 +58,12 @@ been cooked in a while.
   (Microsoft or Google), their permanent account ID with a button to copy it, and whether they are an editor. This is how a new
   editor finds the ID to add to the editor list (X-7). The page also lets them sign out. Someone who isn't signed in sees a "Sign
   in" option instead.
-- **X-12. Time.** Every time the app stores comes from the server's clock: when a recipe was cooked (COOK-1), added to the "to
-  make" list (PLAN-3) and deleted (REC-6), the 30-day trash deadline (REC-16), when a shopping list link was made and stops
-  working (PLAN-9), and when an import started, for its 10-minute limit (IMP-11). The app never sends a time to be stored or
-  checked. Stored times are shown in the device's time zone. Relative labels such as "3 months ago" (COOK-6) and "10 days left"
-  (REC-14) are calculated on the device, as is whether a recipe was cooked today (COOK-8). Short screen timers such as the Undo
-  message (REC-6) also run on the device.
+- **X-12. Time.** Every time the app stores comes from the server's clock: when a recipe was added (REC-22), cooked (COOK-1),
+  added to the "to make" list (PLAN-3) and deleted (REC-6), the 30-day trash deadline (REC-16), when a shopping list link was
+  made and stops working (PLAN-9), and when an import started, for its 10-minute limit (IMP-11). The app never sends a time to
+  be stored or checked. Stored times are shown in the device's time zone. Relative labels such as "3 months ago" (COOK-6) and
+  "10 days left" (REC-14) are calculated on the device, as is whether a recipe was cooked today (COOK-8) and whether it was added
+  in the last 30 days (REC-22). Short screen timers such as the Undo message (REC-6) also run on the device.
 - **X-13. Text.** These rules apply wherever the specs count characters, sort text or match a search term:
   - Characters are counted as a person sees them. Every emoji counts as one character, including combined ones such as flags.
   - Sorting and matching ignore case and accents, using English rules. "Éclair" sorts among the E's, and searching "creme" finds

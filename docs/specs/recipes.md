@@ -31,8 +31,8 @@ tag.
   same rules as REC-1 and REC-2 apply. Entries can't be reordered: steps are written in order, and the order of ingredients
   matters little.
 - **REC-6. Delete to trash.** An editor can delete a recipe without being asked to confirm. The recipe moves to the trash (REC-14)
-  and disappears at once from everywhere else: the list, search results, tag filters and counts, the "to make" list and the
-  "haven't made in a while" view. Opening it shows "not found" (REC-4).
+  and disappears at once from everywhere else: the list, the "Recently added" row (REC-22), search results, tag filters and
+  counts, the "to make" list and the "haven't made in a while" view. Opening it shows "not found" (REC-4).
   - Right after deleting, a "‹name› moved to trash" message with an Undo option is shown for at least 10 seconds. Deleting
     another recipe meanwhile replaces the message; the first can still be restored from the trash. Undo restores the
     recipe exactly as restoring from the trash does (REC-15).
@@ -101,6 +101,20 @@ tag.
   entry per line. One or more line breaks start the next entry, so blank lines are ignored. Numbering isn't needed; the text is
   kept as typed. Editing a recipe shows its entries one per line; a line break inside an entry saved earlier is shown as a space,
   so the entry stays one entry. How a recipe is viewed doesn't change.
+- **REC-22. Recently added.** Above the recipe list (REC-8), a "Recently added" row shows the recipes added in the last 30
+  days, newest first, at most 8. Each shows its photo thumbnail (or the placeholder), its name and the date it was added
+  ("Added Nov 8"). Opening one opens the recipe (REC-4). A recipe in the row is also in the list below it.
+  - A recipe's added time is when it was created (REC-1) or, for an imported recipe, when it was added to the collection
+    (IMP-10), by the server's clock (X-12). It never changes: editing a recipe or its photo leaves it as it was, and a recipe
+    restored from the trash (REC-15) keeps it.
+  - Recipes added at the same time are ordered by name (X-13).
+  - Recipes created before the added time was recorded have none. They never appear in the row.
+  - Recipes in the trash don't appear (REC-6).
+  - "The last 30 days" is calendar days on the device (X-12): today and the 30 days before it, by the date the recipe was added
+    in the device's time zone. On Nov 8, a recipe added any time on Oct 9 is shown and one added on Oct 8 isn't.
+  - When no recipe was added in the last 30 days, the row isn't shown.
+  - While a search term is typed (REC-9) or tags are picked (REC-13), the row isn't shown; only the list is.
+  - The row and the added dates are public, like the recipes themselves (X-1).
 
 ## Examples
 
@@ -128,6 +142,13 @@ tag.
 | Remove "quick" from A and C                                                  | "quick" no longer offered as a filter       |
 | Attach "quick" to a recipe that has 20 tags including "quick"                | No change, no error                         |
 | Restore a recipe deleted 30 days and 2 hours ago, not yet removed            | Refused: can no longer be restored          |
+| Today is Nov 8; A added Nov 8, B Nov 5, C Oct 1, D before added times        | Recently added: A, B                        |
+| Today is Nov 8; A added Oct 9 at 11:30 pm, B Oct 8 at 9 am                   | Recently added: A                           |
+| 10 recipes added this week                                                   | Recently added shows the newest 8           |
+| "Pad Thai" added Oct 20, edited Nov 7                                        | Still "Added Oct 20", in the same place     |
+| "Pad Thai" added Nov 1, deleted, restored Nov 6                              | Back in Recently added as "Added Nov 1"     |
+| Search "chick" typed                                                         | No Recently added row                       |
+| No recipe added in the last 30 days                                          | No Recently added row                       |
 
 ## Out of scope
 
