@@ -54,8 +54,15 @@ export interface FilePart {
   bytes: Buffer;
 }
 
+/** A text part; a browser's FormData sends it without a content type. */
+export interface TextPart {
+  field: string;
+  value: string;
+  contentType?: string;
+}
+
 /** A multipart/form-data body, as a browser's FormData would send it. Text fields are given as strings. */
-export function multipartBody(parts: readonly (FilePart | { field: string; value: string })[]): {
+export function multipartBody(parts: readonly (FilePart | TextPart)[]): {
   payload: Buffer;
   contentType: string;
 } {
@@ -64,7 +71,8 @@ export function multipartBody(parts: readonly (FilePart | { field: string; value
   for (const part of parts) {
     chunks.push(Buffer.from(`--${boundary}\r\n`));
     if ("value" in part) {
-      chunks.push(Buffer.from(`Content-Disposition: form-data; name="${part.field}"\r\n\r\n${part.value}\r\n`));
+      const type = part.contentType === undefined ? "" : `Content-Type: ${part.contentType}\r\n`;
+      chunks.push(Buffer.from(`Content-Disposition: form-data; name="${part.field}"\r\n${type}\r\n${part.value}\r\n`));
       continue;
     }
     chunks.push(

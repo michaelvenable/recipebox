@@ -1688,7 +1688,7 @@ button.pill-button:disabled {
 .import-photos {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -1699,7 +1699,16 @@ button.pill-button:disabled {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+}
+
+/* A square tile, so the preview fits whichever way Rotate has turned it (IMP-1). */
+.import-photo-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
 }
 
 .import-photo-image {
@@ -1718,11 +1727,36 @@ button.pill-button:disabled {
   color: var(--muted);
 }
 
+/* IMP-1: at least 44 px tall, like every touch target. */
+.import-photo-rotate {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--touch);
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 22px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.import-photo-rotate:hover {
+  border-color: var(--muted);
+}
+
+.import-photo-rotate:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 /* A 44 px target around a 24 px dot at the preview's corner. */
 .import-photo-remove {
   position: absolute;
-  top: -12px;
-  right: -14px;
+  top: -10px;
+  right: -12px;
   display: flex;
   align-items: center;
   justify-content: center;

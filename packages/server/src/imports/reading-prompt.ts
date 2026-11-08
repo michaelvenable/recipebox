@@ -21,7 +21,8 @@ Rules:
    "Banana Bread").
 6. ingredients: one entry per ingredient, in the page's order, with its quantity, as in "1/3 cup melted butter". If the page
    groups ingredients under headings such as "For the sauce", start each entry in that group with the heading and a colon:
-   "Sauce: 2 tbsp soy sauce". Do not include the heading as an entry of its own.
+   "Sauce: 2 tbsp soy sauce". Do not include the heading as an entry of its own. When the page lists amounts for different
+   numbers of servings side by side, such as "1 | 2" for 2 and 4 people, copy only the first amount, as in "1 Tomato".
 7. prep: only if the page lists preparation separately from the method, under its own heading such as "Preparation" or
    "Before you start". Otherwise an empty list. Do not move steps from the method into prep.
 8. steps: one entry per step, in order, without the step numbers. If the method is one paragraph with no numbers, split it

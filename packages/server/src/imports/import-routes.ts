@@ -12,7 +12,7 @@
 import multipart from "@fastify/multipart";
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply } from "fastify";
 import { type Instant, RecipeImport } from "@recipebox/domain";
-import type { ErrorItem, ImportStatus } from "@recipebox/shared";
+import { type ErrorItem, type ImportStatus, type PhotoRotation, PhotoRotations } from "@recipebox/shared";
 import type { Clock, ImportIdGenerator } from "../clock.js";
 import { requireEditor } from "../http/caller.js";
 import { type PhotoProcessingOptions, processImportPage } from "../photos/photo-processing.js";
@@ -21,6 +21,7 @@ import {
   deleteImages,
   readUploads,
   sendError,
+  type TextPart,
   TOO_LARGE,
   UNREADABLE,
   UNSUPPORTED,
@@ -59,7 +60,12 @@ export function toImportStatus(recipeImport: RecipeImport, now: Instant): Import
 const NO_PHOTO: ErrorItem = {
   code: "photo.required",
   field: "photos",
-  message: `Send 1 to ${MAX_IMPORT_PHOTOS} image files as multipart/form-data, with no other fields.`,
+  message: `Send 1 to ${MAX_IMPORT_PHOTOS} image files as multipart/form-data, with no other fields than rotations.`,
+};
+const ROTATIONS: ErrorItem = {
+  code: "photo.rotations",
+  field: "rotations",
+  message: "Send rotations before the photos as a JSON list of 0, 90, 180 or 270, one for each photo, in the same order.",
 };
 const TOO_MANY: ErrorItem = {
   code: "photo.tooMany",
@@ -80,7 +86,29 @@ function uploadsError(problem: UploadsProblem): ErrorItem {
       return TOO_MANY;
     case "tooLarge":
       return forPhoto(TOO_LARGE, problem.index);
+    case "textPart":
+      return ROTATIONS;
   }
+}
+
+/**
+ * IMP-1: how far to turn each of `count` photos clockwise, from the optional `rotations` part (docs/api.md, "Import from a
+ * photo"): a JSON list of 0, 90, 180 or 270, one per photo in the same order. Without it, no photo is turned. Undefined when
+ * the part isn't such a list or its length doesn't match.
+ */
+function rotationsOf(textPart: TextPart | undefined, count: number): PhotoRotation[] | undefined {
+  if (textPart === undefined) return new Array<PhotoRotation>(count).fill(0);
+  if (!textPart.ok) return undefined;
+  let value = textPart.value;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value) as unknown;
+    } catch {
+      return undefined;
+    }
+  }
+  const parsed = PhotoRotations.safeParse(value);
+  return parsed.success && parsed.data.length === count ? parsed.data : undefined;
 }
 
 /** IMP-5: newest first, by when each started; the id breaks ties, so the order never changes between reads. */
@@ -128,16 +156,20 @@ export async function registerImportRoutes(
       }
 
       // IMP-2: every file is read, and their number checked, before any is decoded.
-      const upload = await readUploads(request, MAX_IMPORT_PHOTOS);
+      const upload = await readUploads(request, MAX_IMPORT_PHOTOS, "rotations");
       if (!upload.ok) return sendError(reply, 400, uploadsError(upload.problem));
+      // IMP-1: the turns are checked before any photo is decoded, too.
+      const rotations = rotationsOf(upload.textPart, upload.files.length);
+      if (rotations === undefined) return sendError(reply, 400, ROTATIONS);
 
       const importId = newImportId();
-      // IMP-2: each photo gets the same checks as a recipe photo (REC-7); all metadata is removed and the image scaled down
-      // for reading. One after another, in order, each stored as soon as it is ready.
+      // IMP-2: each photo gets the same checks as a recipe photo (REC-7); it is turned upright as the editor showed it (IMP-1),
+      // all metadata is removed and the image scaled down for reading. One after another, in order, each stored as soon as it
+      // is ready.
       const stored: string[] = [];
       try {
         for (const [index, bytes] of upload.files.entries()) {
-          const processed = await processImportPage(bytes, { ...photoProcessing, log: request.log });
+          const processed = await processImportPage(bytes, { ...photoProcessing, log: request.log }, rotations[index]);
           if (!processed.ok) {
             await deleteImages(photos, stored, request.log);
             if (processed.reason === "busy") return sendError(reply, 503, BUSY);

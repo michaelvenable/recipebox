@@ -1,6 +1,7 @@
 // Decodes an upload and makes the two stored images (REC-7; docs/architecture.md, "Photos"). Runs only inside a photo worker
 // (photo-worker.ts); photo-processing.ts starts the worker and holds the rest of the upload checks.
 import sharp, { type Sharp } from "sharp";
+import type { PhotoRotation } from "@recipebox/shared";
 
 /**
  * Images with more pixels than this are refused before any pixels are decoded, so a small file that expands to a huge image (a
@@ -45,13 +46,15 @@ export interface PixelArea {
 
 /**
  * What a worker is given. Without `purpose`, a recipe photo. With `crop`, a recipe photo is made from that area of the image
- * only: the dish picture on an import's page photo (IMP-9).
+ * only: the dish picture on an import's page photo (IMP-9). With `rotation`, an import's page photo is turned that far
+ * clockwise after the camera's rotation, as the editor turned it (IMP-1); a recipe photo is never turned.
  */
 export interface ConversionRequest {
   bytes: Uint8Array;
   type: ImageType;
   purpose?: ConversionPurpose;
   crop?: PixelArea;
+  rotation?: PhotoRotation;
 }
 
 /**
@@ -66,11 +69,17 @@ export type ConversionResult = { ok: true; photo: Uint8Array; thumbnail?: Uint8A
  * - all metadata is dropped: EXIF (including GPS location), XMP, IPTC, comments and ICC profiles. Recipes are public (X-1) and
  *   phone photos record where they were taken. Colors are converted to sRGB first, so dropping the profile doesn't shift them.
  */
-export async function convertPhoto({ bytes, type, purpose = "recipe", crop }: ConversionRequest): Promise<ConversionResult> {
+export async function convertPhoto({
+  bytes,
+  type,
+  purpose = "recipe",
+  crop,
+  rotation = 0,
+}: ConversionRequest): Promise<ConversionResult> {
   try {
     const source = await decode(bytes, type);
     if (!source.ok) return source;
-    if (purpose === "importPage") return await convertImportPage(source.image);
+    if (purpose === "importPage") return await convertImportPage(source.image, rotation);
     // IMP-9: the area is cut from the oriented image first, so the rest is exactly as for an uploaded photo.
     const image = crop === undefined ? source.image : source.image.extract(crop);
     // The one decode: the source at display size, flattened onto white and in sRGB, as raw pixels without any metadata. JPEG
@@ -98,12 +107,15 @@ export async function convertPhoto({ bytes, type, purpose = "recipe", crop }: Co
 }
 
 /**
- * The page photo of an import (docs/architecture.md, "Recipe import"): oriented, at most IMPORT_PAGE_MAX_SIDE on its longer
- * side, flattened onto white, in sRGB and without any metadata, the same way as a recipe photo, so no location reaches the
- * reading service.
+ * The page photo of an import (docs/architecture.md, "Recipe import"): oriented by the camera's rotation, then turned
+ * `rotation` degrees clockwise as the editor showed it (IMP-1), so the reading service gets the page upright; at most
+ * IMPORT_PAGE_MAX_SIDE on its longer side, flattened onto white, in sRGB and without any metadata, the same way as a recipe
+ * photo, so no location reaches the reading service.
  */
-async function convertImportPage(image: Sharp): Promise<ConversionResult> {
-  const photo = await image
+async function convertImportPage(image: Sharp, rotation: PhotoRotation): Promise<ConversionResult> {
+  // The source is read with autoOrient (decode), so this turn comes on top of the camera's rotation instead of replacing it.
+  const turned = rotation === 0 ? image : image.rotate(rotation);
+  const photo = await turned
     .resize({ width: IMPORT_PAGE_MAX_SIDE, height: IMPORT_PAGE_MAX_SIDE, fit: "inside", withoutEnlargement: true })
     .flatten({ background: "#ffffff" })
     .toColourspace("srgb")

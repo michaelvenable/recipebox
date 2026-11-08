@@ -27,4 +27,4 @@ export {
   RecipeSummary,
   TagRequest,
 } from "./recipes.js";
-export { ImportStatus } from "./imports.js";
+export { ImportStatus, PhotoRotation, PhotoRotations } from "./imports.js";

@@ -17,6 +17,19 @@ describe("IMP-6 what is read: the instructions", () => {
     expect(READING_INSTRUCTIONS).toContain(text);
   });
 
+  it("'A card lists \"Tomato 1 | 2\" for 2 and 4 people': keeps only the first of side-by-side amounts, as approved", () => {
+    // The line is wrapped to fit the prompt; its words are the owner's, exactly.
+    const unwrapped = READING_INSTRUCTIONS.replace(/\n +/g, " ");
+    expect(unwrapped).toContain(
+      'When the page lists amounts for different numbers of servings side by side, such as "1 | 2" for 2 and 4 people, ' +
+        'copy only the first amount, as in "1 Tomato".',
+    );
+    // In the ingredients rule, with the rest of that rule's wording kept.
+    const ingredientsRule = /^6\. ingredients:[\s\S]*?(?=^7\. )/m.exec(READING_INSTRUCTIONS)?.[0] ?? "";
+    expect(ingredientsRule).toContain("copy only the first amount");
+    expect(ingredientsRule).toContain("Do not include the heading as an entry of its own.");
+  });
+
   it("has the thirteen rules, in order", () => {
     const numbers = [...READING_INSTRUCTIONS.matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]));
     expect(numbers).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);

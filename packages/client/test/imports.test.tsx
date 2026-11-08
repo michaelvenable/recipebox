@@ -172,10 +172,14 @@ describe("IMP-1 start from the New recipe form", () => {
     await addPhotos(userEvent.setup(), jpeg());
 
     const panel = screen.getByRole("region", { name: "Have it on paper?" });
-    expect(within(panel).getByText("Add each side or page of this recipe, in order. Up to 4 photos.")).toBeInTheDocument();
+    expect(
+      within(panel).getByText(
+        "Add each side or page of this recipe, in order. Up to 4 photos. Turn each one so the writing reads the right way up.",
+      ),
+    ).toBeInTheDocument();
     expect(within(panel).queryByText("Upload a photo of the recipe to begin.")).not.toBeInTheDocument();
-    expect(photoLabels()).toEqual(["Photo 1"]);
-    expect(within(photoList()).getByRole("img", { name: "Photo 1" })).toHaveAttribute("src", "blob:preview");
+    expect(photoLabels()).toEqual(["Photo 1, not turned"]);
+    expect(within(photoList()).getByRole("img", { name: "Photo 1, not turned" })).toHaveAttribute("src", "blob:preview");
     expect(within(panel).getByRole("button", { name: "Remove Photo 1" })).toBeInTheDocument();
     expect(addInput()).toHaveAttribute("type", "file");
     expect(importButton()).toBeEnabled();
@@ -186,7 +190,7 @@ describe("IMP-1 start from the New recipe form", () => {
   it("adds the next photos one at a time, as Photo 2, Photo 3, in the order added", async () => {
     await openNew();
     await addPhotos(userEvent.setup(), jpeg("front.jpg"), jpeg("back.jpg"), jpeg("insert.jpg"));
-    expect(photoLabels()).toEqual(["Photo 1", "Photo 2", "Photo 3"]);
+    expect(photoLabels()).toEqual(["Photo 1, not turned", "Photo 2, not turned", "Photo 3, not turned"]);
     expect(addInput()).not.toHaveAttribute("multiple");
   });
 
@@ -200,7 +204,7 @@ describe("IMP-1 start from the New recipe form", () => {
 
     await user.click(screen.getByRole("button", { name: "Remove Photo 2" }));
 
-    expect(photoLabels()).toEqual(["Photo 1", "Photo 2"]);
+    expect(photoLabels()).toEqual(["Photo 1, not turned", "Photo 2, not turned"]);
     await user.click(importButton());
     await waitFor(() => expect(router.state.location.pathname).toBe("/"));
     expect((uploads(fetchMock)[0]!.body as FormData).getAll("photo")).toEqual([front, back]);
@@ -237,6 +241,163 @@ describe("IMP-1 start from the New recipe form", () => {
   });
 });
 
+describe("IMP-1 Rotate", () => {
+  const rotateButton = (n: number) => screen.getByRole("button", { name: `Rotate Photo ${n}` });
+  const preview = (n: number) => within(photoList()).getAllByRole("img")[n - 1]!;
+  const sentRotations = (fetchMock: FetchMock, upload = 0) =>
+    JSON.parse(String((uploads(fetchMock)[upload]!.body as FormData).get("rotations"))) as unknown;
+
+  it("gives each photo a Rotate button (its 44 px height is checked in page.test.ts)", async () => {
+    await openNew();
+    await addPhotos(userEvent.setup(), jpeg("front.jpg"), jpeg("back.jpg"));
+    expect(rotateButton(1)).toHaveTextContent("Rotate");
+    expect(rotateButton(2)).toHaveAttribute("type", "button");
+    expect(rotateButton(1)).toHaveClass("import-photo-rotate");
+  });
+
+  it("turns the preview a quarter turn clockwise each press: 0, 90, 180, 270, then 0 again", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await addPhotos(user, jpeg());
+    expect(preview(1).style.transform).toBe("rotate(0deg)");
+
+    const seen: string[] = [];
+    for (let press = 0; press < 4; press++) {
+      await user.click(rotateButton(1));
+      seen.push(preview(1).style.transform);
+    }
+
+    // A quarter turn is drawn slightly smaller, so the turned preview stays within its square tile.
+    expect(seen).toEqual(["rotate(90deg) scale(0.9)", "rotate(180deg)", "rotate(270deg) scale(0.9)", "rotate(0deg)"]);
+    expect(photoLabels()).toEqual(["Photo 1, not turned"]);
+  });
+
+  it("says how a preview is turned, for a screen reader", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await addPhotos(user, jpeg());
+    const labels: (string | null)[] = [];
+    for (let press = 0; press < 3; press++) {
+      await user.click(rotateButton(1));
+      labels.push(preview(1).getAttribute("alt"));
+    }
+    expect(labels).toEqual([
+      "Photo 1, turned a quarter turn",
+      "Photo 1, turned a half turn",
+      "Photo 1, turned three quarter turns",
+    ]);
+  });
+
+  it("'A card photographed upside down; Rotate pressed twice': sends 180 for that photo, and the file as picked", async () => {
+    const user = userEvent.setup();
+    const { fetchMock, router } = await openNew();
+    const front = jpeg("front.jpg");
+    const back = jpeg("back.jpg");
+    await addPhotos(user, front, back);
+
+    await user.click(rotateButton(2));
+    await user.click(rotateButton(2));
+    await user.click(importButton());
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+
+    const form = uploads(fetchMock)[0]!.body as FormData;
+    // The rotations part comes before the files (docs/api.md, "Import from a photo").
+    expect([...form.keys()]).toEqual(["rotations", "photo", "photo"]);
+    expect(sentRotations(fetchMock)).toEqual([0, 180]);
+    // Never re-encoded on the device: the very files picked are sent.
+    expect(form.getAll("photo")).toEqual([front, back]);
+  });
+
+  it("sends each photo's own turn, in order", async () => {
+    const user = userEvent.setup();
+    const { fetchMock, router } = await openNew();
+    await addPhotos(user, jpeg("1.jpg"), jpeg("2.jpg"), jpeg("3.jpg"), jpeg("4.jpg"));
+    for (const [n, presses] of [
+      [1, 1],
+      [3, 3],
+      [4, 4],
+    ] as const) {
+      for (let press = 0; press < presses; press++) await user.click(rotateButton(n));
+    }
+    await user.click(importButton());
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+    expect(sentRotations(fetchMock)).toEqual([90, 0, 270, 0]);
+  });
+
+  it("removes a photo's turn with it; the others keep theirs", async () => {
+    const user = userEvent.setup();
+    const { fetchMock, router } = await openNew();
+    const [front, middle, back] = [jpeg("front.jpg"), jpeg("middle.jpg"), jpeg("back.jpg")];
+    await addPhotos(user, front, middle, back);
+    await user.click(rotateButton(1));
+    await user.click(rotateButton(2));
+    await user.click(rotateButton(2));
+    await user.click(rotateButton(3));
+    await user.click(rotateButton(3));
+    await user.click(rotateButton(3));
+
+    await user.click(screen.getByRole("button", { name: "Remove Photo 2" }));
+
+    expect(photoLabels()).toEqual(["Photo 1, turned a quarter turn", "Photo 2, turned three quarter turns"]);
+    await user.click(importButton());
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+    expect((uploads(fetchMock)[0]!.body as FormData).getAll("photo")).toEqual([front, back]);
+    expect(sentRotations(fetchMock)).toEqual([90, 270]);
+  });
+
+  it("starts a photo added after a turned one was removed unturned", async () => {
+    const user = userEvent.setup();
+    const { fetchMock, router } = await openNew();
+    await addPhotos(user, jpeg("front.jpg"));
+    await user.click(rotateButton(1));
+    await user.click(screen.getByRole("button", { name: "Remove Photo 1" }));
+    await addPhotos(user, jpeg("again.jpg"));
+    expect(photoLabels()).toEqual(["Photo 1, not turned"]);
+    await user.click(importButton());
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+    expect(sentRotations(fetchMock)).toEqual([0]);
+  });
+
+  it("keeps the photos and their turns when the upload fails, and sends them again", async () => {
+    const user = userEvent.setup();
+    let fail = true;
+    const { fetchMock, router } = await openNew({
+      upload: () => {
+        if (fail) return Promise.reject(new TypeError("Failed to fetch"));
+        return jsonResponse(202, { importId: "import-1", status: "reading" });
+      },
+    });
+    await addPhotos(user, jpeg("front.jpg"), jpeg("back.jpg"));
+    await user.click(rotateButton(1));
+    await user.click(rotateButton(1));
+    await user.click(importButton());
+    await screen.findByRole("alert");
+
+    expect(photoLabels()).toEqual(["Photo 1, turned a half turn", "Photo 2, not turned"]);
+    expect(preview(1).style.transform).toBe("rotate(180deg)");
+
+    fail = false;
+    await user.click(importButton());
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+    expect(sentRotations(fetchMock, 0)).toEqual([180, 0]);
+    expect(sentRotations(fetchMock, 1)).toEqual([180, 0]);
+  });
+
+  it("can't be pressed while the photos are uploading", async () => {
+    const user = userEvent.setup();
+    let answer = (_response: Response): void => undefined;
+    const { router } = await openNew({ upload: () => new Promise<Response>((resolve) => (answer = resolve)) });
+    await addPhotos(user, jpeg());
+    await user.click(importButton());
+
+    await screen.findByRole("button", { name: "Uploading photos…" });
+    expect(rotateButton(1)).toBeDisabled();
+
+    answer(jsonResponse(202, { importId: "import-1", status: "reading" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+  });
+});
+
 describe("IMP-2 accepted photos", () => {
   it("asks for JPEG, PNG or WebP, like the recipe photo field (REC-7), for the first photo and the next", async () => {
     await openNew();
@@ -270,7 +431,7 @@ describe("IMP-2 accepted photos", () => {
     await user.upload(addInput(), new File(["x"], "IMG_0002.HEIC", { type: "image/heic" }));
 
     expect(screen.getByRole("alert")).toHaveTextContent("HEIC photos can't be used. Choose a JPEG instead.");
-    expect(photoLabels()).toEqual(["Photo 1"]);
+    expect(photoLabels()).toEqual(["Photo 1, not turned"]);
     expect(uploads(fetchMock)).toHaveLength(0);
     await user.click(importButton());
     await waitFor(() => expect(uploads(fetchMock)).toHaveLength(1));
@@ -280,7 +441,7 @@ describe("IMP-2 accepted photos", () => {
   it("'4 photos added': no more can be added", async () => {
     await openNew();
     await addPhotos(userEvent.setup(), jpeg("1.jpg"), jpeg("2.jpg"), jpeg("3.jpg"), jpeg("4.jpg"));
-    expect(photoLabels()).toEqual(["Photo 1", "Photo 2", "Photo 3", "Photo 4"]);
+    expect(photoLabels()).toEqual(["Photo 1, not turned", "Photo 2, not turned", "Photo 3, not turned", "Photo 4, not turned"]);
     expect(screen.queryByLabelText("Add another photo")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Import from a photo")).not.toBeInTheDocument();
     expect(importButton()).toBeEnabled();
@@ -292,7 +453,7 @@ describe("IMP-2 accepted photos", () => {
     await addPhotos(user, jpeg("1.jpg"), jpeg("2.jpg"), jpeg("3.jpg"), jpeg("4.jpg"));
     await user.click(screen.getByRole("button", { name: "Remove Photo 4" }));
     await user.upload(addInput(), jpeg("5.jpg"));
-    expect(photoLabels()).toEqual(["Photo 1", "Photo 2", "Photo 3", "Photo 4"]);
+    expect(photoLabels()).toEqual(["Photo 1, not turned", "Photo 2, not turned", "Photo 3, not turned", "Photo 4, not turned"]);
   });
 });
 
@@ -309,7 +470,8 @@ describe("IMP-3 one recipe per upload, any number at once", () => {
     expect((init.headers as Record<string, string>)["x-requested-by"]).toBe("recipebox");
     expect((init.headers as Record<string, string>)["content-type"]).toBeUndefined();
     const form = init.body as FormData;
-    expect([...form.keys()]).toEqual(["photo"]);
+    expect([...form.keys()]).toEqual(["rotations", "photo"]);
+    expect(form.get("rotations")).toBe("[0]");
     expect(form.get("photo")).toBe(file);
   });
 
@@ -323,7 +485,8 @@ describe("IMP-3 one recipe per upload, any number at once", () => {
     const sent = uploads(fetchMock);
     expect(sent).toHaveLength(1);
     const form = sent[0]!.body as FormData;
-    expect([...form.keys()]).toEqual(["photo", "photo"]);
+    expect([...form.keys()]).toEqual(["rotations", "photo", "photo"]);
+    expect(form.get("rotations")).toBe("[0,0]");
     expect(form.getAll("photo")).toEqual([front, back]);
     expect(await screen.findAllByText(READING)).toHaveLength(1);
   });
@@ -415,7 +578,7 @@ describe("IMP-4 back to the Catalog", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "The photos weren't uploaded. Couldn't reach the server. Check the connection and try again.",
     );
-    expect(photoLabels()).toEqual(["Photo 1", "Photo 2"]);
+    expect(photoLabels()).toEqual(["Photo 1, not turned", "Photo 2, not turned"]);
 
     fail = false;
     await user.click(importButton());

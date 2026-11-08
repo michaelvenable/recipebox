@@ -3,6 +3,7 @@ import { type QueryClient, useIsMutating, useMutation, useQueryClient } from "@t
 import type { EditorRecipe, PublicRecipe, RecipeContentInput } from "@recipebox/shared";
 import { useLocation, useNavigate } from "react-router";
 import { ApiError } from "../api/client.js";
+import type { ImportPhoto } from "../api/imports.js";
 import { recipeKeys } from "../api/query-keys.js";
 import { createRecipe, removePhoto, saveRecipeContent, uploadPhoto } from "../api/recipes.js";
 import { ImportPanel, importUploadProblem } from "../imports/ImportPanel.js";
@@ -172,14 +173,14 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
    * IMP-4: once uploaded, to the Catalog with a message; if the upload fails, stay here and say so, with the photos still in
    * the panel to try again.
    */
-  async function importPhotos(files: readonly File[]) {
+  async function importPhotos(photos: readonly ImportPhoto[]) {
     if (busy) return;
     setImportError(undefined);
     try {
-      await importing.mutateAsync(files);
+      await importing.mutateAsync(photos);
     } catch (error) {
       // The server's photo.* message when it refused a photo (IMP-2), otherwise why it didn't get through.
-      if (mounted.current) setImportError(importUploadProblem(error, files.length));
+      if (mounted.current) setImportError(importUploadProblem(error, photos.length));
       return;
     }
     if (!mounted.current) return;
@@ -234,7 +235,7 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
             <ImportPanel
               uploading={importing.isPending}
               error={importError}
-              onImport={(files) => void importPhotos(files)}
+              onImport={(photos) => void importPhotos(photos)}
               onPhotosChange={() => setImportError(undefined)}
             />
           )}

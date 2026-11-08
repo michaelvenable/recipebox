@@ -137,3 +137,65 @@ describe('IMP-2 the page photo goes through the same isolated decode (architectu
     expect(await hanging).toEqual({ ok: false, reason: "unreadable" });
   });
 });
+
+describe("IMP-1 Rotate: the page photo is turned clockwise as the editor showed it, after the camera's rotation", () => {
+  // jpeg(): 60 x 40, left half red and right half blue, no EXIF orientation.
+  it.each([
+    [0, [60, 40], { left: "red", right: "blue" }],
+    [90, [40, 60], { top: "red", bottom: "blue" }],
+    [180, [60, 40], { left: "blue", right: "red" }],
+    [270, [40, 60], { top: "blue", bottom: "red" }],
+  ] as const)("turns a page %i° clockwise", async (rotation, size, colors) => {
+    const result = await processImportPage(await jpeg(), {}, rotation);
+    if (!result.ok) throw new Error(result.reason);
+    const image = result.value.image;
+    const { width, height } = await sharp(image).metadata();
+    expect([width, height]).toEqual(size);
+    const [w, h] = size;
+    const at = { left: [5, h / 2], right: [w - 6, h / 2], top: [w / 2, 5], bottom: [w / 2, h - 6] } as const;
+    for (const [side, color] of Object.entries(colors)) {
+      const [x, y] = at[side as keyof typeof at];
+      expectColor(await colorAt(image, x, y), color);
+    }
+  });
+
+  it("'A card photographed upside down; Rotate pressed twice': 180° reads the right way up", async () => {
+    // The card, red at the top of its writing and blue at the bottom, as photographed upside down: blue on top.
+    const upsideDown = await sharp(await jpeg(40, 60)).rotate(270).jpeg().toBuffer();
+    expectColor(await colorAt(upsideDown, 30, 5), "blue");
+    const result = await processImportPage(upsideDown, {}, 180);
+    if (!result.ok) throw new Error(result.reason);
+    expectColor(await colorAt(result.value.image, 30, 5), "red");
+    expectColor(await colorAt(result.value.image, 30, 34), "blue");
+  });
+
+  it.each([
+    // phoneJpeg(): stored 60 x 40 with EXIF orientation 6, so the camera shows it 40 x 60 with red on top.
+    [0, [40, 60], [20, 5], [20, 54]],
+    [90, [60, 40], [54, 20], [5, 20]],
+    [180, [40, 60], [20, 54], [20, 5]],
+    [270, [60, 40], [5, 20], [54, 20]],
+  ] as const)("applies the camera's rotation first, then turns %i°: red, the photo's top as shown, ends up as turned", async (rotation, size, red, blue) => {
+    const result = await processImportPage(await phoneJpeg(), {}, rotation);
+    if (!result.ok) throw new Error(result.reason);
+    const image = result.value.image;
+    const { width, height } = await sharp(image).metadata();
+    expect([width, height]).toEqual(size);
+    expectColor(await colorAt(image, red[0], red[1]), "red");
+    expectColor(await colorAt(image, blue[0], blue[1]), "blue");
+    await expectStrippedJpeg(image);
+  });
+
+  it.each([90, 270] as const)("swaps width and height at %i°, scaling to at most 2048 px on the long side", async (rotation) => {
+    const result = await processImportPage(await jpeg(4096, 3072), {}, rotation);
+    if (!result.ok) throw new Error(result.reason);
+    const { width, height } = await sharp(result.value.image).metadata();
+    expect([width, height]).toEqual([1536, 2048]);
+  });
+
+  it("never turns a recipe photo (REC-7 is unchanged): processPhoto has no turn", async () => {
+    const result = await processPhoto(await jpeg());
+    if (!result.ok) throw new Error(result.reason);
+    expectColor(await colorAt(result.value.photo, 5, 20), "red");
+  });
+});

@@ -4,6 +4,7 @@ import { Worker, type WorkerOptions } from "node:worker_threads";
 // Not used on this thread, but loaded here on purpose: sharp's documentation asks for it to be loaded on the main thread before
 // any worker uses it, so its native libraries stay loaded when a worker ends (glibc Linux, which the API runs on).
 import "sharp";
+import type { PhotoRotation } from "@recipebox/shared";
 import {
   type ConversionPurpose,
   type ConversionResult,
@@ -157,7 +158,7 @@ function convertInWorker(
   bytes: Buffer,
   type: ImageType,
   purpose: ConversionPurpose,
-  crop: PixelArea | undefined,
+  { crop, rotation }: DecodeExtras,
   { timeoutMs = DECODE_TIMEOUT_MS, workerUrl = defaultWorkerUrl(), createWorker = startWorker }: PhotoProcessingOptions,
 ): Promise<ConversionResult> {
   return new Promise((resolve) => {
@@ -181,7 +182,14 @@ function convertInWorker(
     const fail = (detail: string): void => finish({ ok: false, detail });
 
     try {
-      worker = createWorker(workerUrl, { workerData: { bytes, type, purpose, ...(crop === undefined ? {} : { crop }) } });
+      const workerData = {
+        bytes,
+        type,
+        purpose,
+        ...(crop === undefined ? {} : { crop }),
+        ...(rotation === undefined ? {} : { rotation }),
+      };
+      worker = createWorker(workerUrl, { workerData });
     } catch (error) {
       fail(`could not start the photo worker: ${String(error)}`);
       return;
@@ -236,7 +244,7 @@ async function recipePhoto(
   crop: PixelArea | undefined,
   options: PhotoProcessingOptions,
 ): Promise<ProcessingResult> {
-  const result = await decodeInQueue(bytes, "recipe", options, crop);
+  const result = await decodeInQueue(bytes, "recipe", options, crop === undefined ? {} : { crop });
   if (!result.ok) return result;
   const { photo, thumbnail } = result.value;
   if (thumbnail === undefined) throw new Error("The photo worker answered a recipe photo without a thumbnail");
@@ -258,14 +266,25 @@ export type ImportPageResult =
 
 /**
  * Checks and converts the page photo of an import (IMP-2; docs/architecture.md, "Recipe import") with the same checks, decode
- * worker and queue as a recipe photo (processPhoto): the same accepted types, pixel limit, rotation and removal of all
- * metadata, so no location reaches the reading service. It makes one JPEG of at most IMPORT_PAGE_MAX_SIDE on its longer side
- * and no thumbnail.
+ * worker and queue as a recipe photo (processPhoto): the same accepted types, pixel limit, camera rotation and removal of all
+ * metadata, so no location reaches the reading service. After the camera's rotation, the page is turned `rotation` degrees
+ * clockwise, as the editor turned it (IMP-1). It makes one JPEG of at most IMPORT_PAGE_MAX_SIDE on its longer side and no
+ * thumbnail.
  */
-export async function processImportPage(bytes: Buffer, options: PhotoProcessingOptions = {}): Promise<ImportPageResult> {
-  const result = await decodeInQueue(bytes, "importPage", options);
+export async function processImportPage(
+  bytes: Buffer,
+  options: PhotoProcessingOptions = {},
+  rotation: PhotoRotation = 0,
+): Promise<ImportPageResult> {
+  const result = await decodeInQueue(bytes, "importPage", options, { rotation });
   if (!result.ok) return result;
   return { ok: true, value: { image: toBuffer(result.value.photo), contentType: STORED_CONTENT_TYPE } };
+}
+
+/** What a decode is asked for besides the image: an area to cut (IMP-9), or how far to turn a page photo (IMP-1). */
+interface DecodeExtras {
+  crop?: PixelArea;
+  rotation?: PhotoRotation;
 }
 
 /** The type check, then one decode through the shared queue, for either purpose. */
@@ -273,14 +292,14 @@ async function decodeInQueue(
   bytes: Buffer,
   purpose: ConversionPurpose,
   options: PhotoProcessingOptions,
-  crop?: PixelArea,
+  extras: DecodeExtras = {},
 ): Promise<
   | { ok: true; value: { photo: Uint8Array; thumbnail?: Uint8Array } }
   | { ok: false; reason: "unsupportedType" | "unreadable" | "busy" }
 > {
   const type = detectImageType(bytes);
   if (type === undefined) return { ok: false, reason: "unsupportedType" };
-  const decoding = (options.queue ?? sharedDecodeQueue).run(() => convertInWorker(bytes, type, purpose, crop, options));
+  const decoding = (options.queue ?? sharedDecodeQueue).run(() => convertInWorker(bytes, type, purpose, extras, options));
   if (decoding === undefined) {
     options.log?.warn({ type, purpose }, "photo refused: too many uploads are waiting to be decoded");
     return { ok: false, reason: "busy" };

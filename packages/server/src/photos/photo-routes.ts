@@ -96,29 +96,59 @@ export async function readUpload(request: FastifyRequest): Promise<Upload> {
 
 /**
  * Why a multi-file upload can't be read: no file part, or a part that isn't a file (`required`); more files than allowed
- * (`tooMany`); or file `index` (from 0) over 15 MB (`tooLarge`).
+ * (`tooMany`); file `index` (from 0) over 15 MB (`tooLarge`); or a text part sent as JSON that isn't JSON (`textPart`).
  */
-export type UploadsProblem = { kind: "required" } | { kind: "tooMany" } | { kind: "tooLarge"; index: number };
+export type UploadsProblem =
+  | { kind: "required" }
+  | { kind: "tooMany" }
+  | { kind: "tooLarge"; index: number }
+  | { kind: "textPart" };
 
-export type Uploads = { ok: true; files: Buffer[] } | { ok: false; problem: UploadsProblem };
+/**
+ * The one text part an upload may have besides its files, by name: its value as sent (a string, or the parsed JSON when the
+ * part says it is JSON), or `ok: false` when it came after a file or was longer than MAX_TEXT_PART_BYTES.
+ */
+export type TextPart = { ok: true; value: unknown } | { ok: false };
+
+export type Uploads = { ok: true; files: Buffer[]; textPart?: TextPart } | { ok: false; problem: UploadsProblem };
+
+/** The longest text part read (POST /imports `rotations`, which needs about 20 bytes); a longer one is malformed. */
+const MAX_TEXT_PART_BYTES = 256;
 
 /**
  * Reads 1 to `maxFiles` uploaded files, in the order sent, under any field names (POST /imports, docs/api.md). Every file is
  * read before any is decoded, so too many files are refused before any is processed, even when an earlier one is too large:
  * the number is checked first (IMP-2). The 15 MB limit (REC-7) is enforced on each while reading: a file over it stops being
  * buffered at the limit and is dropped, so the body holds at most `maxFiles` files of 15 MB plus the form's overhead.
+ *
+ * With `textPartName`, one text part of that name may come before the files (POST /imports `rotations`, IMP-1); it is returned
+ * as `textPart` for the caller to check. Any other text part, or a second one, is refused as `required`.
  */
-export async function readUploads(request: FastifyRequest, maxFiles: number): Promise<Uploads> {
+export async function readUploads(request: FastifyRequest, maxFiles: number, textPartName?: string): Promise<Uploads> {
   const files: Buffer[] = [];
-  // One more part than files allowed, so a file past the limit is seen as too many rather than as too many parts.
-  const limits = { fileSize: MAX_PHOTO_BYTES, files: maxFiles, fields: 0, parts: maxFiles + 1 };
+  const fields = textPartName === undefined ? 0 : 1;
+  // One more part than files and fields allowed, so a file past the limit is seen as too many rather than as too many parts.
+  const limits = {
+    fileSize: MAX_PHOTO_BYTES,
+    files: maxFiles,
+    fields,
+    fieldSize: MAX_TEXT_PART_BYTES,
+    parts: maxFiles + fields + 1,
+  };
   let firstTooLarge: number | undefined;
+  let textPart: TextPart | undefined;
   try {
     // Not thrown, so the remaining parts are still read and a file past maxFiles still counts as too many. @fastify/multipart
     // honours throwFileSizeLimit in parts() too, though its types list it only for file() and files().
     const options = { limits, throwFileSizeLimit: false };
     for await (const part of request.parts(options)) {
-      if (part.type !== "file") return { ok: false, problem: { kind: "required" } };
+      if (part.type !== "file") {
+        if (part.fieldname !== textPartName) return { ok: false, problem: { kind: "required" } };
+        // Kept to be refused once every file is read, so that too many files are still reported as such.
+        const wellFormed = files.length === 0 && !part.valueTruncated;
+        textPart = wellFormed ? { ok: true, value: part.value } : { ok: false };
+        continue;
+      }
       const bytes = await part.toBuffer();
       if (part.file.truncated) {
         firstTooLarge ??= files.length;
@@ -131,13 +161,19 @@ export async function readUploads(request: FastifyRequest, maxFiles: number): Pr
     const code = (error as { code?: unknown }).code;
     request.log.info({ err: error }, "photo upload refused while reading");
     if (code === "FST_FILES_LIMIT") return { ok: false, problem: { kind: "tooMany" } };
+    // @fastify/multipart parses a text part sent as application/json itself, and throws when it isn't JSON or is longer than
+    // MAX_TEXT_PART_BYTES. With fields limited to the one allowed text part, that is almost always it (IMP-1).
+    if (code === "FST_INVALID_JSON_FIELD_ERROR" && textPartName !== undefined) {
+      return { ok: false, problem: { kind: "textPart" } };
+    }
     return { ok: false, problem: { kind: "required" } };
   }
   if (firstTooLarge !== undefined) {
     request.log.info({ index: firstTooLarge }, "photo upload refused: a file is too large");
     return { ok: false, problem: { kind: "tooLarge", index: firstTooLarge } };
   }
-  return files.length === 0 ? { ok: false, problem: { kind: "required" } } : { ok: true, files };
+  if (files.length === 0) return { ok: false, problem: { kind: "required" } };
+  return textPart === undefined ? { ok: true, files } : { ok: true, files, textPart };
 }
 
 /**

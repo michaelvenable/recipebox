@@ -3,7 +3,7 @@
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ImportStatus } from "@recipebox/shared";
-import { fetchImports, startImport } from "../api/imports.js";
+import { fetchImports, type ImportPhoto, startImport } from "../api/imports.js";
 import { importKeys, recipeKeys, tagKeys } from "../api/query-keys.js";
 import { useViewer } from "../auth/sign-in.js";
 import { useNotices } from "../layout/notices.js";
@@ -147,7 +147,7 @@ export function useStartImport() {
   const { started } = useContext(ImportsContext);
   return useMutation({
     mutationKey: importKeys.start(),
-    mutationFn: (files: readonly File[]) => startImport(files),
+    mutationFn: (photos: readonly ImportPhoto[]) => startImport(photos),
     onSuccess: (status) => started(status),
   });
 }

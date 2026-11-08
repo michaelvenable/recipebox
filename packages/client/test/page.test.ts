@@ -29,6 +29,15 @@ describe("REC-21 entry boxes", () => {
   });
 });
 
+describe("IMP-1 the Rotate button of each import photo", () => {
+  it("is at least 44 px tall", () => {
+    const start = styles.indexOf(".import-photo-rotate {");
+    const rotate = styles.slice(start, styles.indexOf("}", start));
+    expect(rotate).toContain("min-height: var(--touch);");
+    expect(styles).toMatch(/--touch: 44px;/);
+  });
+});
+
 describe("X-14 dark theme follows the device", () => {
   it("redefines the palette when the device prefers dark", () => {
     const dark = styles.slice(styles.indexOf("@media (prefers-color-scheme: dark)"));

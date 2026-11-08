@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { EditorRecipe, Me } from "@recipebox/shared";
+import { EditorRecipe, ImportStatus, Me } from "@recipebox/shared";
 import { ApiError, apiBaseUrl, apiChange, apiChangeNoContent, apiGet, apiUpload } from "../src/api/client.js";
 import { API, EDITOR, jsonResponse, mockFetch } from "./helpers.js";
 
@@ -71,6 +71,20 @@ describe("API client: requests (docs/api.md, Conventions; docs/architecture.md, 
     const parts = [...(init.body as FormData).entries()];
     expect(parts).toHaveLength(1);
     expect(parts[0]![1]).toBe(file);
+  });
+
+  it("IMP-1: sends text parts, such as POST /imports rotations, before the files, still with X-Requested-By", async () => {
+    const fetchMock = mockFetch(() => jsonResponse(202, { importId: "import-1", status: "reading" }));
+    const files = [new File(["a"], "a.jpg", { type: "image/jpeg" }), new File(["b"], "b.jpg", { type: "image/jpeg" })];
+    await apiUpload("/imports", ImportStatus, files, "POST", { rotations: "[90,0]" });
+    const init = fetchMock.mock.calls[0]![1]!;
+    expect(init.method).toBe("POST");
+    expect(headersOf(init)["x-requested-by"]).toBe("recipebox");
+    expect([...(init.body as FormData).entries()]).toEqual([
+      ["rotations", "[90,0]"],
+      ["photo", files[0]],
+      ["photo", files[1]],
+    ]);
   });
 
   it("rejects a response that doesn't match the shared schema, rather than passing it on", async () => {
