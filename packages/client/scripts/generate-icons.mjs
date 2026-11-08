@@ -13,10 +13,10 @@ const iconsDir = new URL("icons/", publicDir);
 
 const ACCENT = "#2E6A4F"; // --accent, light palette (src/styles.css)
 const PAPER = "#F6F6F3"; // --bg, light palette
-const BOX = "#7FC4A0"; // --accent, dark palette
+const MINT = "#7FC4A0"; // --accent, dark palette
 
 /**
- * A recipe card standing in a box, on the accent green. Everything sits inside the central circle of radius 0.4 × size, the safe
+ * A spoon and a fork side by side, on the accent green (owner's choice, 2026-11-08, option B in the design canvas). Everything sits inside the central circle of radius 0.4 × size, the safe
  * zone of a maskable icon, so the same drawing works when Android crops it to a circle or squircle. `rounded` gives the square
  * rounded corners and transparent edges, for places that show the icon as is (browser tab, desktop install); `false` fills the
  * whole square, for maskable icons and iOS, which round the corners themselves.
@@ -27,12 +27,13 @@ function iconSvg({ rounded }) {
     : `<rect width="512" height="512" fill="${ACCENT}"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   ${background}
-  <rect x="160" y="112" width="192" height="176" rx="14" fill="${PAPER}"/>
-  <rect x="190" y="148" width="132" height="16" rx="8" fill="${ACCENT}"/>
-  <rect x="190" y="184" width="104" height="12" rx="6" fill="${ACCENT}" opacity="0.55"/>
-  <rect x="190" y="212" width="118" height="12" rx="6" fill="${ACCENT}" opacity="0.55"/>
-  <rect x="120" y="236" width="272" height="160" rx="24" fill="${BOX}"/>
-  <rect x="206" y="292" width="100" height="36" rx="10" fill="${PAPER}"/>
+  <ellipse cx="200" cy="184" rx="46" ry="66" fill="${PAPER}"/>
+  <rect x="188" y="232" width="24" height="168" rx="12" fill="${PAPER}"/>
+  <rect x="270" y="112" width="14" height="96" rx="7" fill="${MINT}"/>
+  <rect x="305" y="112" width="14" height="96" rx="7" fill="${MINT}"/>
+  <rect x="340" y="112" width="14" height="96" rx="7" fill="${MINT}"/>
+  <path d="M270 196h84v14c0 26-20 42-42 42s-42-16-42-42z" fill="${MINT}"/>
+  <rect x="300" y="236" width="24" height="164" rx="12" fill="${MINT}"/>
 </svg>
 `;
 }
