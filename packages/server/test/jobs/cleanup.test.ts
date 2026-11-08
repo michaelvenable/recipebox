@@ -424,6 +424,9 @@ class WrappedRepository implements RecipeRepository {
   save(recipe: Recipe) {
     return this.inner.save(recipe);
   }
+  add(recipe: Recipe) {
+    return this.inner.add(recipe);
+  }
   remove(id: RecipeId) {
     return this.inner.remove(id);
   }

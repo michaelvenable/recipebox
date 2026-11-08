@@ -30,6 +30,27 @@ export function recipeRepositoryContract(name: string, createRepository: () => P
       expect(await repository.get(newId())).toBeUndefined();
     });
 
+    describe("add: creates only, so an import can't add its recipe twice (docs/architecture.md, 'Recipe import')", () => {
+      it("stores a new recipe and says so", async () => {
+        const recipe = fullRecipe();
+
+        expect(await repository.add(recipe)).toBe(true);
+
+        expect((await repository.get(recipe.id))?.toSnapshot()).toEqual(recipe.toSnapshot());
+      });
+
+      it("leaves an existing recipe with the same id as it is and says so", async () => {
+        const first = newRecipe("Pancakes");
+        await repository.save(first);
+        const again = valueOf(Recipe.create(first.id, content("Waffles")));
+
+        expect(await repository.add(again)).toBe(false);
+
+        expect((await repository.get(first.id))?.toSnapshot()).toEqual(first.toSnapshot());
+        expect(await repository.list()).toHaveLength(1);
+      });
+    });
+
     it("replaces the stored recipe when saved again", async () => {
       const recipe = newRecipe("Pancakes");
       await repository.save(recipe);

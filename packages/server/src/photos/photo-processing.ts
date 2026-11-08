@@ -8,6 +8,7 @@ import {
   type ConversionPurpose,
   type ConversionResult,
   type ImageType,
+  type PixelArea,
   STORED_CONTENT_TYPE,
 } from "./photo-conversion.js";
 
@@ -16,6 +17,7 @@ export {
   IMPORT_PAGE_MAX_SIDE,
   MAX_INPUT_PIXELS,
   PHOTO_MAX_SIDE,
+  type PixelArea,
   STORED_CONTENT_TYPE,
   THUMBNAIL_MAX_SIDE,
 } from "./photo-conversion.js";
@@ -155,6 +157,7 @@ function convertInWorker(
   bytes: Buffer,
   type: ImageType,
   purpose: ConversionPurpose,
+  crop: PixelArea | undefined,
   { timeoutMs = DECODE_TIMEOUT_MS, workerUrl = defaultWorkerUrl(), createWorker = startWorker }: PhotoProcessingOptions,
 ): Promise<ConversionResult> {
   return new Promise((resolve) => {
@@ -178,7 +181,7 @@ function convertInWorker(
     const fail = (detail: string): void => finish({ ok: false, detail });
 
     try {
-      worker = createWorker(workerUrl, { workerData: { bytes, type, purpose } });
+      worker = createWorker(workerUrl, { workerData: { bytes, type, purpose, ...(crop === undefined ? {} : { crop }) } });
     } catch (error) {
       fail(`could not start the photo worker: ${String(error)}`);
       return;
@@ -212,7 +215,28 @@ function convertInWorker(
  * while the upload is read.
  */
 export async function processPhoto(bytes: Buffer, options: PhotoProcessingOptions = {}): Promise<ProcessingResult> {
-  const result = await decodeInQueue(bytes, "recipe", options);
+  return recipePhoto(bytes, undefined, options);
+}
+
+/**
+ * The recipe photo cut from an import's page photo (IMP-9): `area` of the image, in pixels, made into a display image and a
+ * thumbnail exactly as an uploaded photo (processPhoto), through the same decode worker and queue: oriented, without metadata.
+ * The area must lie within the image; dishPhotoArea (imports/dish-photo.ts) clamps it.
+ */
+export async function processDishPhoto(
+  page: Buffer,
+  area: PixelArea,
+  options: PhotoProcessingOptions = {},
+): Promise<ProcessingResult> {
+  return recipePhoto(page, area, options);
+}
+
+async function recipePhoto(
+  bytes: Buffer,
+  crop: PixelArea | undefined,
+  options: PhotoProcessingOptions,
+): Promise<ProcessingResult> {
+  const result = await decodeInQueue(bytes, "recipe", options, crop);
   if (!result.ok) return result;
   const { photo, thumbnail } = result.value;
   if (thumbnail === undefined) throw new Error("The photo worker answered a recipe photo without a thumbnail");
@@ -249,13 +273,14 @@ async function decodeInQueue(
   bytes: Buffer,
   purpose: ConversionPurpose,
   options: PhotoProcessingOptions,
+  crop?: PixelArea,
 ): Promise<
   | { ok: true; value: { photo: Uint8Array; thumbnail?: Uint8Array } }
   | { ok: false; reason: "unsupportedType" | "unreadable" | "busy" }
 > {
   const type = detectImageType(bytes);
   if (type === undefined) return { ok: false, reason: "unsupportedType" };
-  const decoding = (options.queue ?? sharedDecodeQueue).run(() => convertInWorker(bytes, type, purpose, options));
+  const decoding = (options.queue ?? sharedDecodeQueue).run(() => convertInWorker(bytes, type, purpose, crop, options));
   if (decoding === undefined) {
     options.log?.warn({ type, purpose }, "photo refused: too many uploads are waiting to be decoded");
     return { ok: false, reason: "busy" };

@@ -13,6 +13,11 @@ export interface RecipeRepository {
   list(): Promise<Recipe[]>;
   /** Creates the recipe's document, or replaces it if it exists. */
   save(recipe: Recipe): Promise<void>;
+  /**
+   * Creates the recipe's document only if none has its id; returns false, changing nothing, if one already exists. An import
+   * adds its recipe this way, so a queue message delivered twice can't add it twice (docs/architecture.md, "Recipe import").
+   */
+  add(recipe: Recipe): Promise<boolean>;
   /** Permanently removes the recipe's document (trash cleanup, REC-16). Removing an unknown id does nothing. */
   remove(id: RecipeId): Promise<void>;
   /**

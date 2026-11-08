@@ -26,6 +26,12 @@ export class InMemoryRecipeRepository implements RecipeRepository {
     this.documents.set(snapshot.id, { json: JSON.stringify(snapshot), version: String(++this.saves) as RecipeVersion });
   }
 
+  async add(recipe: Recipe): Promise<boolean> {
+    if (this.documents.has(recipe.id.value)) return false;
+    await this.save(recipe);
+    return true;
+  }
+
   async remove(id: RecipeId): Promise<void> {
     this.documents.delete(id.value);
   }

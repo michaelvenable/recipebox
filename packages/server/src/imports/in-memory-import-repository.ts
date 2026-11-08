@@ -1,4 +1,4 @@
-import { RecipeImport, type RecipeImportSnapshot } from "@recipebox/domain";
+import { type ImportId, RecipeImport, type RecipeImportSnapshot } from "@recipebox/domain";
 import type { ImportRepository } from "./import-repository.js";
 
 /**
@@ -17,6 +17,11 @@ export class InMemoryImportRepository implements ImportRepository {
   async save(recipeImport: RecipeImport): Promise<void> {
     const snapshot = recipeImport.toSnapshot();
     this.documents.set(snapshot.id, JSON.stringify(snapshot));
+  }
+
+  async get(id: ImportId): Promise<RecipeImport | undefined> {
+    const json = this.documents.get(id.value);
+    return json === undefined ? undefined : RecipeImport.fromSnapshot(JSON.parse(json) as RecipeImportSnapshot);
   }
 
   async list(): Promise<RecipeImport[]> {

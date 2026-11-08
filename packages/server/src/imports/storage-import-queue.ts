@@ -3,18 +3,39 @@ import { QueueClient, QueueServiceClient } from "@azure/storage-queue";
 import type { ImportId } from "@recipebox/domain";
 import { managedIdentityCredential } from "../azure-credential.js";
 import type { StorageConfig } from "../config.js";
-import { type ImportQueue, importMessageText } from "./import-queue.js";
+import {
+  IMPORT_MESSAGE_VISIBILITY_SECONDS,
+  type ImportMessageSource,
+  type ImportQueue,
+  importMessageText,
+  type ReceivedImportMessage,
+} from "./import-queue.js";
 
 /**
  * The `imports` Storage queue (docs/architecture.md, "Recipe import"). Messages are plain JSON text with the import's id and
  * the queue's default time to live: a message the job hasn't taken within the 10 minutes still starts it, so it can end the
  * import as `timed-out` (IMP-11).
  */
-export class StorageImportQueue implements ImportQueue {
+export class StorageImportQueue implements ImportQueue, ImportMessageSource {
   constructor(private readonly queue: QueueClient) {}
 
   async send(importId: ImportId): Promise<void> {
     await this.queue.sendMessage(importMessageText(importId));
+  }
+
+  async receive(): Promise<ReceivedImportMessage | undefined> {
+    const { receivedMessageItems } = await this.queue.receiveMessages({
+      numberOfMessages: 1,
+      visibilityTimeout: IMPORT_MESSAGE_VISIBILITY_SECONDS,
+    });
+    const item = receivedMessageItems[0];
+    if (item === undefined) return undefined;
+    return {
+      text: item.messageText,
+      delete: async () => {
+        await this.queue.deleteMessage(item.messageId, item.popReceipt);
+      },
+    };
   }
 }
 

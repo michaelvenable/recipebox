@@ -29,6 +29,23 @@ export function importRepositoryContract(name: string, createRepository: () => P
       expect(snapshotsOf(await repository.list())).toEqual([first.toSnapshot()]);
     });
 
+    it("gets one import by id, as the import job does", async () => {
+      const a = startedImport();
+      const b = startedImport("2026-11-07T09:05:00Z");
+      await repository.add(a);
+      await repository.add(b);
+      valueOf(b.succeed(bananaBread(), at("2026-11-07T09:06:00Z")));
+      await repository.save(b);
+
+      expect((await repository.get(a.id))?.toSnapshot()).toEqual(a.toSnapshot());
+      expect((await repository.get(b.id))?.toSnapshot()).toEqual(b.toSnapshot());
+    });
+
+    it("gets undefined for an unknown id", async () => {
+      await repository.add(startedImport());
+      expect(await repository.get(startedImport().id)).toBeUndefined();
+    });
+
     it("IMP-3: keeps any number of imports, each in progress on its own", async () => {
       const a = startedImport("2026-11-07T09:00:00Z");
       const b = startedImport("2026-11-07T09:00:30Z");

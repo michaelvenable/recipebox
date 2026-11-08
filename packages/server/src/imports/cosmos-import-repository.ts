@@ -1,5 +1,5 @@
 import { type Container, type CosmosClient, ErrorResponse } from "@azure/cosmos";
-import { RecipeImport, type RecipeImportSnapshot } from "@recipebox/domain";
+import { type ImportId, RecipeImport, type RecipeImportSnapshot } from "@recipebox/domain";
 import type { ImportRepository } from "./import-repository.js";
 
 /**
@@ -42,11 +42,21 @@ export class CosmosImportRepository implements ImportRepository {
     await this.container.item(document.id, document.id).replace(document);
   }
 
+  async get(id: ImportId): Promise<RecipeImport | undefined> {
+    // read() reports a missing document as a 404 response with no resource, rather than throwing.
+    const { resource } = await this.container.item(id.value, id.value).read<ImportDocument & CosmosSystemProperties>();
+    return resource === undefined ? undefined : toRecipeImport(resource);
+  }
+
   async list(): Promise<RecipeImport[]> {
     // Cosmos DB stops returning a document once its time to live has passed, even before it deletes it.
     const { resources } = await this.container.items.readAll<ImportDocument & CosmosSystemProperties>().fetchAll();
-    return resources.map(({ _rid, _self, _etag, _attachments, _ts, ttl, ...snapshot }) => RecipeImport.fromSnapshot(snapshot));
+    return resources.map(toRecipeImport);
   }
+}
+
+function toRecipeImport({ _rid, _self, _etag, _attachments, _ts, ttl, ...snapshot }: ImportDocument & CosmosSystemProperties) {
+  return RecipeImport.fromSnapshot(snapshot);
 }
 
 /**

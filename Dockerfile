@@ -1,14 +1,18 @@
 # syntax=docker/dockerfile:1
 #
-# The RecipeBox server image, for Azure Container Apps (docs/architecture.md, "Overview" and "Decisions"). One image serves both:
+# The RecipeBox server image, for Azure Container Apps (docs/architecture.md, "Overview" and "Decisions"). One image serves all
+# three:
 #
 #   API (default command):        node --enable-source-maps dist/main.js
 #     The Fastify API, listening on PORT (default 3000).
 #   Daily trash cleanup (job):    node --enable-source-maps dist/cleanup.js
 #     The Container Apps Job overrides the command with this (docs/architecture.md, "Trash cleanup"). It runs once and exits
 #     non-zero if any step failed.
+#   Import a recipe from a photo (job): node --enable-source-maps dist/import.js
+#     The queue-started Container Apps Job overrides the command with this (docs/architecture.md, "Recipe import"). It takes
+#     one message from the imports queue, processes it and exits.
 #
-# Both run in deployed mode: APP_ENV is deliberately not set here, so every setting is required and the app refuses to start
+# All run in deployed mode: APP_ENV is deliberately not set here, so every setting is required and the app refuses to start
 # without them (packages/server/src/config.ts). Settings come from the container app or job, never from the image; Cosmos DB
 # and Blob Storage are reached with the managed identity, so there are no keys to pass (docs/architecture.md, "Access to Cosmos
 # DB and Blob Storage"). The client is not in this image; it is deployed to Static Web Apps.

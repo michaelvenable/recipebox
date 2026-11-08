@@ -35,11 +35,23 @@ export type ImageType = "jpeg" | "png" | "webp";
  */
 export type ConversionPurpose = "recipe" | "importPage";
 
-/** What a worker is given. Without `purpose`, a recipe photo. */
+/** An area of an image in pixels, from its top-left corner as displayed. */
+export interface PixelArea {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * What a worker is given. Without `purpose`, a recipe photo. With `crop`, a recipe photo is made from that area of the image
+ * only: the dish picture on an import's page photo (IMP-9).
+ */
 export interface ConversionRequest {
   bytes: Uint8Array;
   type: ImageType;
   purpose?: ConversionPurpose;
+  crop?: PixelArea;
 }
 
 /**
@@ -54,14 +66,16 @@ export type ConversionResult = { ok: true; photo: Uint8Array; thumbnail?: Uint8A
  * - all metadata is dropped: EXIF (including GPS location), XMP, IPTC, comments and ICC profiles. Recipes are public (X-1) and
  *   phone photos record where they were taken. Colors are converted to sRGB first, so dropping the profile doesn't shift them.
  */
-export async function convertPhoto({ bytes, type, purpose = "recipe" }: ConversionRequest): Promise<ConversionResult> {
+export async function convertPhoto({ bytes, type, purpose = "recipe", crop }: ConversionRequest): Promise<ConversionResult> {
   try {
     const source = await decode(bytes, type);
     if (!source.ok) return source;
     if (purpose === "importPage") return await convertImportPage(source.image);
+    // IMP-9: the area is cut from the oriented image first, so the rest is exactly as for an uploaded photo.
+    const image = crop === undefined ? source.image : source.image.extract(crop);
     // The one decode: the source at display size, flattened onto white and in sRGB, as raw pixels without any metadata. JPEG
     // sources are shrunk while they are decoded, so a large photo never exists at full size here.
-    const { data, info } = await source.image
+    const { data, info } = await image
       .resize({ width: PHOTO_MAX_SIDE, height: PHOTO_MAX_SIDE, fit: "inside", withoutEnlargement: true })
       .flatten({ background: "#ffffff" })
       .toColourspace("srgb")

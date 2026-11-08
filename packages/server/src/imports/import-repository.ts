@@ -1,4 +1,4 @@
-import type { RecipeImport } from "@recipebox/domain";
+import type { ImportId, RecipeImport } from "@recipebox/domain";
 
 /**
  * Stores imports, one document per import holding exactly `recipeImport.toSnapshot()`, keyed by the import id (IMP-3;
@@ -11,6 +11,8 @@ export interface ImportRepository {
   add(recipeImport: RecipeImport): Promise<void>;
   /** Replaces a stored import, such as one ended as failed. */
   save(recipeImport: RecipeImport): Promise<void>;
+  /** The stored import with this id, or undefined if there is none (never stored, or removed after a day). */
+  get(id: ImportId): Promise<RecipeImport | undefined>;
   /** Every stored import, in no particular order; callers sort. */
   list(): Promise<RecipeImport[]>;
 }

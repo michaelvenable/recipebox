@@ -17,6 +17,7 @@
     "dev:client": "npm run dev -w @recipebox/client",
     "start:server": "npm run start -w @recipebox/server",
     "cleanup:server": "npm run cleanup:start -w @recipebox/server",
+    "import:dev": "npm run import:dev -w @recipebox/server",
     "test:int": "vitest run --config vitest.int.config.ts",
     "services:up": "docker compose up -d",
     "services:down": "docker compose down"

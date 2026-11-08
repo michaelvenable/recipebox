@@ -38,6 +38,17 @@ export class CosmosRecipeRepository implements RecipeRepository {
     await this.container.items.upsert(recipe.toSnapshot());
   }
 
+  async add(recipe: Recipe): Promise<boolean> {
+    try {
+      await this.container.items.create(recipe.toSnapshot());
+      return true;
+    } catch (error) {
+      // 409: a document with this id already exists; it is left as it is.
+      if (error instanceof ErrorResponse && error.code === 409) return false;
+      throw error;
+    }
+  }
+
   async remove(id: RecipeId): Promise<void> {
     try {
       await this.container.item(id.value, id.value).delete();
