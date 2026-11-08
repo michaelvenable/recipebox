@@ -139,12 +139,15 @@ export function useReadingImports(): readonly Reading[] {
   return reading;
 }
 
-/** POST /imports (IMP-1, IMP-3, IMP-4). Once the photo is uploaded, the import is watched from any page, even if the form has gone. */
+/**
+ * POST /imports (IMP-1, IMP-3, IMP-4). Once the photos are uploaded, the import is watched from any page, even if the form has
+ * gone.
+ */
 export function useStartImport() {
   const { started } = useContext(ImportsContext);
   return useMutation({
     mutationKey: importKeys.start(),
-    mutationFn: (file: File) => startImport(file),
+    mutationFn: (files: readonly File[]) => startImport(files),
     onSuccess: (status) => started(status),
   });
 }

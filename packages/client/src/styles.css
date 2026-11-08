@@ -1684,6 +1684,72 @@ button.pill-button:disabled {
   opacity: 0.6;
 }
 
+/* The photos of one recipe chosen for import (IMP-1, docs/mockups/ImportPhotos.dc.html). */
+.import-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.import-photo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.import-photo-image {
+  display: block;
+  width: 72px;
+  height: 92px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--surface-muted);
+}
+
+.import-photo-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* A 44 px target around a 24 px dot at the preview's corner. */
+.import-photo-remove {
+  position: absolute;
+  top: -12px;
+  right: -14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch);
+  height: var(--touch);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.import-photo-remove > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--text);
+  color: var(--surface);
+}
+
+.import-photo-remove:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .form-divider {
   display: flex;
   align-items: center;

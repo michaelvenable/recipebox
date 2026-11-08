@@ -94,6 +94,17 @@ export function photoStoreContract(name: string, createStore: () => Promise<Phot
       }
     });
 
+    it("lists only the images whose name starts with a prefix, when one is given", async () => {
+      const folder = `imports/${randomUUID()}/`;
+      const inside = [`${folder}1.jpg`, `${folder}2.jpg`];
+      const outside = [photoName(), `imports/${randomUUID()}/1.jpg`, `${folder.slice(0, -1)}.jpg`];
+      for (const name of [...inside, ...outside]) await store.put(name, Buffer.from(name), "image/jpeg");
+
+      const names = (await store.list(folder)).map((image) => image.name);
+
+      expect(names.sort()).toEqual(inside);
+    });
+
     it("doesn't list deleted images", async () => {
       const kept = photoName();
       const deleted = photoName();

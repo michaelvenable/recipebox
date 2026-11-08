@@ -81,12 +81,12 @@ describe("IMP-1 start an import: POST /imports", () => {
     expect(setup.imports.documentsStored()).toStrictEqual([{ id: FIRST_IMPORT_ID, startedAt: START, status: "reading" }]);
   });
 
-  it("stores the page photo as imports/{importId}.jpg, a JPEG without metadata", async () => {
+  it("stores the page photo as imports/{importId}/1.jpg, a JPEG without metadata", async () => {
     const setup = await importApp(START);
     await startImport(setup.app, await phoneJpeg());
 
-    expect(setup.photos.names()).toEqual([`imports/${FIRST_IMPORT_ID}.jpg`]);
-    const image = await setup.photos.get(`imports/${FIRST_IMPORT_ID}.jpg`);
+    expect(setup.photos.names()).toEqual([`imports/${FIRST_IMPORT_ID}/1.jpg`]);
+    const image = await setup.photos.get(`imports/${FIRST_IMPORT_ID}/1.jpg`);
     expect(image?.contentType).toBe("image/jpeg");
     await expectStrippedJpeg(image!.bytes);
   });
@@ -94,9 +94,47 @@ describe("IMP-1 start an import: POST /imports", () => {
   it("scales the page photo to at most 2048 px on its longer side", async () => {
     const setup = await importApp(START);
     await startImport(setup.app, await jpeg(4096, 3072));
-    const image = await setup.photos.get(`imports/${FIRST_IMPORT_ID}.jpg`);
+    const image = await setup.photos.get(`imports/${FIRST_IMPORT_ID}/1.jpg`);
     const { width, height } = await sharp(image!.bytes).metadata();
     expect([width, height]).toEqual([2048, 1536]);
+  });
+
+  it("stores 1 to 4 photos of one recipe as imports/{importId}/{n}.jpg, n from 1 in the order sent, any field names", async () => {
+    const setup = await importApp(START);
+    const sizes = [
+      [100, 50],
+      [60, 40],
+      [40, 60],
+      [50, 100],
+    ] as const;
+    const files = await Promise.all(sizes.map(([w, h]) => jpeg(w, h)));
+    const fields = ["photo", "back", "page", "photo"] as const;
+
+    const res = await startImport(
+      setup.app,
+      files.map((bytes, i) => ({ bytes, field: fields[i]! })),
+    );
+
+    expect(res.statusCode, res.body).toBe(202);
+    const names = [1, 2, 3, 4].map((n) => `imports/${FIRST_IMPORT_ID}/${n}.jpg`);
+    expect(setup.photos.names()).toEqual(names);
+    for (const [i, name] of names.entries()) {
+      const stored = await setup.photos.get(name);
+      const metadata = await expectStrippedJpeg(stored!.bytes);
+      expect([metadata.width, metadata.height], name).toEqual(sizes[i]);
+    }
+    // One import: one record and one message, whatever the number of photos (IMP-3).
+    expect(setup.imports.documentsStored()).toStrictEqual([{ id: FIRST_IMPORT_ID, startedAt: START, status: "reading" }]);
+    expect(setup.queue.messages()).toEqual([JSON.stringify({ importId: FIRST_IMPORT_ID })]);
+  });
+
+  it("removes the metadata of every photo and scales each to at most 2048 px", async () => {
+    const setup = await importApp(START);
+    expect((await startImport(setup.app, [await jpeg(), await phoneJpeg(), await jpeg(4096, 3072)])).statusCode).toBe(202);
+    const third = await setup.photos.get(`imports/${FIRST_IMPORT_ID}/3.jpg`);
+    const { width, height } = await sharp(third!.bytes).metadata();
+    expect([width, height]).toEqual([2048, 1536]);
+    await expectStrippedJpeg((await setup.photos.get(`imports/${FIRST_IMPORT_ID}/2.jpg`))!.bytes);
   });
 
   it("queues one message with the import's id, and nothing else", async () => {
@@ -141,7 +179,8 @@ describe("IMP-2 accepted photos: the same rules and photo.* errors as a recipe p
 
   it("refuses a file over 15 MB with photo.tooLarge; no import starts", async () => {
     const setup = await importApp(START);
-    expectErrors(await startImport(setup.app, paddedJpeg(await jpeg(), MAX_PHOTO_BYTES + 1)), 400, ["photo.tooLarge"]);
+    const body = expectErrors(await startImport(setup.app, paddedJpeg(await jpeg(), MAX_PHOTO_BYTES + 1)), 400, ["photo.tooLarge"]);
+    expect(body.errors[0]?.field).toBe("photos[0]");
     expect(storedState(setup)).toEqual(NOTHING_STORED);
   });
 
@@ -154,12 +193,98 @@ describe("IMP-2 accepted photos: the same rules and photo.* errors as a recipe p
 
   it.each([
     ["no file", async () => multipartBody([])],
-    ["two files: one photo per upload (IMP-3)", async () => multipartBody([{ bytes: await jpeg() }, { field: "other", bytes: await jpeg() }])],
     ["a text field instead of a file", async () => multipartBody([{ field: "photo", value: "hello" }])],
-  ])("refuses %s with photo.required: exactly one file is expected", async (_name, make) => {
+    ["a text field after a file", async () => multipartBody([{ bytes: await jpeg() }, { field: "note", value: "back" }])],
+  ])("refuses %s with photo.required: only 1 to 4 files are expected", async (_name, make) => {
     const setup = await importApp(START);
     const { payload, contentType } = await make();
-    expectErrors(await startImportBody(setup.app, payload, contentType), 400, ["photo.required"]);
+    const body = expectErrors(await startImportBody(setup.app, payload, contentType), 400, ["photo.required"]);
+    expect(body.errors[0]?.field).toBe("photos");
+    expect(storedState(setup)).toEqual(NOTHING_STORED);
+  });
+
+  it("accepts 4 photos", async () => {
+    const setup = await importApp(START);
+    const res = await startImport(setup.app, [await jpeg(), await jpeg(), await jpeg(), await jpeg()]);
+    expect(res.statusCode, res.body).toBe(202);
+  });
+
+  it("'An upload of 5 photos sent to the server': photo.tooMany before any photo is processed; no import", async () => {
+    // A decode queue that is full: any photo processed would be refused as busy (503), so a 400 shows none was.
+    const queue = new DecodeQueue(1, 0);
+    const setup = await importApp(START, { queue });
+    let release = (): void => undefined;
+    const occupied = queue.run(() => new Promise<void>((resolve) => (release = resolve)));
+    const five = [await jpeg(), await jpeg(), await jpeg(), await jpeg(), await jpeg()];
+
+    const body = expectErrors(await startImport(setup.app, five), 400, ["photo.tooMany"]);
+
+    expect(body.errors[0]?.field).toBe("photos");
+    expect(storedState(setup)).toEqual(NOTHING_STORED);
+    release();
+    await occupied;
+  });
+
+  it("refuses 5 photos with the first over 15 MB as too many, not as too large: the number is checked first", async () => {
+    const setup = await importApp(START);
+    const files = [paddedJpeg(await jpeg(), MAX_PHOTO_BYTES + 1), await jpeg(), await jpeg(), await jpeg(), await jpeg()];
+
+    const body = expectErrors(await startImport(setup.app, files), 400, ["photo.tooMany"]);
+
+    expect(body.errors[0]?.field).toBe("photos");
+    expect(storedState(setup)).toEqual(NOTHING_STORED);
+  });
+
+  it("refuses 5 HEIC files as too many, not as unsupported: the number is checked first", async () => {
+    const setup = await importApp(START);
+    const heic = { bytes: phoneHeic(), filename: "IMG_0001.HEIC", contentType: "image/heic" };
+    expectErrors(await startImport(setup.app, [heic, heic, heic, heic, heic]), 400, ["photo.tooMany"]);
+    expect(storedState(setup)).toEqual(NOTHING_STORED);
+  });
+
+  const damaged = async () => ({ bytes: Buffer.concat([(await jpeg()).subarray(0, 4), Buffer.alloc(300, 9)]) });
+  const tooLarge = async () => ({ bytes: paddedJpeg(await jpeg(), MAX_PHOTO_BYTES + 1) });
+
+  it.each([
+    ["a HEIC file as the second photo", 1, "photo.unsupportedType", async () => ({ bytes: phoneHeic(), filename: "b.heic" })],
+    ["a text file as the third photo", 2, "photo.unsupportedType", async () => ({ bytes: TEXT_FILE })],
+    ["a damaged image as the second photo", 1, "photo.unreadable", damaged],
+    ["a file over 15 MB as the fourth photo", 3, "photo.tooLarge", tooLarge],
+    ["a file over 15 MB as the first photo", 0, "photo.tooLarge", tooLarge],
+    ["a file over 15 MB as the second photo", 1, "photo.tooLarge", tooLarge],
+  ])("names the photo refused, %s, as photos[%i]; those already stored are deleted, no import", async (_case, index, code, make) => {
+    const setup = await importApp(START);
+    const files = [await jpeg(), await jpeg(), await jpeg(), await jpeg()].map((bytes) => ({ bytes }));
+    files[index] = await make();
+
+    const body = expectErrors(await startImport(setup.app, files), 400, [code]);
+
+    expect(body.errors[0]?.field).toBe(`photos[${index}]`);
+    expect(storedState(setup)).toEqual(NOTHING_STORED);
+  });
+
+  it("deletes the photos already stored when a later one can't be stored (500); no import starts", async () => {
+    const setup = await importApp(START);
+    setup.photos.putsBeforeFailure = 2;
+
+    expectErrors(await startImport(setup.app, [await jpeg(), await jpeg(), await jpeg()]), 500, ["server.error"]);
+
+    expect(setup.photos.puts).toBe(3);
+    expect(storedState(setup)).toEqual(NOTHING_STORED);
+  });
+
+  it("deletes the photos already stored when a later one is refused as busy (503); no import starts", async () => {
+    // A queue with room for one decode only: the second photo finds it taken.
+    class OneDecode extends DecodeQueue {
+      private decodes = 0;
+      override run<T>(task: () => Promise<T>): Promise<T> | undefined {
+        return ++this.decodes > 1 ? undefined : super.run(task);
+      }
+    }
+    const setup = await importApp(START, { queue: new OneDecode() });
+
+    expectErrors(await startImport(setup.app, [await jpeg(), await jpeg()]), 503, ["photo.busy"]);
+
     expect(storedState(setup)).toEqual(NOTHING_STORED);
   });
 
@@ -190,7 +315,7 @@ describe("IMP-2 accepted photos: the same rules and photo.* errors as a recipe p
   });
 });
 
-describe("IMP-3 one photo per upload, any number at once", () => {
+describe("IMP-3 one recipe per upload, any number at once", () => {
   it("starts a second import while the first is still reading, each with its own record, photo and message", async () => {
     const setup = await appReading();
     setup.clock.set("2026-11-07T09:00:30.000Z");
@@ -203,7 +328,7 @@ describe("IMP-3 one photo per upload, any number at once", () => {
       { id: FIRST_IMPORT_ID, startedAt: START, status: "reading" },
       { id: SECOND_IMPORT_ID, startedAt: "2026-11-07T09:00:30.000Z", status: "reading" },
     ]);
-    expect(setup.photos.names()).toEqual([`imports/${FIRST_IMPORT_ID}.jpg`, `imports/${SECOND_IMPORT_ID}.jpg`]);
+    expect(setup.photos.names()).toEqual([`imports/${FIRST_IMPORT_ID}/1.jpg`, `imports/${SECOND_IMPORT_ID}/1.jpg`]);
     expect(setup.queue.messages()).toEqual([
       JSON.stringify({ importId: FIRST_IMPORT_ID }),
       JSON.stringify({ importId: SECOND_IMPORT_ID }),
@@ -250,18 +375,18 @@ describe("IMP-4 if the upload fails, no import is in progress and nothing is lef
     expect(storedState(setup)).toEqual(NOTHING_STORED);
   });
 
-  it("deletes the photo when the record can't be stored (500)", async () => {
+  it("deletes the photos when the record can't be stored (500)", async () => {
     const setup = await importApp(START);
     setup.imports.failAdds = true;
-    expectErrors(await startImport(setup.app, await jpeg()), 500, ["server.error"]);
+    expectErrors(await startImport(setup.app, [await jpeg(), await jpeg()]), 500, ["server.error"]);
     expect(storedState(setup)).toEqual(NOTHING_STORED);
   });
 
-  it("ends the import as failed and deletes the photo when it can't be queued (500)", async () => {
+  it("ends the import as failed and deletes all its photos when it can't be queued (500)", async () => {
     const setup = await importApp(START);
     setup.queue.failSends = true;
 
-    expectErrors(await startImport(setup.app, await jpeg()), 500, ["server.error"]);
+    expectErrors(await startImport(setup.app, [await jpeg(), await jpeg(), await jpeg()]), 500, ["server.error"]);
 
     expect(setup.photos.names()).toEqual([]);
     expect(setup.imports.documentsStored()).toStrictEqual([{ id: FIRST_IMPORT_ID, startedAt: START, status: "failed" }]);
@@ -432,10 +557,10 @@ describe("X-1, IMP-5 imports are private", () => {
   });
 });
 
-describe("IMP-12 the page photo is never shown", () => {
+describe("IMP-12 the page photos are never shown", () => {
   it("is not served by the photo routes, to editors or visitors", async () => {
     const setup = await appReading();
-    expect(await setup.photos.get(`imports/${FIRST_IMPORT_ID}.jpg`)).toBeDefined();
+    expect(await setup.photos.get(`imports/${FIRST_IMPORT_ID}/1.jpg`)).toBeDefined();
 
     for (const as of [AS_EDITOR, AS_VISITOR]) {
       for (const path of ["photo", "thumbnail"]) {
@@ -447,12 +572,12 @@ describe("IMP-12 the page photo is never shown", () => {
   });
 
   it("is not a recipe image name, so the trash cleanup's orphan sweep never deletes it", () => {
-    expect(isRecipeImageName(`imports/${FIRST_IMPORT_ID}.jpg`)).toBe(false);
+    expect(isRecipeImageName(`imports/${FIRST_IMPORT_ID}/1.jpg`)).toBe(false);
   });
 
   it("is not reachable through a path that names it", async () => {
     const setup = await appReading();
-    for (const url of [`/imports/${FIRST_IMPORT_ID}.jpg`, `/imports/${FIRST_IMPORT_ID}`, `/imports/${FIRST_IMPORT_ID}/photo`]) {
+    for (const url of [`/imports/${FIRST_IMPORT_ID}/1.jpg`, `/imports/${FIRST_IMPORT_ID}`, `/imports/${FIRST_IMPORT_ID}/photo`]) {
       for (const as of [AS_EDITOR, AS_VISITOR]) {
         const res = await get(setup.app, url, as);
         expect(res.statusCode, url).toBe(404);

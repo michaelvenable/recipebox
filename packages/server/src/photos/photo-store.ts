@@ -25,8 +25,9 @@ export interface PhotoStore {
   /** Deletes the image stored under `name`. Deleting a name that holds nothing does nothing and is not an error. */
   delete(name: string): Promise<void>;
   /**
-   * Every stored image's full name with the time it was last stored, in no particular order. The trash cleanup uses it to find
-   * images no recipe refers to (docs/architecture.md, "Trash cleanup").
+   * Every stored image's full name with the time it was last stored, in no particular order; only those whose name starts with
+   * `prefix`, if given. The trash cleanup uses it to find images no recipe refers to (docs/architecture.md, "Trash cleanup"),
+   * and the import job to find an import's page photos, `imports/{importId}/` (IMP-12).
    */
-  list(): Promise<StoredImageInfo[]>;
+  list(prefix?: string): Promise<StoredImageInfo[]>;
 }

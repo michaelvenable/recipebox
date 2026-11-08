@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from "react-router";
 import { ApiError } from "../api/client.js";
 import { recipeKeys } from "../api/query-keys.js";
 import { createRecipe, removePhoto, saveRecipeContent, uploadPhoto } from "../api/recipes.js";
-import { ImportPanel } from "../imports/ImportPanel.js";
+import { ImportPanel, importUploadProblem } from "../imports/ImportPanel.js";
 import { useStartImport } from "../imports/imports.js";
 import { useNotices } from "../layout/notices.js";
 import { TopBar } from "../layout/top-bar.js";
@@ -168,15 +168,18 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
     setProblem({ errors: photoErrorsOf(result.photoError), contentSaved: true, photo });
   }
 
-  /** IMP-4: once uploaded, to the Catalog with a message; if the upload fails, stay here and say so. */
-  async function importPhoto(file: File) {
+  /**
+   * IMP-4: once uploaded, to the Catalog with a message; if the upload fails, stay here and say so, with the photos still in
+   * the panel to try again.
+   */
+  async function importPhotos(files: readonly File[]) {
     if (busy) return;
     setImportError(undefined);
     try {
-      await importing.mutateAsync(file);
+      await importing.mutateAsync(files);
     } catch (error) {
-      // The server's photo.* message when it refused the photo (IMP-2), otherwise why it didn't get through.
-      if (mounted.current) setImportError(`The photo wasn't uploaded. ${changeErrorMessage(error)}`);
+      // The server's photo.* message when it refused a photo (IMP-2), otherwise why it didn't get through.
+      if (mounted.current) setImportError(importUploadProblem(error, files.length));
       return;
     }
     if (!mounted.current) return;
@@ -227,7 +230,14 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
 
       <form id={`${id}-form`} className="recipe-form" onSubmit={onSubmit} noValidate>
         <fieldset className="form-fields" disabled={busy}>
-          {saved.id === undefined && <ImportPanel uploading={importing.isPending} error={importError} onPick={(file) => void importPhoto(file)} />}
+          {saved.id === undefined && (
+            <ImportPanel
+              uploading={importing.isPending}
+              error={importError}
+              onImport={(files) => void importPhotos(files)}
+              onPhotosChange={() => setImportError(undefined)}
+            />
+          )}
 
           <div className="field">
             <label htmlFor={`${id}-name`} className="field-title">

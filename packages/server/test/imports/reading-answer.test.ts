@@ -2,14 +2,14 @@
 // domain sees it.
 import { describe, expect, it } from "vitest";
 import { ImportId } from "@recipebox/domain";
-import { dishPhotoArea } from "../../src/imports/dish-photo.js";
+import { dishPhotoArea, dishPhotoPage } from "../../src/imports/dish-photo.js";
 import { importedRecipeId } from "../../src/imports/imported-recipe-id.js";
 import { parseReadingAnswer } from "../../src/imports/reading-answer.js";
 import { answer } from "./process-import-helpers.js";
 
 describe("IMP-6 / IMP-11 the answer's shape", () => {
   it("gives the recipe that was read", () => {
-    expect(parseReadingAnswer(answer({ tags: ["baking"], dishPhoto: { left: 0.1, top: 0.2, width: 0.3, height: 0.4 } })))
+    expect(parseReadingAnswer(answer({ tags: ["baking"], dishPhoto: { photo: 2, left: 0.1, top: 0.2, width: 0.3, height: 0.4 } })))
       .toEqual({
         ok: true,
         value: {
@@ -22,7 +22,7 @@ describe("IMP-6 / IMP-11 the answer's shape", () => {
             totalTimeMinutes: 75,
             tags: ["baking"],
           },
-          dishPhoto: { left: 0.1, top: 0.2, width: 0.3, height: 0.4 },
+          dishPhoto: { photo: 2, left: 0.1, top: 0.2, width: 0.3, height: 0.4 },
         },
       });
   });
@@ -40,6 +40,11 @@ describe("IMP-6 / IMP-11 the answer's shape", () => {
     expect(parsed).toMatchObject({ ok: true, value: { found: true, recipe: { tags: [] } } });
   });
 
+  it("IMP-9: keeps a recipe whose box names a fractional photo; which photo that is, none, is decided later", () => {
+    const parsed = parseReadingAnswer(answer({ dishPhoto: { photo: 1.5, left: 0, top: 0, width: 1, height: 1 } }));
+    expect(parsed).toMatchObject({ ok: true, value: { found: true, dishPhoto: { photo: 1.5 } } });
+  });
+
   it("is not found when found is false, whatever else it holds", () => {
     expect(parseReadingAnswer(answer({ found: false }))).toEqual({ ok: true, value: { found: false } });
   });
@@ -51,7 +56,8 @@ describe("IMP-6 / IMP-11 the answer's shape", () => {
     ["a field of the wrong type", answer({ ingredients: "3 bananas" })],
     ["a fractional total time", answer({ totalTimeMinutes: 12.5 })],
     ["an extra field", answer({ notes: "Grandma's favourite" })],
-    ["an extra field in the box", answer({ dishPhoto: { left: 0, top: 0, width: 1, height: 1, label: "loaf" } })],
+    ["an extra field in the box", answer({ dishPhoto: { photo: 1, left: 0, top: 0, width: 1, height: 1, label: "loaf" } })],
+    ["IMP-9: a box without the photo it is on", answer({ dishPhoto: { left: 0, top: 0, width: 1, height: 1 } })],
   ])("refuses %s, without quoting the answer", (_case, raw) => {
     const parsed = parseReadingAnswer(raw);
     expect(parsed.ok).toBe(false);
@@ -61,6 +67,26 @@ describe("IMP-6 / IMP-11 the answer's shape", () => {
 
   it("names the field that doesn't fit", () => {
     expect(parseReadingAnswer(answer({ steps: [1] }))).toEqual({ ok: false, detail: expect.stringContaining("steps.0") });
+  });
+});
+
+describe("IMP-9 the photo the dish picture is on: from 1, in the order given", () => {
+  const pages = ["front", "back"] as const;
+  const box = { left: 0, top: 0, width: 1, height: 1 };
+
+  it.each([
+    [1, "front"],
+    [2, "back"],
+  ])("photo %i is the photo added in that place", (photo, page) => {
+    expect(dishPhotoPage({ ...box, photo }, pages)).toBe(page);
+  });
+
+  it.each([0, -1, 3, 4])("means no photo for photo %i, which doesn't exist", (photo) => {
+    expect(dishPhotoPage({ ...box, photo }, pages)).toBeUndefined();
+  });
+
+  it("means no photo when there is no box", () => {
+    expect(dishPhotoPage(undefined, pages)).toBeUndefined();
   });
 });
 

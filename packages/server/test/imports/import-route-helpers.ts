@@ -31,12 +31,17 @@ export class TestImportRepository extends InMemoryImportRepository {
   }
 }
 
-/** A photo store whose writes can be made to fail. */
+/** A photo store whose writes can be made to fail: all of them, or every one after the first `putsBeforeFailure`. */
 export class TestPhotoStore extends InMemoryPhotoStore {
   failPuts = false;
+  putsBeforeFailure: number | undefined;
+  puts = 0;
 
   override async put(name: string, bytes: Buffer, contentType: string): Promise<void> {
-    if (this.failPuts) throw new Error("Blob Storage is unavailable");
+    this.puts += 1;
+    if (this.failPuts || (this.putsBeforeFailure !== undefined && this.puts > this.putsBeforeFailure)) {
+      throw new Error("Blob Storage is unavailable");
+    }
     return super.put(name, bytes, contentType);
   }
 }
@@ -90,13 +95,17 @@ export async function importApp(
 /** How the client sends an upload: as an editor, with X-Requested-By (docs/api.md, "Conventions"). */
 export const AS_EDITOR_UPLOADING = { ...AS_EDITOR, ...UPLOAD_HEADERS };
 
-/** POST /imports with one file, as the app sends it, unless `headers` says otherwise. */
+/**
+ * POST /imports with one file, or several in order, as the app sends them (each as a `photo` part, unless a FilePart names
+ * another field), unless `headers` says otherwise.
+ */
 export function startImport(
   app: FastifyInstance,
-  file: FilePart | Buffer,
+  files: FilePart | Buffer | readonly (FilePart | Buffer)[],
   headers: Record<string, string> = AS_EDITOR_UPLOADING,
 ): Promise<LightMyRequestResponse> {
-  const { payload, contentType } = multipartBody([Buffer.isBuffer(file) ? { bytes: file } : file]);
+  const list = Array.isArray(files) ? files : [files as FilePart | Buffer];
+  const { payload, contentType } = multipartBody(list.map((file) => (Buffer.isBuffer(file) ? { bytes: file } : file)));
   return startImportBody(app, payload, contentType, headers);
 }
 

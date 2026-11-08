@@ -19,7 +19,7 @@ interface PhotoFieldProps {
 }
 
 /** A temporary address for previewing a picked file, released when the file changes or the field goes. */
-function useObjectUrl(file: File | undefined): string | undefined {
+export function useObjectUrl(file: File | undefined): string | undefined {
   const [url, setUrl] = useState<string>();
   useEffect(() => {
     if (file === undefined) {

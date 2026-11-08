@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Writable } from "node:stream";
 import { pino } from "pino";
 import { ImportId, Recipe, RecipeImport } from "@recipebox/domain";
-import { importPageName } from "../../src/imports/import-page-name.js";
+import { importPageName, importPagesPrefix } from "../../src/imports/import-page-name.js";
 import { InMemoryImportRepository } from "../../src/imports/in-memory-import-repository.js";
 import {
   type ImportOutcome,
@@ -21,7 +21,8 @@ export const STARTED = "2026-11-07T09:00:00.000Z";
 
 /** One call the job made to the reading service. */
 export interface ReaderCall {
-  image: Buffer;
+  /** The page photos sent, in order, in one request (IMP-3, IMP-6). */
+  images: readonly Buffer[];
   allowedTags: readonly string[];
   signal: AbortSignal;
 }
@@ -32,8 +33,8 @@ export class FakeReader implements RecipeReader {
 
   constructor(public answer: (call: ReaderCall) => Promise<string>) {}
 
-  read(image: Buffer, allowedTags: readonly string[], signal: AbortSignal): Promise<string> {
-    const call = { image, allowedTags, signal };
+  read(images: readonly Buffer[], allowedTags: readonly string[], signal: AbortSignal): Promise<string> {
+    const call = { images, allowedTags, signal };
     this.calls.push(call);
     return this.answer(call);
   }
@@ -90,18 +91,24 @@ export class ImportJobFixture {
     };
   }
 
-  /** Starts an import at STARTED, as POST /imports does: its page photo, then its record. */
-  async startImport(page?: Buffer): Promise<ImportId> {
+  /** Starts an import at STARTED, as POST /imports does: its page photos (one by default), then its record. */
+  async startImport(pages?: Buffer | readonly Buffer[]): Promise<ImportId> {
     const created = ImportId.create(randomUUID());
     if (!created.ok) throw new Error("not a UUID");
     const id = created.value;
-    await this.photos.put(importPageName(id), page ?? (await jpeg()), "image/jpeg");
+    const list = pages === undefined ? [await jpeg()] : Buffer.isBuffer(pages) ? [pages] : pages;
+    for (const [index, page] of list.entries()) await this.photos.put(importPageName(id, index + 1), page, "image/jpeg");
     await this.imports.add(RecipeImport.start(id, instant(STARTED)));
     return id;
   }
 
   process(id: ImportId, overrides: Partial<ImportProcessingDependencies> = {}): Promise<ImportOutcome> {
     return processImport(id, this.dependencies(overrides));
+  }
+
+  /** The names of the import's page photos still stored. */
+  pagesKept(id: ImportId): string[] {
+    return this.photos.names().filter((name) => name.startsWith(importPagesPrefix(id)));
   }
 
   async record(id: ImportId): Promise<RecipeImport> {

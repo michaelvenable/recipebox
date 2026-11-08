@@ -25,8 +25,10 @@ export class InMemoryPhotoStore implements PhotoStore {
     this.images.delete(name);
   }
 
-  async list(): Promise<StoredImageInfo[]> {
-    return [...this.images].map(([name, image]) => ({ name, lastModified: image.lastModified }));
+  async list(prefix = ""): Promise<StoredImageInfo[]> {
+    return [...this.images]
+      .filter(([name]) => name.startsWith(prefix))
+      .map(([name, image]) => ({ name, lastModified: image.lastModified }));
   }
 
   /** Every stored name, sorted; for tests that check which images exist. */

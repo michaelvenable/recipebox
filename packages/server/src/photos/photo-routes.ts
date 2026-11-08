@@ -39,7 +39,7 @@ interface IdParams {
 
 export type Upload = { ok: true; bytes: Buffer } | { ok: false; error: ErrorItem };
 
-const TOO_LARGE: ErrorItem = {
+export const TOO_LARGE: ErrorItem = {
   code: "photo.tooLarge",
   field: "photo",
   message: "The photo is larger than 15 MB. Choose a smaller one.",
@@ -92,6 +92,52 @@ export async function readUpload(request: FastifyRequest): Promise<Upload> {
     return { ok: false, error: code === "FST_REQ_FILE_TOO_LARGE" ? TOO_LARGE : NOT_ONE_FILE };
   }
   return bytes === undefined ? { ok: false, error: NOT_ONE_FILE } : { ok: true, bytes };
+}
+
+/**
+ * Why a multi-file upload can't be read: no file part, or a part that isn't a file (`required`); more files than allowed
+ * (`tooMany`); or file `index` (from 0) over 15 MB (`tooLarge`).
+ */
+export type UploadsProblem = { kind: "required" } | { kind: "tooMany" } | { kind: "tooLarge"; index: number };
+
+export type Uploads = { ok: true; files: Buffer[] } | { ok: false; problem: UploadsProblem };
+
+/**
+ * Reads 1 to `maxFiles` uploaded files, in the order sent, under any field names (POST /imports, docs/api.md). Every file is
+ * read before any is decoded, so too many files are refused before any is processed, even when an earlier one is too large:
+ * the number is checked first (IMP-2). The 15 MB limit (REC-7) is enforced on each while reading: a file over it stops being
+ * buffered at the limit and is dropped, so the body holds at most `maxFiles` files of 15 MB plus the form's overhead.
+ */
+export async function readUploads(request: FastifyRequest, maxFiles: number): Promise<Uploads> {
+  const files: Buffer[] = [];
+  // One more part than files allowed, so a file past the limit is seen as too many rather than as too many parts.
+  const limits = { fileSize: MAX_PHOTO_BYTES, files: maxFiles, fields: 0, parts: maxFiles + 1 };
+  let firstTooLarge: number | undefined;
+  try {
+    // Not thrown, so the remaining parts are still read and a file past maxFiles still counts as too many. @fastify/multipart
+    // honours throwFileSizeLimit in parts() too, though its types list it only for file() and files().
+    const options = { limits, throwFileSizeLimit: false };
+    for await (const part of request.parts(options)) {
+      if (part.type !== "file") return { ok: false, problem: { kind: "required" } };
+      const bytes = await part.toBuffer();
+      if (part.file.truncated) {
+        firstTooLarge ??= files.length;
+        files.push(Buffer.alloc(0));
+      } else {
+        files.push(bytes);
+      }
+    }
+  } catch (error) {
+    const code = (error as { code?: unknown }).code;
+    request.log.info({ err: error }, "photo upload refused while reading");
+    if (code === "FST_FILES_LIMIT") return { ok: false, problem: { kind: "tooMany" } };
+    return { ok: false, problem: { kind: "required" } };
+  }
+  if (firstTooLarge !== undefined) {
+    request.log.info({ index: firstTooLarge }, "photo upload refused: a file is too large");
+    return { ok: false, problem: { kind: "tooLarge", index: firstTooLarge } };
+  }
+  return files.length === 0 ? { ok: false, problem: { kind: "required" } } : { ok: true, files };
 }
 
 /**

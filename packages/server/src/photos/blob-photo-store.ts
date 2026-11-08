@@ -35,10 +35,10 @@ export class BlobPhotoStore implements PhotoStore {
     await this.container.getBlobClient(name).deleteIfExists();
   }
 
-  async list(): Promise<StoredImageInfo[]> {
+  async list(prefix?: string): Promise<StoredImageInfo[]> {
     const images: StoredImageInfo[] = [];
     // A flat listing gives each blob's full name, slashes included; the SDK follows continuation pages.
-    for await (const blob of this.container.listBlobsFlat()) {
+    for await (const blob of this.container.listBlobsFlat(prefix === undefined ? {} : { prefix })) {
       const lastModified = Instant.fromEpochMillis(blob.properties.lastModified.getTime());
       if (!lastModified.ok) throw new Error(`Blob Storage returned an invalid last-modified time for ${blob.name}`);
       images.push({ name: blob.name, lastModified: lastModified.value });

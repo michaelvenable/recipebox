@@ -3,6 +3,7 @@
 // reading (capitalization, units, times) is the prompt's (reading-prompt.test.ts).
 import { beforeEach, describe, expect, it } from "vitest";
 import { IMPORT_MINUTES, Recipe } from "@recipebox/domain";
+import type { ImportId } from "@recipebox/domain";
 import { importPageName } from "../../src/imports/import-page-name.js";
 import { importedRecipeId } from "../../src/imports/imported-recipe-id.js";
 import { InMemoryImportRepository } from "../../src/imports/in-memory-import-repository.js";
@@ -21,6 +22,17 @@ let job: ImportJobFixture;
 beforeEach(() => {
   job = new ImportJobFixture();
 });
+
+/** The fixture's photo store, with some calls replaced. */
+function photosOf(overrides: Partial<PhotoStore>): PhotoStore {
+  return {
+    put: (...args) => job.photos.put(...args),
+    get: (name) => job.photos.get(name),
+    list: (prefix) => job.photos.list(prefix),
+    delete: (name) => job.photos.delete(name),
+    ...overrides,
+  };
+}
 
 /** No line holds any of the recipe's text (IMP-11). */
 function expectNoRecipeTextLogged(): void {
@@ -91,6 +103,40 @@ describe("IMP-7 saved like any other recipe", () => {
     job.reader.answer = async () => answer({ name: "  " });
     expect(await job.process(id)).toBe("invalid-recipe");
     expect(await job.recipes.list()).toEqual([]);
+  });
+});
+
+describe("IMP-3, IMP-6 the photos are read together, as one recipe", () => {
+  it("'Card front has the ingredients, the back the steps; both added': one recipe with the ingredients and steps", async () => {
+    const front = await jpeg(60, 40);
+    const back = await jpeg(80, 40);
+    const id = await job.startImport([front, back]);
+    job.reader.answer = async () =>
+      answer({ ingredients: ["3 ripe bananas", "1/3 cup melted butter"], steps: ["Mash the bananas.", "Bake."] });
+
+    expect(await job.process(id)).toBe("done");
+
+    // One request with both photos, in the order they were added.
+    expect(job.reader.calls).toHaveLength(1);
+    const images = job.reader.calls[0]!.images;
+    expect(images).toHaveLength(2);
+    expect(images[0]?.equals(front)).toBe(true);
+    expect(images[1]?.equals(back)).toBe(true);
+    const recipes = await job.recipes.list();
+    expect(recipes).toHaveLength(1);
+    expect(recipes[0]?.content.ingredients.map((i) => i.value)).toEqual(["3 ripe bananas", "1/3 cup melted butter"]);
+    expect(recipes[0]?.content.steps.map((s) => s.value)).toEqual(["Mash the bananas.", "Bake."]);
+  });
+
+  it("sends the photos in the order they were added, by their number, whatever order they are listed in", async () => {
+    const id = await job.startImport([]);
+    const pages = [await jpeg(10, 10), await jpeg(20, 10), await jpeg(30, 10), await jpeg(40, 10)];
+    for (const n of [3, 1, 4, 2]) await job.photos.put(importPageName(id, n), pages[n - 1]!, "image/jpeg");
+
+    expect(await job.process(id)).toBe("done");
+
+    const images = job.reader.calls[0]!.images;
+    expect(images.map((image) => pages.findIndex((page) => page.equals(image)) + 1)).toEqual([1, 2, 3, 4]);
   });
 });
 
@@ -170,7 +216,7 @@ describe("IMP-9 photo: the dish picture becomes the recipe's photo", () => {
 
   it("cuts the box from the page and stores it as an uploaded photo: display image and thumbnail, no metadata", async () => {
     const id = await job.startImport(await bigPage());
-    job.reader.answer = async () => answer({ dishPhoto: { left: 0.5, top: 0, width: 0.5, height: 1 } });
+    job.reader.answer = async () => answer({ dishPhoto: { photo: 1, left: 0.5, top: 0, width: 0.5, height: 1 } });
 
     expect(await job.process(id)).toBe("done");
 
@@ -192,7 +238,7 @@ describe("IMP-9 photo: the dish picture becomes the recipe's photo", () => {
 
   it("clamps a box that reaches outside the image", async () => {
     const id = await job.startImport(await bigPage());
-    job.reader.answer = async () => answer({ dishPhoto: { left: -0.2, top: -1, width: 0.7, height: 3 } });
+    job.reader.answer = async () => answer({ dishPhoto: { photo: 1, left: -0.2, top: -1, width: 0.7, height: 3 } });
 
     await job.process(id);
 
@@ -206,7 +252,7 @@ describe("IMP-9 photo: the dish picture becomes the recipe's photo", () => {
   it("gives no photo for a box too small for a thumbnail", async () => {
     const id = await job.startImport(await bigPage());
     // 399 x 300 pixels: the longer side is under THUMBNAIL_MAX_SIDE.
-    job.reader.answer = async () => answer({ dishPhoto: { left: 0, top: 0, width: 399 / 800, height: 0.5 } });
+    job.reader.answer = async () => answer({ dishPhoto: { photo: 1, left: 0, top: 0, width: 399 / 800, height: 0.5 } });
 
     expect(await job.process(id)).toBe("done");
 
@@ -216,7 +262,7 @@ describe("IMP-9 photo: the dish picture becomes the recipe's photo", () => {
 
   it("gives no photo for a box entirely outside the image", async () => {
     const id = await job.startImport(await bigPage());
-    job.reader.answer = async () => answer({ dishPhoto: { left: 1.2, top: 0, width: 0.5, height: 1 } });
+    job.reader.answer = async () => answer({ dishPhoto: { photo: 1, left: 1.2, top: 0, width: 0.5, height: 1 } });
     expect(await job.process(id)).toBe("done");
     expect((await job.recipes.get(importedRecipeId(id)))?.photo).toBeUndefined();
   });
@@ -230,7 +276,7 @@ describe("IMP-9 photo: the dish picture becomes the recipe's photo", () => {
       .jpeg()
       .toBuffer();
     const id = await job.startImport(page);
-    job.reader.answer = async () => answer({ dishPhoto: { left: 0, top: 0, width: 1, height: 0.5 } });
+    job.reader.answer = async () => answer({ dishPhoto: { photo: 1, left: 0, top: 0, width: 1, height: 0.5 } });
 
     await job.process(id);
 
@@ -241,9 +287,33 @@ describe("IMP-9 photo: the dish picture becomes the recipe's photo", () => {
     expectColor(await colorAt(display!.bytes, 400, 300), "red");
   });
 
+  it("cuts the dish picture from the photo it is on: photo 2, the back of the card", async () => {
+    const back = await sharp({ create: { width: 1000, height: 500, channels: 3, background: "white" } }).jpeg().toBuffer();
+    const id = await job.startImport([await bigPage(), back]);
+    job.reader.answer = async () => answer({ dishPhoto: { photo: 2, left: 0, top: 0, width: 1, height: 1 } });
+
+    expect(await job.process(id)).toBe("done");
+
+    const photo = (await job.recipes.get(importedRecipeId(id)))?.photo;
+    const display = await job.photos.get(photo!.blobName);
+    const metadata = await expectStrippedJpeg(display!.bytes);
+    expect([metadata.width, metadata.height]).toEqual([1000, 500]);
+    expectColor(await colorAt(display!.bytes, 0, 0), "white");
+  });
+
+  it.each([0, 3, 1.5])("gives no photo for a box on photo %s, which doesn't exist; the recipe is added", async (photo) => {
+    const id = await job.startImport([await bigPage(), await bigPage()]);
+    job.reader.answer = async () => answer({ dishPhoto: { photo, left: 0, top: 0, width: 1, height: 1 } });
+
+    expect(await job.process(id)).toBe("done");
+
+    expect((await job.recipes.get(importedRecipeId(id)))?.photo).toBeUndefined();
+    expect(job.photos.names()).toEqual([]);
+  });
+
   it("deletes the stored photo again if the recipe can't be added", async () => {
     const id = await job.startImport(await bigPage());
-    job.reader.answer = async () => answer({ dishPhoto: { left: 0, top: 0, width: 1, height: 1 } });
+    job.reader.answer = async () => answer({ dishPhoto: { photo: 1, left: 0, top: 0, width: 1, height: 1 } });
     const recipes = new InMemoryRecipeRepository();
     recipes.add = async () => {
       throw new Error("Cosmos DB is unavailable");
@@ -310,11 +380,11 @@ describe("IMP-10 done: the import keeps the recipe's id and name", () => {
 
   it("a delivery that finds the recipe already added (two at once) ends as done, adding nothing more", async () => {
     const id = await job.startImport(await jpeg(800, 600));
-    job.reader.answer = async () => answer({ dishPhoto: { left: 0, top: 0, width: 1, height: 1 } });
+    job.reader.answer = async () => answer({ dishPhoto: { photo: 1, left: 0, top: 0, width: 1, height: 1 } });
     // The other delivery's run: it adds the recipe, with its photo, while this one is reading.
     const other = new ImportJobFixture();
     const otherId = id;
-    await other.photos.put(importPageName(otherId), (await job.photos.get(importPageName(id)))!.bytes, "image/jpeg");
+    await other.photos.put(importPageName(otherId, 1), (await job.photos.get(importPageName(id, 1)))!.bytes, "image/jpeg");
     await other.imports.add((await job.record(id)));
     other.reader.answer = job.reader.answer;
     await other.process(otherId, { recipes: job.recipes });
@@ -424,7 +494,7 @@ describe("IMP-11 failure", () => {
     job.reader.answer = async () => {
       // The server's clock moves on while the service reads.
       job.clock.set("2026-11-07T09:10:00.000Z");
-      return answer({ dishPhoto: { left: 0, top: 0, width: 1, height: 1 } });
+      return answer({ dishPhoto: { photo: 1, left: 0, top: 0, width: 1, height: 1 } });
     };
 
     expect(await job.process(id)).toBe("timed-out");
@@ -490,7 +560,7 @@ describe("IMP-11 failure", () => {
     await job.process(failing);
 
     expect((await job.record(other)).isInProgress(job.clock.now())).toBe(true);
-    expect(job.photos.names()).toEqual([importPageName(other)]);
+    expect(job.photos.names()).toEqual([importPageName(other, 1)]);
   });
 
   it("a missing record is logged and nothing else happens", async () => {
@@ -507,7 +577,7 @@ describe("IMP-11 failure", () => {
 
 describe("IMP-11 internal-error: the app's own storage fails partway (owner decision)", () => {
   /** Nothing added, the record failed, and exactly one error line: internal-error, no detail, no recipe text. */
-  async function expectInternalError(id: Parameters<typeof importPageName>[0]): Promise<void> {
+  async function expectInternalError(id: ImportId): Promise<void> {
     expect(await job.recipes.list()).toEqual([]);
     expect((await job.record(id)).toSnapshot().status).toBe("failed");
     expect(job.errors()).toEqual([
@@ -521,17 +591,6 @@ describe("IMP-11 internal-error: the app's own storage fails partway (owner deci
       },
     ]);
     expectNoRecipeTextLogged();
-  }
-
-  /** The fixture's photo store, with some calls replaced. */
-  function photosWith(overrides: Partial<PhotoStore>): PhotoStore {
-    return {
-      put: (...args) => job.photos.put(...args),
-      get: (name) => job.photos.get(name),
-      list: () => job.photos.list(),
-      delete: (name) => job.photos.delete(name),
-      ...overrides,
-    };
   }
 
   it("a recipe write that fails: nothing added, logged internal-error", async () => {
@@ -561,7 +620,7 @@ describe("IMP-11 internal-error: the app's own storage fails partway (owner deci
 
   it("the page photo can't be read (Blob Storage): logged internal-error", async () => {
     const id = await job.startImport();
-    const photos = photosWith({
+    const photos = photosOf({
       get: async () => {
         throw new Error("Blob Storage is unavailable");
       },
@@ -594,12 +653,12 @@ describe("IMP-11 internal-error: the app's own storage fails partway (owner deci
     ]);
     // It can't be ended: it reads as failed after its 10 minutes, and the lifecycle rule deletes the photo (owner decision).
     expect((await job.record(id)).toSnapshot().status).toBe("reading");
-    expect(await job.photos.get(importPageName(id))).toBeDefined();
+    expect(job.pagesKept(id)).toEqual([importPageName(id, 1)]);
   });
 
   it("the page photo is missing: logged internal-error", async () => {
     const id = await job.startImport();
-    await job.photos.delete(importPageName(id));
+    await job.photos.delete(importPageName(id, 1));
 
     expect(await job.process(id)).toBe("internal-error");
 
@@ -609,9 +668,9 @@ describe("IMP-11 internal-error: the app's own storage fails partway (owner deci
 
   it("storing the dish photo fails: nothing added, no images left, logged internal-error", async () => {
     const id = await job.startImport(await jpeg(800, 600));
-    job.reader.answer = async () => answer({ dishPhoto: { left: 0, top: 0, width: 1, height: 1 } });
+    job.reader.answer = async () => answer({ dishPhoto: { photo: 1, left: 0, top: 0, width: 1, height: 1 } });
     let puts = 0;
-    const photos = photosWith({
+    const photos = photosOf({
       put: async (...args) => {
         // The display image is stored, the thumbnail isn't.
         if (++puts > 1) throw new Error("Blob Storage is unavailable");
@@ -681,7 +740,7 @@ describe("IMP-11 a run that stopped after adding the recipe, seen again after 10
     ]);
     expect((await job.record(id)).toSnapshot().status).toBe("failed");
     expect(await job.recipes.list()).toHaveLength(1);
-    expect(await job.photos.get(importPageName(id))).toBeUndefined();
+    expect(job.pagesKept(id)).toEqual([]);
   });
 
   it("without that recipe, the same record is timed-out", async () => {
@@ -713,13 +772,13 @@ describe("IMP-11 a run that stopped after adding the recipe, seen again after 10
       },
     ]);
     expect((await job.record(id)).toSnapshot().status).toBe("failed");
-    expect(await job.photos.get(importPageName(id))).toBeUndefined();
+    expect(job.pagesKept(id)).toEqual([]);
   });
 });
 
-describe("IMP-12 the uploaded photo isn't kept", () => {
-  async function pageKept(id: Parameters<typeof importPageName>[0]): Promise<boolean> {
-    return (await job.photos.get(importPageName(id))) !== undefined;
+describe("IMP-12 the uploaded photos aren't kept", () => {
+  async function pageKept(id: ImportId): Promise<boolean> {
+    return job.pagesKept(id).length > 0;
   }
 
   it("passes the page photo to the reading service, then deletes it once the import is done", async () => {
@@ -728,8 +787,34 @@ describe("IMP-12 the uploaded photo isn't kept", () => {
 
     await job.process(id);
 
-    expect(job.reader.calls[0]?.image.equals(page)).toBe(true);
+    expect(job.reader.calls[0]?.images).toHaveLength(1);
+    expect(job.reader.calls[0]?.images[0]?.equals(page)).toBe(true);
     expect(await pageKept(id)).toBe(false);
+  });
+
+  it("deletes every page photo of the import once it is done, and none of another import's", async () => {
+    const id = await job.startImport([await jpeg(), await jpeg(), await jpeg(), await jpeg()]);
+    const other = await job.startImport([await jpeg(), await jpeg()]);
+
+    expect(await job.process(id)).toBe("done");
+
+    expect(job.pagesKept(id)).toEqual([]);
+    expect(job.pagesKept(other)).toEqual([importPageName(other, 1), importPageName(other, 2)]);
+  });
+
+  it("deletes every page photo when one of them can't be read", async () => {
+    const id = await job.startImport([await jpeg(), await jpeg()]);
+    const photos = photosOf({
+      get: async (name) => {
+        if (name === importPageName(id, 2)) throw new Error("Blob Storage is unavailable");
+        return job.photos.get(name);
+      },
+    });
+
+    expect(await job.process(id, { photos })).toBe("internal-error");
+
+    expect(job.reader.calls).toEqual([]);
+    expect(job.pagesKept(id)).toEqual([]);
   });
 
   it.each([
@@ -767,14 +852,11 @@ describe("IMP-12 the uploaded photo isn't kept", () => {
 
   it("a page photo that can't be deleted doesn't change the outcome; it is logged and left for the lifecycle rule", async () => {
     const id = await job.startImport();
-    const photos: PhotoStore = {
-      put: (...args) => job.photos.put(...args),
-      get: (name) => job.photos.get(name),
-      list: () => job.photos.list(),
+    const photos = photosOf({
       delete: async () => {
         throw new Error("Blob Storage is unavailable");
       },
-    };
+    });
     expect(await job.process(id, { photos })).toBe("done");
     expect(job.errors()).toEqual([expect.objectContaining({ importId: id.value })]);
   });

@@ -102,6 +102,11 @@ async function nextCheck() {
 }
 
 const importInput = () => screen.getByLabelText("Import from a photo");
+const addInput = () => screen.getByLabelText("Add another photo");
+const importButton = () => screen.getByRole("button", { name: "Import recipe" });
+const photoList = () => screen.getByRole("list", { name: "Photos of this recipe" });
+/** The photos in the panel, by their labels, in order. */
+const photoLabels = () => within(photoList()).getAllByRole("img").map((img) => img.getAttribute("alt") ?? img.getAttribute("aria-label"));
 const cards = () => screen.queryAllByText(READING);
 
 async function openNew(partial: Partial<FakeServer> = {}) {
@@ -119,9 +124,15 @@ async function openCatalog(partial: Partial<FakeServer> = {}) {
   return { ...fake, ...rendered };
 }
 
-/** Picks `file` with the import button and waits for the Catalog, as the editor sees it after an upload (IMP-4). */
-async function importFrom(user: ReturnType<typeof userEvent.setup>, router: { state: { location: { pathname: string } } }, file = jpeg()) {
-  await user.upload(importInput(), file);
+/** Adds `files` to the panel in order: the first with "Import from a photo", the others with "Add another photo". */
+async function addPhotos(user: ReturnType<typeof userEvent.setup>, ...files: File[]) {
+  for (const [i, file] of files.entries()) await user.upload(i === 0 ? importInput() : addInput(), file);
+}
+
+/** Picks `files`, presses "Import recipe" and waits for the Catalog, as the editor sees it after an upload (IMP-4). */
+async function importFrom(user: ReturnType<typeof userEvent.setup>, router: { state: { location: { pathname: string } } }, ...files: File[]) {
+  await addPhotos(user, ...(files.length > 0 ? files : [jpeg()]));
+  await user.click(importButton());
   await waitFor(() => expect(router.state.location.pathname).toBe("/"));
 }
 
@@ -140,6 +151,7 @@ describe("IMP-1 start from the New recipe form", () => {
     const panel = screen.getByRole("region", { name: "Have it on paper?" });
     expect(within(panel).getByText("Upload a photo of the recipe to begin.")).toBeInTheDocument();
     expect(within(panel).getByLabelText("Import from a photo")).toHaveAttribute("type", "file");
+    expect(within(panel).queryByRole("button", { name: "Import recipe" })).not.toBeInTheDocument();
     const divider = screen.getByText("or type it in");
     const name = screen.getByRole("textbox", { name: "Name" });
     expect(panel.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -154,12 +166,83 @@ describe("IMP-1 start from the New recipe form", () => {
     expect(screen.queryByLabelText("Import from a photo")).not.toBeInTheDocument();
     expect(screen.queryByText("or type it in")).not.toBeInTheDocument();
   });
+
+  it("shows a picked photo as 'Photo 1', with 'Add another photo' and 'Import recipe', and uploads nothing yet", async () => {
+    const { fetchMock, router } = await openNew();
+    await addPhotos(userEvent.setup(), jpeg());
+
+    const panel = screen.getByRole("region", { name: "Have it on paper?" });
+    expect(within(panel).getByText("Add each side or page of this recipe, in order. Up to 4 photos.")).toBeInTheDocument();
+    expect(within(panel).queryByText("Upload a photo of the recipe to begin.")).not.toBeInTheDocument();
+    expect(photoLabels()).toEqual(["Photo 1"]);
+    expect(within(photoList()).getByRole("img", { name: "Photo 1" })).toHaveAttribute("src", "blob:preview");
+    expect(within(panel).getByRole("button", { name: "Remove Photo 1" })).toBeInTheDocument();
+    expect(addInput()).toHaveAttribute("type", "file");
+    expect(importButton()).toBeEnabled();
+    expect(uploads(fetchMock)).toHaveLength(0);
+    expect(router.state.location.pathname).toBe("/recipes/new");
+  });
+
+  it("adds the next photos one at a time, as Photo 2, Photo 3, in the order added", async () => {
+    await openNew();
+    await addPhotos(userEvent.setup(), jpeg("front.jpg"), jpeg("back.jpg"), jpeg("insert.jpg"));
+    expect(photoLabels()).toEqual(["Photo 1", "Photo 2", "Photo 3"]);
+    expect(addInput()).not.toHaveAttribute("multiple");
+  });
+
+  it("removes any photo before the import starts; the others are numbered again in order", async () => {
+    const user = userEvent.setup();
+    const { fetchMock, router } = await openNew();
+    const front = jpeg("front.jpg");
+    const middle = jpeg("middle.jpg");
+    const back = jpeg("back.jpg");
+    await addPhotos(user, front, middle, back);
+
+    await user.click(screen.getByRole("button", { name: "Remove Photo 2" }));
+
+    expect(photoLabels()).toEqual(["Photo 1", "Photo 2"]);
+    await user.click(importButton());
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+    expect((uploads(fetchMock)[0]!.body as FormData).getAll("photo")).toEqual([front, back]);
+  });
+
+  it("goes back to the empty panel when the only photo is removed", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await addPhotos(user, jpeg());
+    await user.click(screen.getByRole("button", { name: "Remove Photo 1" }));
+    expect(screen.getByText("Upload a photo of the recipe to begin.")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Photos of this recipe" })).not.toBeInTheDocument();
+    expect(importInput()).toBeInTheDocument();
+  });
+
+  it("IMP-12, X-15: previews are local object URLs, released when a photo is removed or the form is left", async () => {
+    const user = userEvent.setup();
+    const created = vi.mocked(URL.createObjectURL);
+    const revoked = vi.mocked(URL.revokeObjectURL);
+    created.mockReturnValueOnce("blob:first").mockReturnValueOnce("blob:second");
+    const { router } = await openNew();
+    await addPhotos(user, jpeg("front.jpg"), jpeg("back.jpg"));
+    expect(created).toHaveBeenCalledTimes(2);
+
+    await user.click(screen.getByRole("button", { name: "Remove Photo 1" }));
+    expect(revoked).toHaveBeenCalledWith("blob:first");
+    expect(revoked).not.toHaveBeenCalledWith("blob:second");
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+    expect(revoked).toHaveBeenCalledWith("blob:second");
+    expect(localStorage.length).toBe(0);
+    expect(sessionStorage.length).toBe(0);
+  });
 });
 
 describe("IMP-2 accepted photos", () => {
-  it("asks for JPEG, PNG or WebP, like the recipe photo field (REC-7)", async () => {
+  it("asks for JPEG, PNG or WebP, like the recipe photo field (REC-7), for the first photo and the next", async () => {
     await openNew();
     expect(importInput()).toHaveAttribute("accept", "image/jpeg,image/png,image/webp");
+    await addPhotos(userEvent.setup(), jpeg());
+    expect(addInput()).toHaveAttribute("accept", "image/jpeg,image/png,image/webp");
   });
 
   it.each([
@@ -172,14 +255,49 @@ describe("IMP-2 accepted photos", () => {
     Object.defineProperty(file, "size", { value: size });
     await userEvent.setup({ applyAccept: false }).upload(importInput(), file);
     expect(screen.getByRole("alert")).toHaveTextContent(message);
+    expect(screen.queryByRole("list", { name: "Photos of this recipe" })).not.toBeInTheDocument();
     expect(uploads(fetchMock)).toHaveLength(0);
     expect(importReads(fetchMock)).toBe(0);
     expect(router.state.location.pathname).toBe("/recipes/new");
   });
+
+  it("'A HEIC file added after one good photo': refused (REC-7); the first photo stays", async () => {
+    const user = userEvent.setup({ applyAccept: false });
+    const { fetchMock } = await openNew();
+    const first = jpeg("front.jpg");
+    await addPhotos(user, first);
+
+    await user.upload(addInput(), new File(["x"], "IMG_0002.HEIC", { type: "image/heic" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("HEIC photos can't be used. Choose a JPEG instead.");
+    expect(photoLabels()).toEqual(["Photo 1"]);
+    expect(uploads(fetchMock)).toHaveLength(0);
+    await user.click(importButton());
+    await waitFor(() => expect(uploads(fetchMock)).toHaveLength(1));
+    expect((uploads(fetchMock)[0]!.body as FormData).getAll("photo")).toEqual([first]);
+  });
+
+  it("'4 photos added': no more can be added", async () => {
+    await openNew();
+    await addPhotos(userEvent.setup(), jpeg("1.jpg"), jpeg("2.jpg"), jpeg("3.jpg"), jpeg("4.jpg"));
+    expect(photoLabels()).toEqual(["Photo 1", "Photo 2", "Photo 3", "Photo 4"]);
+    expect(screen.queryByLabelText("Add another photo")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Import from a photo")).not.toBeInTheDocument();
+    expect(importButton()).toBeEnabled();
+  });
+
+  it("can add a photo again once one of 4 is removed", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await addPhotos(user, jpeg("1.jpg"), jpeg("2.jpg"), jpeg("3.jpg"), jpeg("4.jpg"));
+    await user.click(screen.getByRole("button", { name: "Remove Photo 4" }));
+    await user.upload(addInput(), jpeg("5.jpg"));
+    expect(photoLabels()).toEqual(["Photo 1", "Photo 2", "Photo 3", "Photo 4"]);
+  });
 });
 
-describe("IMP-3 one photo per upload, any number at once", () => {
-  it("picks one photo only, and sends it as a multipart POST /imports with one file part, X-Requested-By and the cookie", async () => {
+describe("IMP-3 one recipe per upload, any number at once", () => {
+  it("sends one photo as a multipart POST /imports with one file part, X-Requested-By and the cookie", async () => {
     const { fetchMock, router } = await openNew();
     expect(importInput()).not.toHaveAttribute("multiple");
     const file = jpeg();
@@ -195,7 +313,22 @@ describe("IMP-3 one photo per upload, any number at once", () => {
     expect(form.get("photo")).toBe(file);
   });
 
-  it("two photos uploaded one after the other, both read fine: two cards, then both recipes added", async () => {
+  it("'Card front has the ingredients, the back the steps; both added': one upload with both photos, in order", async () => {
+    const { fetchMock, router } = await openNew();
+    const front = jpeg("front.jpg");
+    const back = jpeg("back.jpg");
+
+    await importFrom(userEvent.setup(), router, front, back);
+
+    const sent = uploads(fetchMock);
+    expect(sent).toHaveLength(1);
+    const form = sent[0]!.body as FormData;
+    expect([...form.keys()]).toEqual(["photo", "photo"]);
+    expect(form.getAll("photo")).toEqual([front, back]);
+    expect(await screen.findAllByText(READING)).toHaveLength(1);
+  });
+
+  it("two recipes uploaded one after the other, both read fine: two cards, then both recipes added", async () => {
     const user = fakeTimers();
     const { server, router } = await openNew();
     await importFrom(user, router);
@@ -203,7 +336,8 @@ describe("IMP-3 one photo per upload, any number at once", () => {
 
     await user.click(screen.getByRole("link", { name: "Add recipe" }));
     await screen.findByRole("textbox", { name: "Name" });
-    await importFrom(user, router);
+    expect(screen.getByText("Upload a photo of the recipe to begin.")).toBeInTheDocument();
+    await importFrom(user, router, jpeg("front.jpg"), jpeg("back.jpg"));
     await waitFor(() => expect(cards()).toHaveLength(2));
 
     server.imports = [done("import-2", SCONES_ID, "Scones"), done("import-1", BREAD_ID, "Banana Bread")];
@@ -219,13 +353,17 @@ describe("IMP-3 one photo per upload, any number at once", () => {
 describe("IMP-4 back to the Catalog", () => {
   it("shows the button is uploading and can't be pressed again, then goes to the Catalog with the message", async () => {
     let answer: (response: Response) => void = () => {};
+    const user = userEvent.setup();
     const { fetchMock, router } = await openNew({ upload: () => new Promise<Response>((resolve) => (answer = resolve)) });
-    await userEvent.upload(importInput(), jpeg());
+    await addPhotos(user, jpeg(), jpeg("back.jpg"));
+    await user.click(importButton());
 
-    const uploading = await screen.findByLabelText("Uploading photo…");
+    const uploading = await screen.findByRole("button", { name: "Uploading photos…" });
     expect(uploading).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
-    await userEvent.setup({ pointerEventsCheck: 0 }).upload(uploading, jpeg("again.jpg"));
+    expect(screen.getByRole("button", { name: "Remove Photo 1" })).toBeDisabled();
+    expect(addInput()).toBeDisabled();
+    await userEvent.setup({ pointerEventsCheck: 0 }).click(uploading);
     expect(uploads(fetchMock)).toHaveLength(1);
 
     answer(jsonResponse(202, { importId: "import-1", status: "reading" }));
@@ -236,7 +374,10 @@ describe("IMP-4 back to the Catalog", () => {
   it.each([
     [
       "the server refuses the photo",
-      () => jsonResponse(400, { errors: [{ code: "photo.unsupportedType", field: "photo", message: "This file isn't a JPEG, PNG or WebP image." }] }),
+      () =>
+        jsonResponse(400, {
+          errors: [{ code: "photo.unsupportedType", field: "photos[0]", message: "This file isn't a JPEG, PNG or WebP image." }],
+        }),
       "The photo wasn't uploaded. This file isn't a JPEG, PNG or WebP image.",
     ],
     ["the server fails", () => jsonResponse(500, { errors: [] }), "The photo wasn't uploaded. The server couldn't make the change. Try again."],
@@ -246,13 +387,69 @@ describe("IMP-4 back to the Catalog", () => {
       "The photo wasn't uploaded. Couldn't reach the server. Check the connection and try again.",
     ],
   ])("stays on the form with a message when %s, and no import is in progress", async (_what, upload, message) => {
+    const user = userEvent.setup();
     const { fetchMock, router } = await openNew({ upload });
-    await userEvent.upload(importInput(), jpeg());
+    await addPhotos(user, jpeg());
+    await user.click(importButton());
     expect(await screen.findByRole("alert")).toHaveTextContent(message);
     expect(router.state.location.pathname).toBe("/recipes/new");
-    expect(importInput()).toBeEnabled();
+    expect(importButton()).toBeEnabled();
     expect(screen.queryByText(UPLOADED)).not.toBeInTheDocument();
     expect(importReads(fetchMock)).toBe(0);
+  });
+
+  it("keeps the photos in the panel when the upload fails, says the photos weren't uploaded, and tries again with them", async () => {
+    const user = userEvent.setup();
+    let fail = true;
+    const { fetchMock, router } = await openNew({
+      upload: () => {
+        if (fail) return Promise.reject(new TypeError("Failed to fetch"));
+        return jsonResponse(202, { importId: "import-1", status: "reading" });
+      },
+    });
+    const front = jpeg("front.jpg");
+    const back = jpeg("back.jpg");
+    await addPhotos(user, front, back);
+    await user.click(importButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The photos weren't uploaded. Couldn't reach the server. Check the connection and try again.",
+    );
+    expect(photoLabels()).toEqual(["Photo 1", "Photo 2"]);
+
+    fail = false;
+    await user.click(importButton());
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+    const sent = uploads(fetchMock);
+    expect(sent).toHaveLength(2);
+    expect((sent[1]!.body as FormData).getAll("photo")).toEqual([front, back]);
+  });
+
+  it("names the photo the server refused when there are several", async () => {
+    const user = userEvent.setup();
+    await openNew({
+      upload: () =>
+        jsonResponse(400, {
+          errors: [{ code: "photo.unreadable", field: "photos[1]", message: "This image can't be read. It may be damaged or incomplete." }],
+        }),
+    });
+    await addPhotos(user, jpeg("front.jpg"), jpeg("back.jpg"));
+    await user.click(importButton());
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The photos weren't uploaded. Photo 2: This image can't be read. It may be damaged or incomplete.",
+    );
+  });
+
+  it("clears the message about a failed upload once a photo is added or removed", async () => {
+    const user = userEvent.setup();
+    await openNew({ upload: () => jsonResponse(500, { errors: [] }) });
+    await addPhotos(user, jpeg("front.jpg"));
+    await user.click(importButton());
+    await screen.findByRole("alert");
+
+    await user.upload(addInput(), jpeg("back.jpg"));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
 

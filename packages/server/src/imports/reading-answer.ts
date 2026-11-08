@@ -4,8 +4,12 @@
 import { z } from "zod";
 import type { ReadRecipe } from "@recipebox/domain";
 
-/** IMP-9: the box around the dish picture, as fractions of the image's width and height, from its top-left corner. */
+/**
+ * IMP-9: the dish picture: which photo it is on (`photo`, from 1 in the order given) and the box around it, as fractions of
+ * that image's width and height, from its top-left corner. The photo number is untrusted too (dish-photo.ts).
+ */
 export interface DishPhotoBox {
+  photo: number;
   left: number;
   top: number;
   width: number;
@@ -27,7 +31,9 @@ const answerShape = z.strictObject({
   // text is accepted here.
   tags: z.array(z.string()).optional(),
   dishPhoto: z
-    .strictObject({ left: z.number(), top: z.number(), width: z.number(), height: z.number() })
+    // `photo` may be any number: one that names no photo, such as 1.5, means no photo (IMP-9, dish-photo.ts), not a broken
+    // answer.
+    .strictObject({ photo: z.number(), left: z.number(), top: z.number(), width: z.number(), height: z.number() })
     .nullable(),
 });
 

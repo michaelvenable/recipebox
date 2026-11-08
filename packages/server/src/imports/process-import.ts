@@ -1,4 +1,5 @@
-// The import job's work for one import (docs/architecture.md, "Recipe import"): read the page photo with the reading service,
+// The import job's work for one import (docs/architecture.md, "Recipe import"): read the page photos (1 to 4 of one recipe,
+// IMP-3) with the reading service in one request,
 // turn the answer into a recipe through the domain, add it with the dish picture as its photo, and end the import. Any number
 // of imports run at once, each in its own job execution (IMP-3); nothing here looks at other imports.
 //
@@ -7,14 +8,15 @@
 //    a run that stopped partway already added its recipe, ended as failed and logged as an ordinary error).
 // 2. The reading service is called with a deadline (READING_MARGIN_MS before the 10 minutes; stopped there, it is
 //    `timed-out`), and its answer parsed.
-// 3. The recipe is built by the domain (importedRecipe); the dish picture is cut and stored under fresh names.
+// 3. The recipe is built by the domain (importedRecipe); the dish picture is cut from the photo it is on and stored under
+//    fresh names.
 // 4. `succeed` is called on the import with the server's time, before the recipe is written. If it refuses (the 10 minutes
 //    passed while reading), nothing has been added: the stored images are deleted and the import ends as `timed-out`.
 // 5. The recipe is written with create; its id comes from the import id, so a second delivery of the same message finds it
 //    there and treats the import as done, deleting the images it stored itself.
 // 6. The record is saved as done, tried again a few times if the write fails.
 // The app's own storage failing before the recipe is added ends the import as `internal-error` (IMP-11).
-// The page photo is deleted at the end whatever happened (IMP-12).
+// The page photos are deleted at the end whatever happened (IMP-12).
 import sharp from "sharp";
 import {
   IMPORT_MINUTES,
@@ -31,8 +33,8 @@ import { imageNamesOf, newPhotoName } from "../photos/photo-names.js";
 import { type PhotoProcessingOptions, processDishPhoto } from "../photos/photo-processing.js";
 import type { PhotoStore } from "../photos/photo-store.js";
 import type { RecipeRepository } from "../recipes/recipe-repository.js";
-import { dishPhotoArea } from "./dish-photo.js";
-import { importPageName } from "./import-page-name.js";
+import { dishPhotoArea, dishPhotoPage } from "./dish-photo.js";
+import { importPagesInOrder, importPagesPrefix } from "./import-page-name.js";
 import type { ImportRepository } from "./import-repository.js";
 import { importedRecipeId } from "./imported-recipe-id.js";
 import { type DishPhotoBox, parseReadingAnswer } from "./reading-answer.js";
@@ -64,7 +66,7 @@ export interface ImportLogger {
 export interface ImportProcessingDependencies {
   imports: ImportRepository;
   recipes: RecipeRepository;
-  /** The page photos (`imports/{importId}.jpg`) and recipe photos. */
+  /** The page photos (`imports/{importId}/{n}.jpg`) and recipe photos. */
   photos: PhotoStore;
   reader: RecipeReader;
   /** The server's clock (X-12): whether the import is still in progress, and the time it ends. */
@@ -82,7 +84,7 @@ export async function processImport(importId: ImportId, deps: ImportProcessingDe
     recipeImport = await imports.get(importId);
   } catch {
     // IMP-11: the app's own storage failed. A record that can't be loaded can't be ended; it reads as failed after its 10
-    // minutes, and the page photo is left for the one-day lifecycle rule (owner decision).
+    // minutes, and the page photos are left for the one-day lifecycle rule (owner decision).
     logFailure(logger, importId.value, "internal-error", undefined);
     return "internal-error";
   }
@@ -90,28 +92,44 @@ export async function processImport(importId: ImportId, deps: ImportProcessingDe
     logger.warn({ importId: importId.value }, "no record for this import; nothing to do");
     return "missing";
   }
-  const pageName = importPageName(importId);
   try {
-    return await processLoaded(recipeImport, pageName, deps);
+    return await processLoaded(recipeImport, deps);
   } finally {
-    // IMP-12: the page photo is deleted when the import ends, whether it succeeds or fails.
+    // IMP-12: every page photo is deleted when the import ends, whether it succeeds or fails. Listed again here, so photos are
+    // deleted even when reading them failed partway.
     try {
-      await photos.delete(pageName);
+      const stored = await photos.list(importPagesPrefix(importId));
+      for (const { name } of stored) await photos.delete(name);
     } catch (error) {
-      // A lifecycle rule deletes it within a day (docs/architecture.md, "Recipe import").
+      // A lifecycle rule deletes them within a day (docs/architecture.md, "Recipe import").
       logger.error(
         { err: error, importId: importId.value },
-        "could not delete an import's page photo; left for the lifecycle rule",
+        "could not delete an import's page photos; left for the lifecycle rule",
       );
     }
   }
 }
 
-async function processLoaded(
-  recipeImport: RecipeImport,
-  pageName: string,
-  deps: ImportProcessingDependencies,
-): Promise<ImportOutcome> {
+/**
+ * The import's page photos, in the order they were added (`imports/{importId}/{n}.jpg`, by n). Throws if there are none or one
+ * listed can't be read: the app's own storage failed (IMP-11, `internal-error`).
+ */
+async function readPages(importId: ImportId, photos: PhotoStore): Promise<Buffer[]> {
+  const names = importPagesInOrder(
+    importId,
+    (await photos.list(importPagesPrefix(importId))).map((image) => image.name),
+  );
+  if (names.length === 0) throw new Error("The import's page photos are missing");
+  const pages: Buffer[] = [];
+  for (const name of names) {
+    const page = await photos.get(name);
+    if (page === undefined) throw new Error("One of the import's page photos is missing");
+    pages.push(page.bytes);
+  }
+  return pages;
+}
+
+async function processLoaded(recipeImport: RecipeImport, deps: ImportProcessingDependencies): Promise<ImportOutcome> {
   const { imports, photos, recipes, clock, logger } = deps;
   const importId = recipeImport.id.value;
   const loaded = recipeImport.toSnapshot();
@@ -127,12 +145,11 @@ async function processLoaded(
   let storedImages: string[] = [];
   let recipeAdded = false;
   try {
-    const page = await photos.get(pageName);
-    if (page === undefined) throw new Error("The import's page photo is missing");
+    const pages = await readPages(recipeImport.id, photos);
     const tags = tagsInUse(await recipes.list()).map((entry) => entry.tag);
 
     const deadline = recipeImport.startedAt.plusMinutes(IMPORT_MINUTES).epochMillis - READING_MARGIN_MS;
-    const answer = await readWithDeadline(deps.reader, page.bytes, tags, deadline - now.epochMillis);
+    const answer = await readWithDeadline(deps.reader, pages, tags, deadline - now.epochMillis);
     // IMP-11 (owner decision): a read stopped at the deadline is a timeout, not a failure of the service.
     if (answer.kind === "stopped") return await endAsFailed(recipeImport, "timed-out", undefined, deps);
     if (answer.kind === "failed") return await endAsFailed(recipeImport, "service-error", answer.detail, deps);
@@ -144,7 +161,7 @@ async function processLoaded(
     const built = importedRecipe(importedRecipeId(recipeImport.id), parsed.value.recipe, tags);
     if (!built.ok) return await endAsFailed(recipeImport, "invalid-recipe", undefined, deps);
     const recipe = built.value;
-    storedImages = await attachDishPhoto(recipe, page.bytes, parsed.value.dishPhoto, importId, deps);
+    storedImages = await attachDishPhoto(recipe, pages, parsed.value.dishPhoto, importId, deps);
 
     // Decided before the recipe is written, so a recipe read too late is never added (IMP-11, X-12).
     const succeeded = recipeImport.succeed(recipe, clock());
@@ -230,7 +247,7 @@ type ReadResult = { kind: "answered"; text: string } | { kind: "failed"; detail:
  */
 async function readWithDeadline(
   reader: RecipeReader,
-  image: Buffer,
+  images: readonly Buffer[],
   tags: readonly Tag[],
   timeoutMs: number,
 ): Promise<ReadResult> {
@@ -239,14 +256,14 @@ async function readWithDeadline(
   let timer: NodeJS.Timeout | undefined;
   const stopped = new Promise<ReadResult>((resolve) => {
     timer = setTimeout(() => {
-      controller.abort(new Error("The import's time to read the photo ran out."));
+      controller.abort(new Error("The import's time to read the photos ran out."));
       resolve({ kind: "stopped" });
     }, timeoutMs);
   });
   const reading = Promise.resolve()
     .then(() =>
       reader.read(
-        image,
+        images,
         tags.map((t) => t.value),
         controller.signal,
       ),
@@ -263,19 +280,21 @@ async function readWithDeadline(
 }
 
 /**
- * IMP-9: cuts the dish picture from the page photo and stores it as an uploaded recipe photo is stored (photo-routes.ts): a
- * display image and a thumbnail under fresh names, oriented and without metadata, then attached with the domain's `setPhoto`.
- * Returns the names stored, for cleaning up if the recipe isn't added. No box, a box too small, or a picture that can't be
- * cut leaves the recipe without a photo.
+ * IMP-9: cuts the dish picture from the page photo the box names and stores it as an uploaded recipe photo is stored
+ * (photo-routes.ts): a display image and a thumbnail under fresh names, oriented and without metadata, then attached with the
+ * domain's `setPhoto`.
+ * Returns the names stored, for cleaning up if the recipe isn't added. No box, a box on a photo that doesn't exist, a box too
+ * small, or a picture that can't be cut leaves the recipe without a photo.
  */
 async function attachDishPhoto(
   recipe: Recipe,
-  page: Buffer,
+  pages: readonly Buffer[],
   box: DishPhotoBox | undefined,
   importId: string,
   { photos, logger, photoProcessing = {} }: ImportProcessingDependencies,
 ): Promise<string[]> {
-  if (box === undefined) return [];
+  const page = dishPhotoPage(box, pages);
+  if (box === undefined || page === undefined) return [];
   // The page photo is the API's own output (an oriented JPEG without metadata), so reading its size here is safe; it is
   // decoded only in the worker.
   // The size as displayed, which is what the box describes and what the worker cuts from.
