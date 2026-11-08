@@ -115,6 +115,11 @@ tag.
   - When no recipe was added in the last 30 days, the row isn't shown.
   - While a search term is typed (REC-9) or tags are picked (REC-13), the row isn't shown; only the list is.
   - The row and the added dates are public, like the recipes themselves (X-1).
+- **REC-23. Waking the server.** The server sleeps when nobody has used the app for a while, and the first request after that
+  can take several seconds (docs/architecture.md, "Decisions": scale to zero). While the recipe list (REC-8) is loading, it
+  says "Loading recipes…". If the list hasn't arrived after 5 seconds, the message becomes "Loading recipes… (waking up the
+  server)", until the list arrives or loading fails. The 5 seconds are counted on the device (X-12) from when this load
+  started; loading again with "Try again" starts the count again. Visitors and editors see the same message.
 
 ## Examples
 
@@ -149,6 +154,8 @@ tag.
 | "Pad Thai" added Nov 1, deleted, restored Nov 6                              | Back in Recently added as "Added Nov 1"     |
 | Search "chick" typed                                                         | No Recently added row                       |
 | No recipe added in the last 30 days                                          | No Recently added row                       |
+| The recipe list arrives after 3 seconds                                      | Only "Loading recipes…" was shown           |
+| The recipe list arrives after 12 seconds                                     | "(waking up the server)" added at 5 seconds |
 
 ## Out of scope
 
