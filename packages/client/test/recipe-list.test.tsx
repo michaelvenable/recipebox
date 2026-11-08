@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EditorRecipeSummary, Me, RecipeSummary, TagCount } from "@recipebox/shared";
@@ -650,5 +650,144 @@ describe("REC-22 recently added", () => {
     renderAt("/");
     await listShown();
     expect(rowNames()).toEqual(["A"]);
+  });
+});
+
+describe("REC-23 waking the server", () => {
+  const LOADING = "Loading recipes…";
+  const WAKING = "Loading recipes… (waking up the server)";
+
+  /**
+   * Only the timers are faked, and they move only when a test says so, so it can stop just before 5 seconds. Each answer to
+   * GET /recipes waits until the test gives it.
+   */
+  function slowList(me: Me = VISITOR) {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const answers: ((response: Response) => void)[] = [];
+    mockListApi({ me, recipes: () => new Promise<Response>((resolve) => answers.push(resolve)) });
+    return {
+      /** Answers the latest GET /recipes. */
+      answer: (response: Response) => answers.at(-1)?.(response),
+      requests: () => answers.length,
+    };
+  }
+
+  /** Moves the device's clock on by `ms`, running whatever was waiting for it. */
+  async function wait(ms: number) {
+    await act(() => vi.advanceTimersByTimeAsync(ms));
+  }
+
+  /** Lets the page load what it can without moving the clock. */
+  async function settle() {
+    for (let i = 0; i < 5; i += 1) await wait(0);
+  }
+
+  function status(): HTMLElement {
+    return screen.getByText(/^Loading recipes…/);
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("spec example: the list arrives after 3 seconds: only 'Loading recipes…' was shown", async () => {
+    const list = slowList();
+    renderAt("/");
+    await settle();
+    expect(status()).toHaveTextContent(new RegExp(`^${LOADING}$`));
+    for (let second = 1; second <= 3; second += 1) {
+      await wait(1_000);
+      expect(screen.queryByText(WAKING)).not.toBeInTheDocument();
+      expect(screen.getByText(LOADING)).toBeInTheDocument();
+    }
+    list.answer(jsonResponse(200, ALL));
+    await settle();
+    expect(screen.getByText("Pad Thai")).toBeInTheDocument();
+    expect(screen.queryByText(/^Loading recipes…/)).not.toBeInTheDocument();
+    // Nothing left to change after the list is shown.
+    await wait(10_000);
+    expect(screen.queryByText(/^Loading recipes…/)).not.toBeInTheDocument();
+  });
+
+  it("spec example: the list arrives after 12 seconds: '(waking up the server)' is added at 5 seconds", async () => {
+    const list = slowList();
+    renderAt("/");
+    await settle();
+    const region = status();
+    expect(region).toHaveAttribute("role", "status");
+    expect(region).toHaveTextContent(new RegExp(`^${LOADING}$`));
+
+    await wait(5_000);
+    // The same live region, its text changed in place.
+    expect(status()).toBe(region);
+    expect(region).toHaveTextContent(WAKING);
+    expect(screen.getAllByRole("status").filter((el) => /Loading/.test(el.textContent ?? ""))).toHaveLength(1);
+
+    await wait(7_000);
+    expect(region).toHaveTextContent(WAKING);
+    list.answer(jsonResponse(200, ALL));
+    await settle();
+    expect(screen.getByText("Pad Thai")).toBeInTheDocument();
+    expect(screen.queryByText(/^Loading recipes…/)).not.toBeInTheDocument();
+  });
+
+  it("says 'Loading recipes…' just before 5 seconds, and adds '(waking up the server)' at 5 seconds", async () => {
+    slowList();
+    renderAt("/");
+    await settle();
+    await wait(4_999);
+    expect(status()).toHaveTextContent(new RegExp(`^${LOADING}$`));
+    await wait(1);
+    expect(status()).toHaveTextContent(WAKING);
+  });
+
+  it("removes the message when loading fails, and shows the error", async () => {
+    const list = slowList();
+    renderAt("/");
+    await settle();
+    await wait(6_000);
+    expect(status()).toHaveTextContent(WAKING);
+
+    list.answer(jsonResponse(500, { errors: [] }));
+    await settle();
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load the recipes.");
+    expect(screen.queryByText(/^Loading recipes…/)).not.toBeInTheDocument();
+  });
+
+  it("starts the 5 seconds again when loading again with 'Try again'", async () => {
+    const list = slowList();
+    renderAt("/");
+    await settle();
+    await wait(6_000);
+    list.answer(jsonResponse(500, { errors: [] }));
+    await settle();
+
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Try again" }));
+    await settle();
+    expect(list.requests()).toBe(2);
+    expect(status()).toHaveTextContent(new RegExp(`^${LOADING}$`));
+    await wait(4_999);
+    expect(status()).toHaveTextContent(new RegExp(`^${LOADING}$`));
+    await wait(1);
+    expect(status()).toHaveTextContent(WAKING);
+
+    list.answer(jsonResponse(200, ALL));
+    await settle();
+    expect(screen.getByText("Pad Thai")).toBeInTheDocument();
+    expect(screen.queryByText(/^Loading recipes…/)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["visitors", VISITOR, "Recipe Box"],
+    ["editors", EDITOR, "Catalog"],
+  ] as const)("shows %s the same message", async (_who, me, heading) => {
+    slowList(me);
+    renderAt("/");
+    await settle();
+    // Signed in as who the test says: editors see "Catalog", visitors "Recipe Box".
+    expect(screen.getByRole("heading", { level: 1, name: heading })).toBeInTheDocument();
+    expect(status()).toHaveTextContent(new RegExp(`^${LOADING}$`));
+    await wait(5_000);
+    expect(status()).toHaveTextContent(WAKING);
   });
 });

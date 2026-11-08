@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { recipeKeys, tagKeys } from "../api/query-keys.js";
@@ -155,7 +155,7 @@ function Results({ recipes: loaded, isPending, isUpdating, failed, retry, filter
         </div>
       );
     }
-    return isPending || isUpdating ? <p role="status">Loading recipes…</p> : null;
+    return isPending || isUpdating ? <LoadingRecipes /> : null;
   }
 
   if (recipes.length === 0 && !filtering) {
@@ -193,4 +193,21 @@ function Results({ recipes: loaded, isPending, isUpdating, failed, retry, filter
       )}
     </>
   );
+}
+
+/** REC-23: how long the recipe list may take before the loading message says the server is waking up. */
+const WAKING_MS = 5_000;
+
+/**
+ * "Loading recipes…", which becomes "Loading recipes… (waking up the server)" when the list hasn't arrived after WAKING_MS
+ * (REC-23). Shown only while the list loads, so the count starts on the device (X-12) when this load starts, including one
+ * started with "Try again", and stops when the list arrives or loading fails. One live region, its text changed in place.
+ */
+function LoadingRecipes() {
+  const [waking, setWaking] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setWaking(true), WAKING_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  return <p role="status">{waking ? "Loading recipes… (waking up the server)" : "Loading recipes…"}</p>;
 }
