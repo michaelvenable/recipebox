@@ -25,6 +25,8 @@ describe("REC-21 entry boxes", () => {
   it("can be dragged taller or shorter, which sizing the box to its text would prevent", () => {
     const textArea = styles.slice(styles.indexOf(".text-area {"), styles.indexOf("}", styles.indexOf(".text-area {")));
     expect(textArea).toContain("resize: vertical;");
+    // A flex basis inside the .field column would override the height the drag sets.
+    expect(textArea).toContain("flex: none;");
     expect(styles).not.toMatch(/^\s*field-sizing:/m);
   });
 });

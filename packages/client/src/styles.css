@@ -1608,6 +1608,8 @@ button.pill-button:disabled {
 }
 
 .text-area {
+  /* In a .field column, .text-input's flex: 1 would size the height from the flex basis and ignore the dragged height. */
+  flex: none;
   width: 100%;
   min-height: 48px;
   padding: 10px 12px;
