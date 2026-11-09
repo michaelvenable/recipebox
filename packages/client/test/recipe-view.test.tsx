@@ -275,6 +275,26 @@ describe("REC-19 ticks", () => {
     expect(step(1)).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("ticks and unticks a step or prep entry from a tap on its text, once per tap", async () => {
+    await openRecipe({ me: VISITOR, recipes: { [ID]: () => CURRY } });
+    await userEvent.click(screen.getByText("Simmer."));
+    expect(step(2)).toHaveAttribute("aria-pressed", "true");
+    expect(step(1)).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(screen.getByText("Simmer."));
+    expect(step(2)).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(within(screen.getByRole("region", { name: "Prep" })).getAllByRole("listitem")[0]!);
+    expect(prep(1)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("ticks a step from the keyboard on its number", async () => {
+    await openRecipe({ me: VISITOR, recipes: { [ID]: () => PAD_THAI } });
+    step(1).focus();
+    await userEvent.keyboard("{Enter}");
+    expect(step(1)).toHaveAttribute("aria-pressed", "true");
+    await userEvent.keyboard(" ");
+    expect(step(1)).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("never sends ticks to the API or saves them on the device", async () => {
     const setItem = vi.spyOn(Storage.prototype, "setItem");
     const { fetchMock } = await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI) } });

@@ -146,7 +146,11 @@ interface NumberedSectionProps {
   setTicks: (update: (ticks: Ticks) => Ticks) => void;
 }
 
-/** Prep or steps: in the order entered (REC-3), numbered from 1 (REC-4), each number ticked off when done (REC-19). */
+/**
+ * Prep or steps: in the order entered (REC-3), numbered from 1 (REC-4), each ticked off when done (REC-19). A tap anywhere on the
+ * line ticks it, which is easier while cooking than aiming at the number. The number stays the button keyboards and screen
+ * readers use; its click bubbles to the line, so the line alone toggles.
+ */
 function NumberedSection({ id, title, noun, entries, ticks, setTicks }: NumberedSectionProps) {
   return (
     <section className="recipe-section" aria-labelledby={`${id}-heading`}>
@@ -157,14 +161,8 @@ function NumberedSection({ id, title, noun, entries, ticks, setTicks }: Numbered
         {entries.map((entry, index) => {
           const done = ticks.has(index);
           return (
-            <li key={index} className={done ? "step ticked" : "step"}>
-              <button
-                type="button"
-                className="step-number"
-                aria-pressed={done}
-                aria-label={`${noun} ${index + 1} done`}
-                onClick={() => setTicks((current) => toggled(current, index))}
-              >
+            <li key={index} className={done ? "step ticked" : "step"} onClick={() => setTicks((current) => toggled(current, index))}>
+              <button type="button" className="step-number" aria-pressed={done} aria-label={`${noun} ${index + 1} done`}>
                 <span aria-hidden="true">
                   {done ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
