@@ -45,6 +45,10 @@ Visitors get the public shapes. Editors calling the same endpoints get the edito
 - `GET /recipes/{id}/photo` and `GET /recipes/{id}/thumbnail` — the images (REC-7). 404 if there is no photo. If the recipe is in
   the trash: 404 for visitors and non-editors, but editors get the images, so the trash can show thumbnails (REC-14, X-1).
 - `GET /me` — the Account page (X-11). Returns `Me`: whether signed in, provider, account ID, and whether an editor.
+- `GET /signed-in?to={path}` — where sign-in returns to before going back to the app (X-8; docs/architecture.md, "Sign-in").
+  Answers 302 to the client's origin plus `to`. A `to` that isn't a path in the app (missing, not starting with a single `/`,
+  or naming another site once parsed) goes to the client's home page instead, so the route can't send anyone to another site.
+  Changes nothing.
 - `GET /shopping-lists/{token}` — a shopping list link (PLAN-9), for anyone with the link and the same for everyone. Returns
   `SharedShoppingList`: the current shopping list, built on every request with `shoppingList` from the stored recipes, as for
   `GET /plan/shopping-list`. While the link works (`isAvailable` by the server's clock, X-12): 200, with `items` empty when the

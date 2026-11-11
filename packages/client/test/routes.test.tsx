@@ -1,6 +1,6 @@
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { API, APP, EDITOR, NON_EDITOR, VISITOR, jsonResponse, mockApi, mockApiAs, renderAt, requestedUrls } from "./helpers.js";
+import { API, afterSignIn, EDITOR, NON_EDITOR, VISITOR, jsonResponse, mockApi, mockApiAs, renderAt, requestedUrls } from "./helpers.js";
 
 const ID = "8d3f2a4e-1b2c-4d5e-8f90-1234567890ab";
 
@@ -20,7 +20,7 @@ describe("X-1, X-6 editor-only pages", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Sign in to see this" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
       "href",
-      `${API}/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(`${APP}${path}`)}`,
+      `${API}/.auth/login/aad?post_login_redirect_uri=${afterSignIn(path)}`,
     );
     expect(requestedUrls(fetchMock)).toEqual([`${API}/me`]);
   });

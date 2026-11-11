@@ -7,6 +7,7 @@ import { registerCaller } from "./http/caller.js";
 import { registerJsonOnlyChanges } from "./http/content-type.js";
 import { registerErrorHandling } from "./http/errors.js";
 import { withRedactedUrls } from "./http/request-log.js";
+import { registerSignedInRoute } from "./http/signed-in.js";
 import type { ImportQueue } from "./imports/import-queue.js";
 import type { ImportRepository } from "./imports/import-repository.js";
 import { registerImportRoutes } from "./imports/import-routes.js";
@@ -91,6 +92,8 @@ export async function buildApp({
     if (!caller.signedIn) return { signedIn: false, isEditor: false };
     return { signedIn: true, provider: caller.provider, accountId: caller.accountId, isEditor: caller.isEditor };
   });
+
+  registerSignedInRoute(app, config.clientOrigin);
 
   // Each in its own scope, so their hooks (and the photo routes' multipart parser) apply only to them.
   await app.register(async (scope) => registerRecipeRoutes(scope, { recipes, clock, newRecipeId }));

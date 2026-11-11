@@ -62,12 +62,12 @@ export function AccountPage() {
   if (me === undefined || !me.signedIn) {
     // X-8: return to the page the visitor came from (set by the nav's Sign in link), or else to this page.
     const from: unknown = (location.state as { from?: unknown } | null)?.from;
-    const returnTo = appUrl(isAppPath(from) ? from : `${location.pathname}${location.search}`);
+    const returnPath = isAppPath(from) ? from : `${location.pathname}${location.search}`;
     return (
       <>
         <h1>Account</h1>
         <p className="muted">Sign in to add and edit recipes. Anyone can view recipes without signing in.</p>
-        <SignInButtons returnTo={returnTo} />
+        <SignInButtons returnPath={returnPath} />
         <PrivacyLink />
       </>
     );

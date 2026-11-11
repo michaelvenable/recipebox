@@ -1,6 +1,6 @@
 import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { API, APP, EDITOR, VISITOR, mockApiAs, renderAt } from "./helpers.js";
+import { API, afterSignIn, EDITOR, VISITOR, mockApiAs, renderAt } from "./helpers.js";
 
 // Every place the client offers sign-in: the Account page and the editor-only pages' message (X-8).
 const SIGN_IN_PAGES = ["/account", "/plan"];
@@ -12,7 +12,7 @@ describe("X-7 sign-in providers: Microsoft only unless the client is built with 
     renderAt(path);
     expect(await screen.findByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
       "href",
-      `${API}/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(`${APP}${path}`)}`,
+      `${API}/.auth/login/aad?post_login_redirect_uri=${afterSignIn(path)}`,
     );
     expect(screen.queryByRole("link", { name: "Sign in with Google" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /^Sign in with / })).toHaveLength(1);
@@ -30,7 +30,7 @@ describe("X-7 sign-in providers: Microsoft only unless the client is built with 
     vi.stubEnv("VITE_GOOGLE_SIGN_IN", "true");
     mockApiAs(VISITOR);
     renderAt(path);
-    const returnTo = encodeURIComponent(`${APP}${path}`);
+    const returnTo = afterSignIn(path);
     expect(await screen.findByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
       "href",
       `${API}/.auth/login/aad?post_login_redirect_uri=${returnTo}`,

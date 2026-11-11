@@ -13,6 +13,14 @@ export const NON_EDITOR: Me = { signedIn: true, provider: "aad", accountId: "9f3
 export const APP = "http://localhost:5173";
 export const API = "http://localhost:3000";
 
+/**
+ * The encoded `post_login_redirect_uri` of a sign-in link that returns to `path` in the app: `/signed-in?to={path}` on the API
+ * host (X-8; docs/architecture.md, "Sign-in").
+ */
+export function afterSignIn(path: string): string {
+  return encodeURIComponent(`/signed-in?to=${encodeURIComponent(path)}`);
+}
+
 export function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }

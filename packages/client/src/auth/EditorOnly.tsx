@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
-import { appUrl, useViewer } from "./sign-in.js";
+import { useViewer } from "./sign-in.js";
 import { SignInButtons } from "./SignInButtons.js";
 
 /**
@@ -17,7 +17,7 @@ export function EditorOnly({ children }: { children: ReactNode }) {
       <>
         <h1>Sign in to see this</h1>
         <p className="muted">This page is for the household's editors.</p>
-        <SignInButtons returnTo={appUrl(`${location.pathname}${location.search}${location.hash}`)} />
+        <SignInButtons returnPath={`${location.pathname}${location.search}${location.hash}`} />
       </>
     );
   }

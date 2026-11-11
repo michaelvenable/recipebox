@@ -1,7 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import { API, APP, EDITOR, NON_EDITOR, VISITOR, jsonResponse, mockApiAs, mockFetch, renderAt } from "./helpers.js";
+import { API, afterSignIn, EDITOR, NON_EDITOR, VISITOR, jsonResponse, mockApiAs, mockFetch, renderAt } from "./helpers.js";
 
 async function mainNav(): Promise<HTMLElement> {
   const nav = screen.getByRole("navigation", { name: "Main" });
@@ -98,7 +98,7 @@ describe("X-8 Sign in returns to the page the visitor was on", () => {
     renderAt("/recipes/8d3f2a4e-1b2c-4d5e-8f90-1234567890ab");
     await userEvent.click(within(await mainNav()).getByRole("link", { name: "Sign in" }));
 
-    const returnTo = encodeURIComponent(`${APP}/recipes/8d3f2a4e-1b2c-4d5e-8f90-1234567890ab`);
+    const returnTo = afterSignIn("/recipes/8d3f2a4e-1b2c-4d5e-8f90-1234567890ab");
     expect(await screen.findByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
       "href",
       `${API}/.auth/login/aad?post_login_redirect_uri=${returnTo}`,
@@ -111,7 +111,7 @@ describe("X-8 Sign in returns to the page the visitor was on", () => {
     await userEvent.click(within(await mainNav()).getByRole("link", { name: "Sign in" }));
     expect(await screen.findByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
       "href",
-      `${API}/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(`${APP}/?tags=dinner`)}`,
+      `${API}/.auth/login/aad?post_login_redirect_uri=${afterSignIn("/?tags=dinner")}`,
     );
   });
 });

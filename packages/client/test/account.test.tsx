@@ -1,7 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { API, APP, EDITOR, NON_EDITOR, VISITOR, jsonResponse, mockApiAs, mockFetch, renderAt } from "./helpers.js";
+import { API, afterSignIn, APP, EDITOR, NON_EDITOR, VISITOR, jsonResponse, mockApiAs, mockFetch, renderAt } from "./helpers.js";
 
 function detail(term: string): HTMLElement {
   const dt = screen.getByText(term, { selector: "dt" });
@@ -12,7 +12,7 @@ describe("X-11 Account page, signed out", () => {
   it("offers Microsoft sign-in, returning to the Account page", async () => {
     mockApiAs(VISITOR);
     renderAt("/account");
-    const returnTo = encodeURIComponent(`${APP}/account`);
+    const returnTo = afterSignIn("/account");
     expect(await screen.findByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
       "href",
       `${API}/.auth/login/aad?post_login_redirect_uri=${returnTo}`,
@@ -21,12 +21,22 @@ describe("X-11 Account page, signed out", () => {
     expect(screen.queryByText("Account ID")).not.toBeInTheDocument();
   });
 
+  // X-8: the auth layer returns to a path on the API host, since it drops a full client address for Microsoft sign-in.
+  it("returns through /signed-in on the API host, with the page encoded in to", async () => {
+    mockApiAs(VISITOR);
+    renderAt("/account", { from: "/?tags=dinner&q=a b" });
+    expect(await screen.findByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
+      "href",
+      `${API}/.auth/login/aad?post_login_redirect_uri=%2Fsigned-in%3Fto%3D%252F%253Ftags%253Ddinner%2526q%253Da%2520b`,
+    );
+  });
+
   it("ignores a return address that isn't a page of this app", async () => {
     mockApiAs(VISITOR);
     renderAt("/account", { from: "//evil.example/steal" });
     expect(await screen.findByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
       "href",
-      `${API}/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(`${APP}/account`)}`,
+      `${API}/.auth/login/aad?post_login_redirect_uri=${afterSignIn("/account")}`,
     );
   });
 
@@ -38,7 +48,7 @@ describe("X-11 Account page, signed out", () => {
       renderAt("/account", { from });
       expect(await screen.findByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
         "href",
-        `${API}/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(`${APP}/account`)}`,
+        `${API}/.auth/login/aad?post_login_redirect_uri=${afterSignIn("/account")}`,
       );
     },
   );
@@ -49,7 +59,7 @@ describe("X-11 Account page, signed out", () => {
     renderAt("/account");
     expect(await screen.findByRole("link", { name: "Sign in with Microsoft" })).toHaveAttribute(
       "href",
-      `https://api.example.net/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(`${APP}/account`)}`,
+      `https://api.example.net/.auth/login/aad?post_login_redirect_uri=${afterSignIn("/account")}`,
     );
   });
 });

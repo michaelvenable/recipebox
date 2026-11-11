@@ -106,8 +106,11 @@ Microsoft and Google are both offered (X-7). Google is switched on by configurat
 the Key Vault and the `GOOGLE_CLIENT_ID` variable. Without that variable, only Microsoft is offered.
 
 - Configuration: "Allow unauthenticated access", so visitors can read public recipes; the API decides what needs an editor.
-- Sign-in links point at `https://api.recipes.mikevenable.net/.auth/login/{aad|google}`, with `post_login_redirect_uri` returning
-  the editor to the page they were on (X-8). The client's address must be allowed as a redirect target in the auth configuration.
+- Sign-in links point at `https://api.recipes.mikevenable.net/.auth/login/{aad|google}`, with `post_login_redirect_uri` set to
+  `/signed-in?to={page}`, a path on the API host. That API route then sends the editor to the page they were on in the client
+  (X-8). A path is used because the auth layer drops a full address for Microsoft sign-in and returns to the API's `/` instead;
+  Google keeps it, but both use the same path. Sign-out still returns straight to the client, so the client's address must stay
+  allowed as a redirect target in the auth configuration.
 - The client calls the API with `credentials: "include"`. The API's CORS policy allows exactly the client's origin, with
   credentials.
 - Both hosts are under one registrable domain, so the browser treats the API's cookie as same-site. Without that, Safari on iPhone

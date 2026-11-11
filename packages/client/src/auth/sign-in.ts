@@ -18,17 +18,22 @@ export function signInProviders(): readonly Provider[] {
   return import.meta.env.VITE_GOOGLE_SIGN_IN === "true" ? ["aad", "google"] : ["aad"];
 }
 
-/** Sign in with `provider`, then come back to `returnTo`, an absolute address in this app (X-8). */
-export function signInUrl(provider: Provider, returnTo: string): string {
-  return `${apiBaseUrl()}/.auth/login/${provider}?post_login_redirect_uri=${encodeURIComponent(returnTo)}`;
+/**
+ * Sign in with `provider`, then come back to `returnPath`, a path in this app such as "/plan?x=1" (X-8). The auth layer returns
+ * to `/signed-in` on the API host, which redirects to the client: a full client address would be dropped for Microsoft sign-in
+ * (docs/architecture.md, "Sign-in"). The API sends anything that isn't a path in the app to the home page.
+ */
+export function signInUrl(provider: Provider, returnPath: string): string {
+  const afterSignIn = `/signed-in?to=${encodeURIComponent(returnPath)}`;
+  return `${apiBaseUrl()}/.auth/login/${provider}?post_login_redirect_uri=${encodeURIComponent(afterSignIn)}`;
 }
 
-/** Sign out, then come back to `returnTo`. */
+/** Sign out, then come back to `returnTo`, an absolute address in this app. */
 export function signOutUrl(returnTo: string): string {
   return `${apiBaseUrl()}/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(returnTo)}`;
 }
 
-/** The absolute address of a path in this app, for the redirects above. */
+/** The absolute address of a path in this app, for signing out. */
 export function appUrl(path: string): string {
   return new URL(path, window.location.origin).href;
 }

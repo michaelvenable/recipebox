@@ -646,8 +646,8 @@ resource authConfig 'Microsoft.App/containerApps/authConfigs@2025-01-01' = if (e
           }
         : {}
     )
-    // post_login_redirect_uri sends the editor back to the client page they were on (X-8). Session length is left at the
-    // defaults (open item 2 in docs/architecture.md).
+    // Sign-in returns to the API's own /signed-in path, which needs no entry here (X-8); the client's origin is listed for
+    // sign-out's post_logout_redirect_uri. Session length is left at the defaults (open item 2 in docs/architecture.md).
     login: {
       allowedExternalRedirectUrls: [
         clientOrigin
