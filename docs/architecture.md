@@ -115,6 +115,17 @@ the Key Vault and the `GOOGLE_CLIENT_ID` variable. Without that variable, only M
   credentials.
 - Both hosts are under one registrable domain, so the browser treats the API's cookie as same-site. Without that, Safari on iPhone
   and iPad would block the cookie and editors could not stay signed in.
+- Session length (X-9): the auth configuration sets `login.cookieExpiration` to a fixed 30 days. Even so, the auth layer issues
+  its `AppServiceAuthSession` cookie as a browser-session cookie, with no expiry date (seen in Firefox), so closing the browser
+  signs the editor out. Microsoft and Google keep their own longer sessions, so a visit to `/.auth/login/{provider}` usually
+  signs the editor in again without any typing or click.
+- Signing in again automatically (X-16): the client keeps the provider an editor last signed in with in `localStorage` ("aad" or
+  "google", and nothing else), written only once `/me` confirms an editor. When the app opens and `/me` says not signed in, the
+  device is online and the page isn't a shopping list link (PLAN-9), it goes to the usual sign-in link for that provider,
+  returning to the same page. A flag in `sessionStorage`, set before leaving, limits this to one try per visit, so an editor who
+  comes back still signed out sees the visitor's page. Sign out clears the provider before leaving, and so does `/me` reporting a
+  signed-in non-editor. If `/me` fails or storage is unavailable, nothing happens. The decision is made once, on the first answer
+  from `/me`; a session that ends mid-visit doesn't send the editor away.
 
 Why a cookie rather than a bearer token: current guidance for browser-based OAuth apps (OAuth 2.0 for Browser-Based Applications)
 recommends keeping tokens out of the app's JavaScript. The session cookie is `HttpOnly`, so a malicious script on the page could
@@ -368,8 +379,10 @@ storage code itself is tested against the emulators with `npm run test:int`.
 
 1. Microsoft issuer: editors sign in with personal Microsoft accounts only, so the issuer is the consumers tenant,
    `https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0` (owner decision). Confirm with a real sign-in.
-2. Session length (X-9): confirm how the built-in auth's session cookie expires and whether active use extends it. If not, the
-   client calls `/.auth/refresh` periodically, or the API issues its own sliding session.
+2. Session length (X-9): the built-in auth's cookie is a browser-session cookie even with `cookieExpiration` set to 30 days, so
+   it ends when the browser closes; X-16 signs the editor in again automatically to make up for it ("Sign-in"). Still to confirm:
+   whether active use extends the 30 days while the browser stays open, and how long Microsoft's and Google's own sessions last
+   without a prompt.
 3. Microsoft account IDs: confirm which identifier the built-in auth passes for personal Microsoft accounts and that it stays the
    same if the app registration is ever recreated. The Account page makes this easy to check.
 4. Cosmos free tier: must be chosen when the account is created; only one free-tier account is allowed per subscription.

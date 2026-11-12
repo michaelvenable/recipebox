@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EditorRecipe, EditorRecipeSummary, ImportStatus, Me, RecipeSummary } from "@recipebox/shared";
+import { REMEMBERED_PROVIDER_KEY } from "../src/auth/auto-sign-in.js";
 import { IMPORT_POLL_MS } from "../src/imports/imports.js";
 import { NOTICE_MS } from "../src/layout/notices.js";
 import { EDITOR, type FetchMock, NON_EDITOR, VISITOR, jsonResponse, mockApi, renderAt } from "./helpers.js";
@@ -236,7 +237,8 @@ describe("IMP-1 start from the New recipe form", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/"));
     expect(revoked).toHaveBeenCalledWith("blob:second");
-    expect(localStorage.length).toBe(0);
+    // The only thing kept on the device is the editor's sign-in provider (X-16).
+    expect(Object.keys(localStorage)).toEqual([REMEMBERED_PROVIDER_KEY]);
     expect(sessionStorage.length).toBe(0);
   });
 });

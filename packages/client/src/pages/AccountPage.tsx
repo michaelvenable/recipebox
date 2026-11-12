@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
 import type { Me } from "@recipebox/shared";
+import { forgetProvider } from "../auth/auto-sign-in.js";
 import { PROVIDER_NAMES, appUrl, isAppPath, signOutUrl, useViewer } from "../auth/sign-in.js";
 import { SignInButtons } from "../auth/SignInButtons.js";
 
@@ -103,7 +104,8 @@ export function AccountPage() {
             editor list.
           </p>
         )}
-        <a href={signOutUrl(appUrl("/"))} className="button">
+        {/* X-16: forgotten before leaving, so the app doesn't sign the editor straight back in. */}
+        <a href={signOutUrl(appUrl("/"))} className="button" onClick={forgetProvider}>
           Sign out
         </a>
       </div>

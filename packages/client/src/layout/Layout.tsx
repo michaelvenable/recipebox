@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Outlet } from "react-router";
+import { useAutoSignIn } from "../auth/auto-sign-in.js";
 import { ImportsProvider } from "../imports/imports.js";
 import { NavBar } from "./NavBar.js";
 import { NoticeProvider, NoticeRegion } from "./notices.js";
@@ -19,18 +20,20 @@ export function Layout() {
     return () => setClaims((n) => n - 1);
   }, []);
   const slot = useMemo<TopBarSlot>(() => ({ element, claim }), [element, claim]);
+  // X-16: while leaving to sign in again automatically, keep showing that the app is loading, not the visitor's page.
+  const signingIn = useAutoSignIn();
 
   return (
     <div className="app">
       <TopBarContext value={slot}>
         <NoticeProvider>
           <ImportsProvider>
-            {claims === 0 && <NavBar />}
+            {claims === 0 && !signingIn && <NavBar />}
             <div ref={setElement} className="top-bar-slot" />
             <OfflineBanner />
             <NoticeRegion />
             <main className="page">
-              <Outlet />
+              {signingIn ? <p role="status">Loading…</p> : <Outlet />}
             </main>
           </ImportsProvider>
         </NoticeProvider>

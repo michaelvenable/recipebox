@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EditorRecipe, Me, PublicRecipe } from "@recipebox/shared";
+import { REMEMBERED_PROVIDER_KEY } from "../src/auth/auto-sign-in.js";
 import { planKeys, recipeKeys, rediscoverKeys, tagKeys } from "../src/api/query-keys.js";
 import { API, EDITOR, type FetchMock, NON_EDITOR, VISITOR, jsonResponse, mockApi, renderAt } from "./helpers.js";
 
@@ -304,7 +305,8 @@ describe("REC-19 ticks", () => {
     await userEvent.click(step(1));
     expect(fetchMock.mock.calls.length).toBe(before);
     expect(changes(fetchMock)).toEqual([]);
-    expect(setItem).not.toHaveBeenCalled();
+    // The only thing saved is the editor's sign-in provider (X-16), never a tick.
+    expect(setItem.mock.calls.filter(([key]) => key !== REMEMBERED_PROVIDER_KEY)).toEqual([]);
   });
 
   it("clears ticks on leaving the recipe and coming back", async () => {

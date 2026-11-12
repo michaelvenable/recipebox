@@ -647,11 +647,17 @@ resource authConfig 'Microsoft.App/containerApps/authConfigs@2025-01-01' = if (e
         : {}
     )
     // Sign-in returns to the API's own /signed-in path, which needs no entry here (X-8); the client's origin is listed for
-    // sign-out's post_logout_redirect_uri. Session length is left at the defaults (open item 2 in docs/architecture.md).
+    // sign-out's post_logout_redirect_uri.
     login: {
       allowedExternalRedirectUrls: [
         clientOrigin
       ]
+      // X-9: a session lasts 30 days. The cookie is still a browser-session cookie, deleted when the browser closes whatever
+      // this says; the client signs the editor in again automatically to make up for it (X-16; architecture.md, "Sign-in").
+      cookieExpiration: {
+        convention: 'FixedTime'
+        timeToExpiration: '30.00:00:00'
+      }
     }
   }
   dependsOn: [

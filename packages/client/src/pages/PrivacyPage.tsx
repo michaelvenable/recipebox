@@ -59,14 +59,17 @@ export function PrivacyPage() {
       </section>
 
       {/*
-        X-9. The app sets no cookies and uses no localStorage or sessionStorage; the service worker caches only the app's own
-        files (pwa.config.ts). No third-party scripts or fonts.
+        X-9, X-16. The app sets no cookies. Its only storage is the provider an editor last signed in with ("aad" or "google",
+        in localStorage) and a once-per-visit flag in sessionStorage (auth/auto-sign-in.ts); the service worker caches only the
+        app's own files (pwa.config.ts). No third-party scripts or fonts.
       */}
       <section aria-labelledby="privacy-cookies">
         <h2 id="privacy-cookies">Cookies</h2>
         <p>
           The only cookies are the ones signing in sets, to keep you signed in. There are no advertising, tracking or analytics
-          cookies. So that it can be installed and start quickly, the app keeps a copy of its own files on your device.
+          cookies. Your device also remembers which of Microsoft or Google an editor last signed in with, and nothing else about
+          them, so that the app can sign them in again when it is next opened. So that it can be installed and start quickly,
+          the app keeps a copy of its own files on your device.
         </p>
       </section>
 

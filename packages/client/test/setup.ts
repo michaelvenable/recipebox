@@ -8,4 +8,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  // X-16 remembers the sign-in provider in localStorage and a once-per-visit flag in sessionStorage.
+  localStorage.clear();
+  sessionStorage.clear();
 });

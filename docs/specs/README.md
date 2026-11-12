@@ -51,7 +51,8 @@ been cooked in a while.
 - **X-8. Editing controls.** Visitors don't see editing controls; they see a "Sign in" option instead. After signing in, the
   editor returns to the page they were on.
 - **X-9. Long sessions.** An editor who uses the app on a device at least once every 30 days stays signed in on that device. After
-  30 days without use, they must sign in again.
+  30 days without use, they must sign in again. The sign-in cookie set by the built-in authentication is deleted when the browser
+  closes, whatever its lifetime; signing in again automatically (X-16) makes up for that (owner decision, 2026-11-11).
 - **X-10. Not in search engines.** The app asks search engines not to index it, so the collection doesn't appear in search
   results.
 - **X-11. Account page.** Anyone who is signed in can open an Account page showing which provider they signed in with
@@ -79,11 +80,26 @@ been cooked in a while.
     or email address (X-7);
   - that a photo uploaded to import a recipe (IMP-1) is sent to an AI service in the app's own Microsoft Azure account to read the
     recipe, is used for nothing else, and is deleted once the import ends (IMP-12);
-  - the cookies used, which are only for staying signed in (X-9);
+  - the cookies used, which are only for staying signed in (X-9), and that the device remembers which provider an editor last
+    signed in with, to sign them in again (X-16);
   - that server logs record requests, including the network address they came from, and are kept only for running the app.
 
   It also says that nothing is sold or shared with anyone else, and that questions go to the household member who shared the
   app. It shows no personal contact details. The Account page links to it (X-11), and it is not indexed (X-10).
+- **X-16. Signing in again automatically.** The app remembers, on each device, the provider an editor last signed in with
+  (Microsoft or Google), and nothing else about them. When the app is opened on that device and the editor isn't signed in, it
+  goes straight to that provider's sign-in and comes back to the same page (X-8). The provider usually remembers the editor, so
+  this needs no typing or click. It works the same in a browser and in the app installed on a phone. (Owner decisions,
+  2026-11-11.)
+  - It tries once per visit. If the editor doesn't come back signed in (they cancel, or the provider asks for a password and they
+    leave), the app shows the page as to a visitor, with the usual "Sign in" option, and doesn't try again until the app is next
+    opened.
+  - Signing out on the device makes it forget the provider, so the app doesn't sign the editor straight back in. Signing in by
+    hand remembers it again.
+  - It never tries while the device is offline, or when the app can't tell whether the editor is signed in.
+  - It is only remembered for editors. A signed-in account that isn't an editor (X-6) isn't remembered, and signing in with one
+    makes the device forget the provider it had remembered.
+  - A shopping list link (PLAN-9) never triggers it, since anyone may open one.
 
 ## Out of scope (for now)
 

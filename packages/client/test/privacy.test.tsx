@@ -57,6 +57,10 @@ describe("X-15 privacy page", () => {
     expect(text).toMatch(/The photo is used for nothing else, and it is deleted once the import\s+ends/);
     // X-9: cookies only for staying signed in.
     expect(text).toMatch(/The only cookies are the ones signing in sets, to keep you signed in/);
+    // X-16: the device remembers the provider an editor last signed in with, to sign them in again.
+    expect(text).toMatch(
+      /device also remembers which of Microsoft or Google an editor last signed in with, and nothing else about\s+them, so that the app can sign them in again/,
+    );
     // Server logs: network address, used only to run the app, and how long they are kept (infra/main.bicep).
     expect(text).toMatch(/network address it came from/);
     expect(text).toMatch(/used only to keep the app running, and are kept for 30 days/);
