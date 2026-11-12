@@ -13,6 +13,7 @@ import { RecipeNotes } from "../recipes/RecipeNotes.js";
 import { ToMakeBadge } from "../recipes/RecipeCard.js";
 import { type RecipeChange, changeErrorMessage, useRecipeChange } from "../recipes/recipe-changes.js";
 import { RecipeTags } from "../recipes/RecipeTags.js";
+import { TimeClock } from "../recipes/TimeClock.js";
 import { usePhotoVersion } from "../recipes/photo-version.js";
 import { useDeleteRecipe } from "../recipes/trash-changes.js";
 import { useWakeLock } from "../recipes/use-wake-lock.js";
@@ -91,10 +92,8 @@ function RecipeContent({ recipe }: { recipe: ViewedRecipe }) {
             <div className="recipe-facts">
               {recipe.totalTimeMinutes !== undefined && (
                 <p className="recipe-time">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="8" />
-                    <path d="M12 8v4l3 2" />
-                  </svg>
+                  {/* REC-26: the clock next to the time; hidden from screen readers, which read the text beside it. */}
+                  <TimeClock minutes={recipe.totalTimeMinutes} size={20} />
                   {formatTotalTime(recipe.totalTimeMinutes)} total
                 </p>
               )}

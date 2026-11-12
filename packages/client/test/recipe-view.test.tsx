@@ -757,6 +757,32 @@ describe("REC-24 servings on the view", () => {
   });
 });
 
+describe("REC-26 time clock on the view", () => {
+  it("shows the clock next to the time, which keeps its wording, for a visitor too", async () => {
+    await openRecipe({ me: VISITOR, recipes: { [ID]: () => ({ ...PAD_THAI, totalTimeMinutes: 75 }) } });
+    const time = screen.getByText("1 h 15 min total");
+    const clock = time.querySelector("svg.time-clock");
+    expect(clock).not.toBeNull();
+    // spec example: 1 h 15 min is full in the first shade with a quarter in the second.
+    expect(clock?.querySelector("circle.time-clock-lap-1")).not.toBeNull();
+    expect(clock?.querySelector("path.time-clock-lap-2")).not.toBeNull();
+  });
+
+  it("keeps the picture from screen readers, which read the text beside it once", async () => {
+    await openRecipe({ me: VISITOR, recipes: { [ID]: () => PAD_THAI } });
+    const time = screen.getByText("30 min total");
+    expect(time.querySelector("svg.time-clock")).toHaveAttribute("aria-hidden", "true");
+    expect(time.querySelector(".visually-hidden")).toBeNull();
+    expect(screen.getAllByText(/30 min/)).toEqual([time]);
+  });
+
+  it("spec example: no total time, no clock", async () => {
+    await openRecipe({ me: VISITOR, recipes: { [OTHER_ID]: () => TOAST } }, `/recipes/${OTHER_ID}`);
+    expect(screen.getByRole("heading", { level: 1, name: "Toast" })).toBeInTheDocument();
+    expect(document.querySelector("svg.time-clock")).toBeNull();
+  });
+});
+
 describe("REC-25 notes on the recipe view", () => {
   const NOTE_1 = "11111111-0000-4000-8000-000000000001";
   const NOTE_2 = "11111111-0000-4000-8000-000000000002";

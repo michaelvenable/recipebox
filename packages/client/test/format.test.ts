@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { filterQuery } from "../src/api/recipes.js";
-import { describeResults, formatTotalTime, isFiltering, recipeMeta } from "../src/recipes/format.js";
+import { describeResults, formatTotalTime, isFiltering } from "../src/recipes/format.js";
 import { filterFromSearch } from "../src/recipes/list-filter.js";
 
 describe("REC-8 total time", () => {
@@ -14,13 +14,6 @@ describe("REC-8 total time", () => {
     [1440, "24 h"],
   ])("shows %i minutes as %s", (minutes, text) => {
     expect(formatTotalTime(minutes)).toBe(text);
-  });
-
-  it("joins the time and tags, leaving out what a recipe doesn't have", () => {
-    expect(recipeMeta({ totalTimeMinutes: 35, tags: ["curry", "dinner"] })).toBe("35 min · curry, dinner");
-    expect(recipeMeta({ tags: ["curry"] })).toBe("curry");
-    expect(recipeMeta({ totalTimeMinutes: 35, tags: [] })).toBe("35 min");
-    expect(recipeMeta({ tags: [] })).toBe("");
   });
 });
 

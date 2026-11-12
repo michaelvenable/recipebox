@@ -9,14 +9,6 @@ export function formatTotalTime(minutes: number): string {
   return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
 }
 
-/** The line under a recipe's name: its total time and tags, e.g. "35 min · curry, dinner". Empty if it has neither. */
-export function recipeMeta(recipe: { totalTimeMinutes?: number | undefined; tags: readonly string[] }): string {
-  const parts: string[] = [];
-  if (recipe.totalTimeMinutes !== undefined) parts.push(formatTotalTime(recipe.totalTimeMinutes));
-  if (recipe.tags.length > 0) parts.push(recipe.tags.join(", "));
-  return parts.join(" · ");
-}
-
 /** Whether the list is searched or filtered, as opposed to showing every recipe. An empty or blank term searches nothing (REC-9). */
 export function isFiltering(filter: RecipeFilter): boolean {
   return filter.name.trim() !== "" || filter.tags.length > 0;

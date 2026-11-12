@@ -26,6 +26,16 @@
   --notice-fg: #ffffff;
   --notice-action-bg: #7fc4a0;
   --notice-action-fg: #10241a;
+  /*
+   * The time clock (REC-26): each lap darker than the last, the third the accent itself. Lap 1 is lighter than the accent so
+   * three darker steps stay apart from each other before the darkest nears the text color.
+   */
+  --clock-face: #ffffff;
+  --clock-rim: #59615c;
+  --clock-lap-1: #8fd0ac;
+  --clock-lap-2: #4a9a72;
+  --clock-lap-3: #2e6a4f;
+  --clock-lap-4: #163a2a;
 
   --font: "Atkinson Hyperlegible", system-ui, sans-serif;
   --font-mono: ui-monospace, Menlo, Consolas, monospace;
@@ -59,6 +69,16 @@
     --notice-fg: #141815;
     --notice-action-bg: #2e6a4f;
     --notice-action-fg: #ffffff;
+    /*
+     * REC-26: the accent is light here, so the scale starts above it and steps down through it. The face is darker than the
+     * surface, and the darkest lap stays well clear of it.
+     */
+    --clock-face: #141815;
+    --clock-rim: #a9b3ac;
+    --clock-lap-1: #c2ead3;
+    --clock-lap-2: #7fc4a0;
+    --clock-lap-3: #4c9a74;
+    --clock-lap-4: #2e6a4f;
   }
 }
 
@@ -556,6 +576,43 @@ code {
   font-size: 14px;
   color: var(--muted);
   overflow-wrap: anywhere;
+}
+
+/* REC-26: the clock in place of the time text, about the text's height, a little apart from the tags. */
+.recipe-card-meta .time-clock {
+  vertical-align: -3px;
+  margin-right: 4px;
+}
+
+/* The time clock (REC-26): a face, the top two laps, and the rim drawn over them. */
+.time-clock {
+  flex: none;
+}
+
+.time-clock-face {
+  fill: var(--clock-face);
+}
+
+.time-clock-rim {
+  fill: none;
+  stroke: var(--clock-rim);
+  stroke-width: 1.5;
+}
+
+.time-clock-lap-1 {
+  fill: var(--clock-lap-1);
+}
+
+.time-clock-lap-2 {
+  fill: var(--clock-lap-2);
+}
+
+.time-clock-lap-3 {
+  fill: var(--clock-lap-3);
+}
+
+.time-clock-lap-4 {
+  fill: var(--clock-lap-4);
 }
 
 /* The "Plan" mark (PLAN-7). */

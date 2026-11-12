@@ -86,8 +86,8 @@ describe("REC-8 list", () => {
     mockListApi();
     renderAt("/");
     const [beef, pad, toast] = await screen.findAllByRole("link", { name: /Beef Stew|Pad Thai|Toast/ });
-    expect(beef).toHaveTextContent("Beef Stew2 h 30 min · dinner, slow");
-    expect(pad).toHaveTextContent("Pad Thai30 min · dinner, noodles, quick");
+    expect(beef).toHaveTextContent("Beef Stew2 h 30 min dinner, slow");
+    expect(pad).toHaveTextContent("Pad Thai30 min dinner, noodles, quick");
     expect(toast).toHaveTextContent(/^Toast$/);
   });
 
@@ -139,6 +139,48 @@ describe("REC-8 list", () => {
     renderAt("/");
     expect(await screen.findByText("No recipes yet.")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Add your first recipe" })).not.toBeInTheDocument();
+  });
+});
+
+describe("REC-26 time clock on cards", () => {
+  /** What a sighted user sees under the name: the meta line without the text kept for screen readers. */
+  function visibleMeta(card: HTMLElement): string {
+    const meta = card.querySelector(".recipe-card-meta")?.cloneNode(true) as HTMLElement | undefined;
+    meta?.querySelectorAll(".visually-hidden").forEach((hidden) => hidden.remove());
+    return meta?.textContent?.trim() ?? "";
+  }
+
+  it("shows the clock in place of the time text, keeping the tags", async () => {
+    mockListApi();
+    renderAt("/");
+    const beef = await screen.findByRole("link", { name: /Beef Stew/ });
+    const clock = beef.querySelector("svg.time-clock");
+    expect(clock).not.toBeNull();
+    expect(visibleMeta(beef)).toBe("dinner, slow");
+    // spec example: 2 h 30 min is full in the second shade with half in the third.
+    expect(clock?.querySelector("circle.time-clock-lap-2")).not.toBeNull();
+    expect(clock?.querySelector("path.time-clock-lap-3")).not.toBeNull();
+  });
+
+  it("gives screen readers the time in words, not the picture", async () => {
+    mockListApi();
+    renderAt("/");
+    const beef = await screen.findByRole("link", { name: /Beef Stew/ });
+    expect(beef.querySelector("svg.time-clock")).toHaveAttribute("aria-hidden", "true");
+    expect(beef.querySelector(".visually-hidden")).toHaveTextContent(/^2 h 30 min$/);
+    expect(screen.getByRole("link", { name: /Pad Thai.*30 min/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("img")).toEqual([screen.getByRole("img", { name: "Pad Thai photo" })]);
+  });
+
+  it("spec example: no total time, no clock", async () => {
+    mockListApi({ recipes: () => [TOAST, { ...TOAST, id: "0b6a3c2e-0000-4000-8000-000000000004", name: "Jam", tags: ["sweet"] }] });
+    renderAt("/");
+    const toast = await screen.findByRole("link", { name: "Toast" });
+    const jam = screen.getByRole("link", { name: /Jam/ });
+    expect(toast.querySelector("svg.time-clock")).toBeNull();
+    expect(toast.querySelector(".recipe-card-meta")).toBeNull();
+    expect(jam.querySelector("svg.time-clock")).toBeNull();
+    expect(visibleMeta(jam)).toBe("sweet");
   });
 });
 
