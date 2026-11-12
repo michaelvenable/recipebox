@@ -113,6 +113,30 @@ describe("REC-1 create", () => {
   });
 });
 
+describe("REC-24 servings", () => {
+  it("spec example: servings left empty is saved with no servings", () => {
+    expect(content({}).servings).toBeUndefined();
+    expect(content({ servings: undefined }).servings).toBeUndefined();
+  });
+
+  it("accepts servings 4", () => {
+    expect(content({ servings: 4 }).servings?.value).toBe(4);
+  });
+
+  it.each([0, 2.5, 101])("spec example: rejects servings %d", (n) => {
+    const result = create({ servings: n });
+    expect(result.ok).toBe(false);
+    expect(errorKeys(result).map((e) => e.field)).toEqual(["servings"]);
+  });
+
+  it("reports a servings error together with the other content errors (REC-1)", () => {
+    expect(errorKeys(create({ name: " ", servings: 101 }))).toEqual([
+      { code: "name.required", field: "name" },
+      { code: "servings.outOfRange", field: "servings" },
+    ]);
+  });
+});
+
 describe("REC-2 entry cleanup", () => {
   it('saves name "  Pad Thai " as "Pad Thai"', () => {
     expect(content({ name: "  Pad Thai " }).name.value).toBe("Pad Thai");

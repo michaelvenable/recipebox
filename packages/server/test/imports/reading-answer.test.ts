@@ -34,6 +34,13 @@ describe("IMP-6 / IMP-11 the answer's shape", () => {
     expect(parsed.value.dishPhoto).toBeUndefined();
   });
 
+  it("IMP-6 / REC-24: gives the servings read, and none for null", () => {
+    expect(parseReadingAnswer(answer({ servings: 2 }))).toMatchObject({ ok: true, value: { found: true, recipe: { servings: 2 } } });
+    const parsed = parseReadingAnswer(answer({ servings: null }));
+    if (!parsed.ok || !parsed.value.found) throw new Error("expected a recipe");
+    expect(parsed.value.recipe).not.toHaveProperty("servings");
+  });
+
   it("accepts an answer without tags, as the schema has none when no tag is in use", () => {
     const { tags: _tags, ...rest } = JSON.parse(answer()) as Record<string, unknown>;
     const parsed = parseReadingAnswer(JSON.stringify(rest));
@@ -55,6 +62,9 @@ describe("IMP-6 / IMP-11 the answer's shape", () => {
     ["a field missing", JSON.stringify({ ...JSON.parse(answer()), steps: undefined })],
     ["a field of the wrong type", answer({ ingredients: "3 bananas" })],
     ["a fractional total time", answer({ totalTimeMinutes: 12.5 })],
+    ["IMP-6: fractional servings", answer({ servings: 2.5 })],
+    ["IMP-6: servings as text", answer({ servings: "4" })],
+    ["IMP-6: no servings field", JSON.stringify({ ...JSON.parse(answer()), servings: undefined })],
     ["an extra field", answer({ notes: "Grandma's favourite" })],
     ["an extra field in the box", answer({ dishPhoto: { photo: 1, left: 0, top: 0, width: 1, height: 1, label: "loaf" } })],
     ["IMP-9: a box without the photo it is on", answer({ dishPhoto: { left: 0, top: 0, width: 1, height: 1 } })],

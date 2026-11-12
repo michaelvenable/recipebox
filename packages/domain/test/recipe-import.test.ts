@@ -203,6 +203,18 @@ describe("IMP-7 saved like any other recipe", () => {
     expect(valueOf(importedRecipe(recipeId(), read, [], ADDED)).content.totalTime).toBeUndefined();
   });
 
+  it("IMP-6 / REC-24: servings read from the page become the recipe's servings", () => {
+    expect(valueOf(importedRecipe(recipeId(), { ...bananaBread(), servings: 2 }, [], ADDED)).content.servings?.value).toBe(2);
+  });
+
+  it("IMP-6 / REC-24: a page that states no servings gives none", () => {
+    expect(valueOf(importedRecipe(recipeId(), bananaBread(), [], ADDED)).content.servings).toBeUndefined();
+  });
+
+  it.each([0, 101, 150, 2.5])("IMP-6: servings %j read outside 1–100 are dropped and the recipe is still added", (servings) => {
+    expect(valueOf(importedRecipe(recipeId(), { ...bananaBread(), servings }, [], ADDED)).content.servings).toBeUndefined();
+  });
+
   it("keeps prep when the page lists it separately (REC-20)", () => {
     const r = valueOf(importedRecipe(recipeId(), { ...bananaBread(), prep: ["Grease the pan."] }, [], ADDED));
     expect(r.content.prep.map((e) => e.value)).toEqual(["Grease the pan."]);

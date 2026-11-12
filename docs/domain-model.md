@@ -67,7 +67,7 @@ The user-editable part of a recipe, validated as a unit so all errors are collec
 ```ts
 class RecipeContent {
   static create(input: RecipeContentInput): Result<RecipeContent>;
-  // name, ingredients, prep, steps, tags, totalTime?
+  // name, ingredients, prep, steps, tags, totalTime?, servings?
 }
 ```
 
@@ -226,6 +226,7 @@ interface ReadRecipe {            // what was read from the photos, after the se
   prep: string[];
   steps: string[];
   totalTimeMinutes?: number;
+  servings?: number;
   tags: string[];
 }
 
@@ -279,6 +280,7 @@ interface RecipeSnapshot {
   prep?: string[];                // omitted when there is none; documents from before REC-20 have none
   steps: string[];
   totalTimeMinutes?: number;
+  servings?: number;              // omitted when there is none; documents from before REC-24 have none
   tags: string[];                 // lowercase, unique, alphabetical
   photo?: { blobName: string; contentType: string };
   toMake?: { addedAt: string };   // ISO 8601 timestamp

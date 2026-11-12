@@ -2,6 +2,7 @@ import { atField, domainError, type DomainError } from "./errors.js";
 import { Minutes } from "./minutes.js";
 import { RecipeName } from "./recipe-name.js";
 import { fail, ok, type Result } from "./result.js";
+import { Servings } from "./servings.js";
 import { Tag } from "./tag.js";
 import { TextEntry } from "./text-entry.js";
 
@@ -14,10 +15,12 @@ export interface RecipeContentInput {
   prep?: readonly string[] | undefined;
   steps: readonly string[];
   totalTimeMinutes?: number | undefined;
+  /** Optional (REC-24); missing means none, so stored documents from before servings keep working. */
+  servings?: number | undefined;
   tags?: readonly string[] | undefined;
 }
 
-/** The user-editable part of a recipe, validated as a unit (REC-1, REC-2, REC-3, REC-11, REC-20). */
+/** The user-editable part of a recipe, validated as a unit (REC-1, REC-2, REC-3, REC-11, REC-20, REC-24). */
 export class RecipeContent {
   private constructor(
     private readonly recipeName: RecipeName,
@@ -25,6 +28,7 @@ export class RecipeContent {
     private readonly prepList: readonly TextEntry[],
     private readonly stepList: readonly TextEntry[],
     private readonly time: Minutes | undefined,
+    private readonly serves: Servings | undefined,
     private readonly tagList: readonly Tag[],
   ) {
     Object.freeze(this);
@@ -57,6 +61,13 @@ export class RecipeContent {
       else errors.push(...atField(minutes.errors, "totalTimeMinutes"));
     }
 
+    let servings: Servings | undefined;
+    if (input.servings !== undefined) {
+      const count = Servings.create(input.servings);
+      if (count.ok) servings = count.value;
+      else errors.push(...atField(count.errors, "servings"));
+    }
+
     const tags = new Map<string, Tag>(); // keyed by text: duplicates collapse into one (REC-11)
     (input.tags ?? []).forEach((raw, i) => {
       const tag = Tag.create(raw);
@@ -78,6 +89,7 @@ export class RecipeContent {
         Object.freeze(prep),
         Object.freeze(steps),
         time,
+        servings,
         Object.freeze(sortedTags),
       ),
     );
@@ -104,6 +116,11 @@ export class RecipeContent {
 
   get totalTime(): Minutes | undefined {
     return this.time;
+  }
+
+  /** How many people the recipe serves, if known (REC-24). */
+  get servings(): Servings | undefined {
+    return this.serves;
   }
 
   /** Unique and in alphabetical order (REC-11). */

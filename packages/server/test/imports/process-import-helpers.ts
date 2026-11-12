@@ -49,6 +49,7 @@ export function answer(overrides: Record<string, unknown> = {}): string {
     prep: [],
     steps: ["Mash the bananas.", "Bake for 60 minutes."],
     totalTimeMinutes: 75,
+    servings: null,
     tags: [],
     dishPhoto: null,
     ...overrides,

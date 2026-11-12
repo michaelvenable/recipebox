@@ -258,6 +258,7 @@ function fullRecipe(): Recipe {
       ingredients: ["Rye bread", "Butter"],
       steps: ["Butter the bread.", "Add toppings."],
       totalTimeMinutes: 15,
+      servings: 2, // REC-24
       tags: ["lunch", "danish"],
     }, at("2026-08-15T10:00:00.250Z")),
   );

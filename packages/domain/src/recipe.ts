@@ -18,6 +18,8 @@ export interface RecipeSnapshot {
   prep?: string[];
   steps: string[];
   totalTimeMinutes?: number;
+  /** Omitted when there is none; documents stored before REC-24 have no servings. */
+  servings?: number;
   /** Lowercase, unique, alphabetical. */
   tags: string[];
   photo?: { blobName: string; contentType: string };
@@ -252,6 +254,7 @@ export class Recipe {
     };
     if (c.prep.length > 0) snapshot.prep = c.prep.map((e) => e.value);
     if (c.totalTime !== undefined) snapshot.totalTimeMinutes = c.totalTime.value;
+    if (c.servings !== undefined) snapshot.servings = c.servings.value;
     if (this.photoRef !== undefined) {
       snapshot.photo = { blobName: this.photoRef.blobName, contentType: this.photoRef.contentType };
     }
@@ -282,6 +285,7 @@ export class Recipe {
         prep: s.prep,
         steps: s.steps,
         totalTimeMinutes: s.totalTimeMinutes,
+        servings: s.servings,
         tags: s.tags,
       }),
     );
@@ -325,6 +329,7 @@ function contentInput(content: RecipeContent): RecipeContentInput {
     prep: content.prep.map((e) => e.value),
     steps: content.steps.map((e) => e.value),
     totalTimeMinutes: content.totalTime?.value,
+    servings: content.servings?.value,
     tags: content.tags.map((t) => t.value),
   };
 }

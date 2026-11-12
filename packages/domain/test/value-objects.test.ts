@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Minutes, PhotoRef, RecipeId, RecipeName, Tag, TextEntry } from "../src/index.js";
+import { Minutes, PhotoRef, RecipeId, RecipeName, Servings, Tag, TextEntry } from "../src/index.js";
 import { errorKeys, valueOf } from "./helpers.js";
 
 describe("RecipeId", () => {
@@ -241,6 +241,20 @@ describe("REC-1 total time rules", () => {
 
   it.each([2.5, Number.NaN, Number.POSITIVE_INFINITY])("rejects %d as not a whole number", (n) => {
     expect(errorKeys(Minutes.create(n))).toEqual([{ code: "totalTime.notWhole", field: "totalTimeMinutes" }]);
+  });
+});
+
+describe("REC-24 servings rules", () => {
+  it.each([1, 4, 100])("accepts %d servings", (n) => {
+    expect(valueOf(Servings.create(n)).value).toBe(n);
+  });
+
+  it.each([0, -1, 101])("spec example: rejects %d servings as out of range", (n) => {
+    expect(errorKeys(Servings.create(n))).toEqual([{ code: "servings.outOfRange", field: "servings" }]);
+  });
+
+  it.each([2.5, Number.NaN, Number.POSITIVE_INFINITY])("spec example: rejects %d as not a whole number", (n) => {
+    expect(errorKeys(Servings.create(n))).toEqual([{ code: "servings.notWhole", field: "servings" }]);
   });
 });
 

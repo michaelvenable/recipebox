@@ -36,6 +36,7 @@ export class DevelopmentRecipeReader implements RecipeReader {
       prep: [],
       steps: ["Mash the bananas and stir in the butter.", "Mix in the sugar, egg and flour.", "Bake at 350°F for 60 minutes."],
       totalTimeMinutes: 75,
+      servings: null, // a loaf: a yield that isn't people sets no servings (IMP-6)
       tags: allowedTags.slice(0, 1),
       dishPhoto: { photo: 1, left: 0, top: 0, width: 1, height: 1 },
     });

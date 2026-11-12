@@ -759,3 +759,52 @@ describe("REC-22 added time", () => {
     }
   });
 });
+
+describe("REC-24 servings", () => {
+  it("saves servings 4 on create, and a visitor's view shows them: public content (X-1)", async () => {
+    const { app, repository } = await recipeApp();
+    const created = await createRecipe(app, content("Pad Thai", { servings: 4 }));
+    expect(created.servings).toBe(4);
+    expect((await storedSnapshots(repository))[created.id]).toMatchObject({ servings: 4 });
+    expect(PublicRecipe.parse((await get(app, `/recipes/${created.id}`)).json()).servings).toBe(4);
+  });
+
+  it("spec example: servings left empty is saved with none, and the key is left out of the response", async () => {
+    const { app } = await recipeApp();
+    const created = await createRecipe(app, content("Pad Thai"));
+    expect(created).not.toHaveProperty("servings");
+    expect((await get(app, `/recipes/${created.id}`)).json()).not.toHaveProperty("servings");
+  });
+
+  it.each([0, 2.5, 101])("spec example: rejects servings %d with 400, and saves nothing", async (servings) => {
+    const { app, repository } = await recipeApp();
+    const res = await change(app, "POST", "/recipes", content("Pad Thai", { servings }));
+    expect(res.statusCode).toBe(400);
+    expect(expectErrorsAt(res.json())).toEqual(["servings"]);
+    expect(await repository.list()).toEqual([]);
+  });
+
+  it("an edit sets servings, and an edit without them removes them", async () => {
+    const { app, repository } = await recipeApp();
+    const recipe = await seed(repository, content("Pad Thai"));
+    const url = `/recipes/${recipe.id.value}/content`;
+    expect(EditorRecipe.parse((await change(app, "PUT", url, content("Pad Thai", { servings: 6 }))).json()).servings).toBe(6);
+    expect(EditorRecipe.parse((await change(app, "PUT", url, content("Pad Thai"))).json()).servings).toBeUndefined();
+  });
+
+  it("rejects servings 101 on edit and changes nothing", async () => {
+    const { app, repository } = await recipeApp();
+    const recipe = await seed(repository, content("Pad Thai", { servings: 4 }));
+    const before = await storedSnapshots(repository);
+    const res = await change(app, "PUT", `/recipes/${recipe.id.value}/content`, content("Pad Thai", { servings: 101 }));
+    expectErrors(res, 400, ["servings.outOfRange"]);
+    expect(await storedSnapshots(repository)).toEqual(before);
+  });
+
+  it("is not in the recipe list", async () => {
+    const { app, repository } = await recipeApp();
+    await seed(repository, content("Pad Thai", { servings: 4 }));
+    const [summary] = RecipeSummary.array().parse((await get(app, "/recipes")).json());
+    expect(summary).not.toHaveProperty("servings");
+  });
+});

@@ -859,3 +859,74 @@ describe("REC-7 a replaced or removed photo is shown afresh", () => {
     expect(after?.startsWith(`${API}/recipes/${ID}/photo?`)).toBe(true);
   });
 });
+
+describe("REC-24 servings in the form", () => {
+  const SERVINGS_HINT = "Optional. How many people it serves, 1 to 100.";
+
+  it("is an optional field, empty for a new recipe, on a number keyboard", async () => {
+    await openNew();
+    expect(field("Servings")).toHaveValue("");
+    expect(field("Servings")).toHaveAccessibleDescription(SERVINGS_HINT);
+    expect(field("Servings")).toHaveAttribute("inputmode", "numeric");
+  });
+
+  it("sends servings 4 on create", async () => {
+    const { fetchMock } = await openNew({
+      change: () => jsonResponse(201, { ...PAD_THAI, id: NEW_ID, servings: 4 }),
+      recipes: { [NEW_ID]: () => ({ ...PAD_THAI, id: NEW_ID, servings: 4 }) },
+    });
+    await userEvent.type(field("Name"), "Pad Thai");
+    await userEvent.type(field("Ingredients"), "2 eggs");
+    await userEvent.type(field("Steps"), "Fry.");
+    await userEvent.type(field("Servings"), "4");
+    await save();
+    await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
+    expect(changes(fetchMock)[0]?.body).toMatchObject({ servings: 4 });
+  });
+
+  it("spec example: left empty, no servings are sent", async () => {
+    const { fetchMock } = await openNew({
+      change: () => jsonResponse(201, { ...PAD_THAI, id: NEW_ID }),
+      recipes: { [NEW_ID]: () => ({ ...PAD_THAI, id: NEW_ID }) },
+    });
+    await userEvent.type(field("Name"), "Pad Thai");
+    await userEvent.type(field("Ingredients"), "2 eggs");
+    await userEvent.type(field("Steps"), "Fry.");
+    await save();
+    await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
+    expect(changes(fetchMock)[0]?.body).not.toHaveProperty("servings");
+  });
+
+  it("starts an edit with the recipe's servings, and sends none once cleared", async () => {
+    const { fetchMock } = await openEdit({ change: () => PAD_THAI }, { ...PAD_THAI, servings: 4 });
+    expect(field("Servings")).toHaveValue("4");
+    await userEvent.clear(field("Servings"));
+    await save();
+    await waitFor(() => expect(changes(fetchMock)).toHaveLength(1));
+    expect(changes(fetchMock)[0]?.body).not.toHaveProperty("servings");
+  });
+
+  it.each([
+    ["0", 0],
+    ["2.5", 2.5],
+    ["101", 101],
+  ])("spec example: sends %j and shows the server's refusal at the field", async (typed, sent) => {
+    const message = "Servings must be between 1 and 100.";
+    const { fetchMock } = await openEdit({ change: () => refused(400, "servings.outOfRange", message, "servings") });
+    await userEvent.type(field("Servings"), typed);
+    await save();
+    expect(await screen.findByText("Not saved. Fix the field marked below.")).toBeInTheDocument();
+    expect(changes(fetchMock)[0]?.body).toMatchObject({ servings: sent });
+    expect(field("Servings")).toHaveAttribute("aria-invalid", "true");
+    expect(field("Servings")).toHaveAccessibleDescription(`${message} ${SERVINGS_HINT}`);
+  });
+
+  it("refuses text that isn't a number in the browser", async () => {
+    const { fetchMock } = await openEdit({ change: () => PAD_THAI });
+    await userEvent.type(field("Servings"), "four");
+    await save();
+    expect(await screen.findByText("Not saved. Fix the field marked below.")).toBeInTheDocument();
+    expect(field("Servings")).toHaveAccessibleDescription(`Enter the number of people, like 4. ${SERVINGS_HINT}`);
+    expect(changes(fetchMock)).toEqual([]);
+  });
+});

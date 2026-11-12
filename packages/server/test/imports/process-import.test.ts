@@ -76,6 +76,19 @@ describe("IMP-7 saved like any other recipe", () => {
     expect((await job.recipes.list())[0]?.toSnapshot()).not.toHaveProperty("totalTimeMinutes");
   });
 
+  it("IMP-6 / REC-24: saves the servings read ('Tomato 1 | 2' for 2 and 4 people gives servings 2)", async () => {
+    const id = await job.startImport();
+    job.reader.answer = async () => answer({ ingredients: ["1 Tomato"], servings: 2 });
+    await job.process(id);
+    expect((await job.recipes.list())[0]?.toSnapshot()).toMatchObject({ ingredients: ["1 Tomato"], servings: 2 });
+  });
+
+  it("IMP-6 / REC-24: gives no servings when the answer has none ('Makes 24 cookies')", async () => {
+    const id = await job.startImport();
+    await job.process(id);
+    expect((await job.recipes.list())[0]?.toSnapshot()).not.toHaveProperty("servings");
+  });
+
   it("keeps prep only when it was read separately (REC-20)", async () => {
     const id = await job.startImport();
     job.reader.answer = async () => answer({ prep: ["Grease the tin."] });

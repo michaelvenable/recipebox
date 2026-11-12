@@ -15,6 +15,7 @@ tag.
 | Steps       | Yes      | Ordered list of free-text entries, at least 1, each up to 1,000 characters |
 | Photo       | No       | One image (see REC-7)                                                      |
 | Total time  | No       | Whole minutes, 1–1440, covering preparation and cooking                    |
+| Servings    | No       | Whole number, 1–100: how many people the recipe serves (REC-24)            |
 | Tags        | No       | Zero or more short labels (see REC-10 to REC-13)                           |
 
 ## Requirements
@@ -120,6 +121,10 @@ tag.
   says "Loading recipes…". If the list hasn't arrived after 5 seconds, the message becomes "Loading recipes… (waking up the
   server)", until the list arrives or loading fails. The 5 seconds are counted on the device (X-12) from when this load
   started; loading again with "Try again" starts the count again. Visitors and editors see the same message.
+- **REC-24. Servings.** A recipe can say how many people it serves, as a whole number from 1 to 100, entered in the create and
+  edit form and left empty if not known. The recipe view shows it next to the total time, as "Serves 4"; a recipe without it shows
+  nothing there. The recipe list doesn't show it. Amounts are never scaled to a different number of servings (out of scope, see
+  docs/specs/README.md). (Owner decision, 2026-11-11.)
 
 ## Examples
 
@@ -156,6 +161,9 @@ tag.
 | No recipe added in the last 30 days                                          | No Recently added row                       |
 | The recipe list arrives after 3 seconds                                      | Only "Loading recipes…" was shown           |
 | The recipe list arrives after 12 seconds                                     | "(waking up the server)" added at 5 seconds |
+| Servings `0`, `2.5` or `101`                                                 | Rejected                                    |
+| Servings left empty                                                          | Saved with no servings; nothing shown       |
+| Servings `4`                                                                 | Recipe view shows "Serves 4"                |
 
 ## Out of scope
 

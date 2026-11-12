@@ -29,7 +29,12 @@ const twentyTags = Array.from({ length: 20 }, (_, i) => `tag${String(i).padStart
 
 /** A recipe with everything set, to check what changes leave alone. */
 function fullRecipe(): Recipe {
-  const r = recipe({ tags: ["dinner", "quick"], totalTimeMinutes: 30, prep: ["Soak the noodles in warm water."] });
+  const r = recipe({
+    tags: ["dinner", "quick"],
+    totalTimeMinutes: 30,
+    servings: 4,
+    prep: ["Soak the noodles in warm water."],
+  });
   valueOf(r.setPhoto(photo("pad-thai.jpg")));
   valueOf(r.markCooked(at("2026-09-01T18:00:00Z")));
   valueOf(r.markCooked(at("2026-10-15T18:00:00Z")));
@@ -72,6 +77,7 @@ describe("REC-5 edit", () => {
     expect(r.content.ingredients.map((e) => e.value)).toEqual(["2 eggs", "wide noodles"]);
     expect(r.content.steps.map((e) => e.value)).toEqual(["Fry.", "Serve."]);
     expect(r.content.totalTime).toBeUndefined();
+    expect(r.content.servings).toBeUndefined(); // emptied in the edit form (REC-24)
     expect(r.content.prep).toEqual([]); // input without prep means none (REC-20)
     expect(tagNames(r)).toEqual(["noodles"]);
   });
@@ -548,6 +554,7 @@ describe("snapshot", () => {
       prep: ["Soak the noodles in warm water."],
       steps: ["Soak the noodles.", "Fry everything."],
       totalTimeMinutes: 30,
+      servings: 4,
       tags: ["dinner", "quick"],
       photo: { blobName: "pad-thai.jpg", contentType: "image/jpeg" },
       cookedAt: ["2026-10-15T18:00:00.000Z", "2026-09-01T18:00:00.000Z"],
@@ -571,6 +578,12 @@ describe("snapshot", () => {
     expect("prep" in stored).toBe(false);
     expect(Recipe.fromSnapshot(stored).content.prep).toEqual([]);
     expect(Recipe.fromSnapshot({ ...stored, prep: [] }).content.prep).toEqual([]);
+  });
+
+  it("reads a document stored before servings existed as having none (REC-24)", () => {
+    const stored = recipe().toSnapshot();
+    expect("servings" in stored).toBe(false);
+    expect(Recipe.fromSnapshot(stored).content.servings).toBeUndefined();
   });
 
   it("omits optional fields that aren't set", () => {
@@ -630,6 +643,8 @@ describe("snapshot", () => {
       ["a prep entry of 1,001 characters", (s) => (s.prep = ["x".repeat(1001)])],
       ["a step of 1,001 characters", (s) => s.steps.push("x".repeat(1001))],
       ["total time 0", (s) => (s.totalTimeMinutes = 0)],
+      ["servings 0 (REC-24)", (s) => (s.servings = 0)],
+      ["servings 2.5 (REC-24)", (s) => (s.servings = 2.5)],
       ["an uppercase tag", (s) => (s.tags = ["Dinner"])],
       ["duplicate tags", (s) => (s.tags = ["dinner", "dinner"])],
       ["unsorted tags", (s) => (s.tags = ["quick", "dinner"])],

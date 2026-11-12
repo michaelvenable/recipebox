@@ -53,6 +53,8 @@ export function toPublicRecipe(recipe: Recipe): PublicRecipe {
     prep: content.prep.length > 0 ? content.prep.map((e) => e.value) : undefined,
     steps: content.steps.map((e) => e.value),
     totalTimeMinutes: content.totalTime?.value,
+    // Public content (REC-24); left out when not known, like totalTimeMinutes.
+    servings: content.servings?.value,
     tags: content.tags.map((t) => t.value),
     hasPhoto: recipe.photo !== undefined,
   };

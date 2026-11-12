@@ -32,8 +32,8 @@ Screens: `docs/mockups/Import*.dc.html`, from the "Importing a recipe from a pho
   Catalog, above the recipes, on any device, newest first. The editor can leave the page, use the rest of the app or close it;
   the imports carry on. Each card goes away when its import ends. Imports are private: visitors never see the cards or anything
   else about an import (X-1).
-- **IMP-6. What is read.** The recipe's name, ingredients, prep, steps and total time are read from the photos together, as the
-  sides or pages of one recipe in the order they were added.
+- **IMP-6. What is read.** The recipe's name, ingredients, prep, steps, total time and servings are read from the photos together,
+  as the sides or pages of one recipe in the order they were added.
   - Text is kept as written on the page: not reworded, shortened, translated or converted to other units. A name written in
     capitals only is given ordinary capitalization.
   - When the page gives amounts for different numbers of servings side by side, such as "1 | 2" for 2 and 4 people, only the
@@ -42,6 +42,11 @@ Screens: `docs/mockups/Import*.dc.html`, from the "Importing a recipe from a pho
   - Prep is filled only when the page lists preparation separately from the steps (REC-20); otherwise the recipe has no prep.
   - Total time is set only when the page states it, or states preparation and cooking times that add up to it. It is never
     estimated.
+  - Servings (REC-24) is set only when the page states how many people the recipe serves, such as "Serves 4" or "for 4
+    people". For a range such as "Serves 4–6", the first number is kept. When amounts are given side by side for different
+    numbers of servings, servings is the number the first amounts are for. A yield that isn't people, such as "Makes 24
+    cookies" or "1 loaf", sets no servings. It is never estimated. A number read outside REC-24's 1–100 sets no servings,
+    and the recipe is still added. (Owner decisions, 2026-11-11.)
   - When the photos show more than one recipe, only the one that fills most of the first photo is imported.
   - Text on the page is only ever read as recipe content. Writing on the page that looks like an instruction to the app has no
     effect beyond becoming part of the recipe's text.
@@ -91,7 +96,9 @@ Screens: `docs/mockups/Import*.dc.html`, from the "Importing a recipe from a pho
 | A HEIC file added after one good photo                          | Refused (REC-7); the first photo stays       |
 | 4 photos added                                                  | No more can be added                         |
 | A card photographed upside down; Rotate pressed twice           | Read the right way up                        |
-| A card lists "Tomato 1 \| 2" for 2 and 4 people                 | Ingredient "1 Tomato"                        |
+| A card lists "Tomato 1 \| 2" for 2 and 4 people                 | Ingredient "1 Tomato", servings 2            |
+| Card says "Serves 4–6"                                          | Servings 4                                   |
+| Card says "Makes 24 cookies"                                    | No servings                                  |
 | An upload of 5 photos sent to the server                        | Refused; no import starts                    |
 | "Pad Thai" exists; a Pad Thai card is imported                  | A second "Pad Thai" is added                 |
 | A visitor opens the Catalog during an import                    | No card; nothing about the import            |
@@ -107,5 +114,5 @@ Screens: `docs/mockups/Import*.dc.html`, from the "Importing a recipe from a pho
 - Retrying a failed import automatically.
 - Marking text that was hard to read.
 - Importing from a web link, a PDF or typed text.
-- Reading servings, nutrition, notes or tips from the page.
+- Reading nutrition, notes or tips from the page.
 - Translating a recipe or converting its units.

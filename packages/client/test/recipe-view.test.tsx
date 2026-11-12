@@ -738,3 +738,21 @@ describe("REC-17, X-12 failed changes", () => {
     expect(changes(fetchMock).map((r) => r.body)).toEqual(["{}", "{}", "{}"]);
   });
 });
+
+describe("REC-24 servings on the view", () => {
+  it('spec example: servings 4 shows "Serves 4" next to the total time, for a visitor too', async () => {
+    await openRecipe({ me: VISITOR, recipes: { [ID]: () => ({ ...PAD_THAI, servings: 4 }) } });
+    const serves = screen.getByText("Serves 4");
+    expect(serves.parentElement).toBe(screen.getByText("30 min total").parentElement);
+  });
+
+  it("shows servings without a total time", async () => {
+    await openRecipe({ me: VISITOR, recipes: { [ID]: () => ({ ...TOAST, id: ID, servings: 2 }) } });
+    expect(screen.getByText("Serves 2")).toBeInTheDocument();
+  });
+
+  it("spec example: a recipe without servings shows nothing there", async () => {
+    await openRecipe({ me: VISITOR, recipes: { [ID]: () => PAD_THAI } });
+    expect(screen.queryByText(/^Serves/)).toBeNull();
+  });
+});

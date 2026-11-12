@@ -730,6 +730,18 @@ code {
   color: var(--muted);
 }
 
+/* REC-24: servings sit next to the total time, wrapping below it on a narrow screen. */
+.recipe-facts {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 20px;
+  row-gap: 6px;
+}
+
+.recipe-facts p {
+  margin: 0;
+}
+
 .recipe-tags {
   display: flex;
   flex-direction: column;
@@ -1622,6 +1634,12 @@ button.pill-button:disabled {
 /* REC-21: a box of entries, one per line, starts five lines tall and gains a row per entry (EntriesField). */
 .entries-input {
   min-height: calc(5 * 1.4em + 22px);
+}
+
+.servings-input {
+  flex: none;
+  align-self: flex-start;
+  width: 120px;
 }
 
 .time-input {

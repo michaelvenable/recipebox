@@ -201,6 +201,7 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
 
   const nameErrors = fieldErrors.get("name");
   const timeErrors = fieldErrors.get("totalTimeMinutes");
+  const servingsErrors = fieldErrors.get("servings");
 
   return (
     <div className="recipe-form-page">
@@ -289,6 +290,35 @@ export function RecipeForm({ recipe }: { recipe: PublicRecipe | undefined }) {
             )}
             <p id={`${id}-time-hint`} className="field-hint">
               Optional. Examples: 1:30, :45.
+            </p>
+          </div>
+
+          {/* REC-24: optional; left empty when not known. */}
+          <div className="field">
+            <label htmlFor={`${id}-servings`} className="field-title">
+              Servings
+            </label>
+            <input
+              id={`${id}-servings`}
+              className="text-input servings-input"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              enterKeyHint="done"
+              value={form.servings}
+              aria-invalid={servingsErrors !== undefined || undefined}
+              aria-describedby={
+                servingsErrors !== undefined ? `${id}-servings-error ${id}-servings-hint` : `${id}-servings-hint`
+              }
+              onChange={(event) => set({ servings: event.target.value })}
+            />
+            {servingsErrors !== undefined && (
+              <p id={`${id}-servings-error`} className="field-error">
+                {servingsErrors.join(" ")}
+              </p>
+            )}
+            <p id={`${id}-servings-hint`} className="field-hint">
+              Optional. How many people it serves, 1 to 100.
             </p>
           </div>
 

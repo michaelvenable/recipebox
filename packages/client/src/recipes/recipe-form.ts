@@ -17,13 +17,15 @@ export interface FormValues {
   steps: string;
   /** Total time as typed: hours:minutes such as "1:30" or ":45", or minutes such as "45"; blank means no total time. */
   totalTime: string;
+  /** Servings as typed, such as "4"; blank means none (REC-24). */
+  servings: string;
   /** Tags as typed, separated by commas, such as "dinner, quick" (REC-10). */
   tags: string;
 }
 
 /** The form for an existing recipe, its entries one per line and its tags separated by commas, or an empty form. */
 export function formFrom(recipe: PublicRecipe | undefined): FormValues {
-  if (recipe === undefined) return { name: "", ingredients: "", prep: "", steps: "", totalTime: "", tags: "" };
+  if (recipe === undefined) return { name: "", ingredients: "", prep: "", steps: "", totalTime: "", servings: "", tags: "" };
   return {
     name: recipe.name,
     ingredients: oneEntryPerLine(recipe.ingredients),
@@ -31,6 +33,7 @@ export function formFrom(recipe: PublicRecipe | undefined): FormValues {
     prep: oneEntryPerLine(recipe.prep ?? []),
     steps: oneEntryPerLine(recipe.steps),
     totalTime: formatTotalTime(recipe.totalTimeMinutes),
+    servings: recipe.servings === undefined ? "" : String(recipe.servings),
     tags: recipe.tags.join(", "),
   };
 }
@@ -102,6 +105,21 @@ export function totalMinutes(typed: string): number | undefined | null {
   return Number.isSafeInteger(total) ? total : null;
 }
 
+// A number as typed: ASCII digits, with an optional decimal part so that "2.5" is sent and the server says why it is refused.
+const NUMBER = /^[0-9]+(?:\.[0-9]+)?$/;
+
+/**
+ * The servings to send: undefined when blank, or null when it isn't a number. Whether it is a whole number from 1 to 100 is the
+ * server's to check (REC-24), so "0", "2.5" and "101" are sent and refused there.
+ */
+export function servingsCount(typed: string): number | undefined | null {
+  const text = typed.trim();
+  if (text === "") return undefined;
+  if (!NUMBER.test(text)) return null;
+  const count = Number(text);
+  return Number.isFinite(count) ? count : null;
+}
+
 /** The body of POST /recipes and PUT /recipes/{id}/content: the whole content, tags included (REC-5), never a time (X-12). */
 export function contentInput(form: FormValues): RecipeContentInput {
   const input: RecipeContentInput = {
@@ -113,17 +131,19 @@ export function contentInput(form: FormValues): RecipeContentInput {
   };
   const minutes = totalMinutes(form.totalTime);
   if (typeof minutes === "number") input.totalTimeMinutes = minutes;
+  const servings = servingsCount(form.servings);
+  if (typeof servings === "number") input.servings = servings;
   return input;
 }
 
 /** The content as typed, to tell whether it has changed since it was loaded or saved. */
 export function contentSnapshot(form: FormValues): string {
-  return JSON.stringify([form.name, form.ingredients, form.prep, form.steps, form.totalTime, form.tags]);
+  return JSON.stringify([form.name, form.ingredients, form.prep, form.steps, form.totalTime, form.servings, form.tags]);
 }
 
 /**
  * The obvious problems the server would refuse anyway (REC-1, REC-2): no name, no ingredient or step that isn't blank, and a
- * total time that can't be read as minutes. Paths and wording match the server's, so both are shown the same way.
+ * total time that can't be read as minutes, and servings that aren't a number (REC-24). Paths and wording match the server's, so both are shown the same way.
  */
 export function obviousErrors(form: FormValues): ErrorItem[] {
   const errors: ErrorItem[] = [];
@@ -141,13 +161,16 @@ export function obviousErrors(form: FormValues): ErrorItem[] {
       message: "Enter the time as hours:minutes, like 1:30 or :45, or as minutes, like 45.",
     });
   }
+  if (servingsCount(form.servings) === null) {
+    errors.push({ code: "servings.format", field: "servings", message: "Enter the number of people, like 4." });
+  }
   return errors;
 }
 
 /** Where an error is shown: a field of the form, or only in the summary at the top. */
 export interface FormErrors {
   /**
-   * Messages by field: "name", "photo", "totalTimeMinutes", "ingredients", "prep", "steps" and "tags". An error about one entry
+   * Messages by field: "name", "photo", "totalTimeMinutes", "servings", "ingredients", "prep", "steps" and "tags". An error about one entry
    * names its line ("Line 3: …", REC-21), and one about one tag names the tag.
    */
   fields: ReadonlyMap<string, readonly string[]>;
@@ -157,7 +180,7 @@ export interface FormErrors {
 
 export const NO_ERRORS: FormErrors = { fields: new Map(), general: [] };
 
-const SIMPLE_FIELDS = new Set(["name", "photo", "totalTimeMinutes", "ingredients", "prep", "steps", "tags"]);
+const SIMPLE_FIELDS = new Set(["name", "photo", "totalTimeMinutes", "servings", "ingredients", "prep", "steps", "tags"]);
 
 /**
  * The form field of a server error path such as "ingredients[2]" or "tags[0]", given the form as it was sent, and what to put

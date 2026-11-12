@@ -27,6 +27,7 @@ const answerShape = z.strictObject({
   prep: z.array(z.string()),
   steps: z.array(z.string()),
   totalTimeMinutes: z.number().int().nullable(),
+  servings: z.number().int().nullable(),
   // Left out of the schema when no tag is in use (readingSchema). Which tags are kept is the domain's rule (IMP-8), so any
   // text is accepted here.
   tags: z.array(z.string()).optional(),
@@ -65,5 +66,6 @@ export function parseReadingAnswer(raw: string): { ok: true; value: ReadingAnswe
     tags: answer.tags ?? [],
   };
   if (answer.totalTimeMinutes !== null) recipe.totalTimeMinutes = answer.totalTimeMinutes;
+  if (answer.servings !== null) recipe.servings = answer.servings; // IMP-6, REC-24: null when the page states none
   return { ok: true, value: { found: true, recipe, dishPhoto: answer.dishPhoto ?? undefined } };
 }

@@ -19,6 +19,8 @@ export const RecipeContentInput = z.strictObject({
   prep: z.array(z.string()).optional(),
   steps: z.array(z.string()),
   totalTimeMinutes: z.number().optional(),
+  /** How many people it serves (REC-24); absent means none, so a client from before servings keeps working. */
+  servings: z.number().optional(),
   tags: z.array(z.string()).optional(),
 });
 export type RecipeContentInput = z.infer<typeof RecipeContentInput>;
@@ -72,6 +74,8 @@ export const PublicRecipe = z.strictObject({
   prep: z.array(z.string()).optional(),
   steps: z.array(z.string()),
   totalTimeMinutes: z.number().optional(),
+  /** How many people it serves (REC-24): public content. Absent when not known, like `prep`. */
+  servings: z.number().optional(),
   tags: z.array(z.string()),
   hasPhoto: z.boolean(),
 });

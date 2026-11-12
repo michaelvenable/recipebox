@@ -40,6 +40,7 @@ const publicRecipe: PublicRecipe = {
   prep: ["Sift the flour."],
   steps: ["Mix.", "Fry."],
   totalTimeMinutes: 20,
+  servings: 4,
   tags: ["breakfast"],
   hasPhoto: false,
 };
@@ -75,6 +76,7 @@ describe("api.md Shapes: RecipeContentInput", () => {
     prep: ["Sift the flour."],
     steps: ["Mix."],
     totalTimeMinutes: 20,
+    servings: 4,
     tags: ["breakfast"],
   };
 
@@ -84,17 +86,18 @@ describe("api.md Shapes: RecipeContentInput", () => {
   it("requires name, ingredients and steps", () => {
     expectRequired(RecipeContentInput, valid, ["name", "ingredients", "steps"]);
   });
-  it("allows prep (REC-20), totalTimeMinutes and tags to be absent or undefined", () => {
-    expectOptional(RecipeContentInput, valid, ["prep", "totalTimeMinutes", "tags"]);
+  it("allows prep (REC-20), totalTimeMinutes, servings (REC-24) and tags to be absent or undefined", () => {
+    expectOptional(RecipeContentInput, valid, ["prep", "totalTimeMinutes", "servings", "tags"]);
     expect(RecipeContentInput.safeParse({ ...valid, prep: "Sift." }).success).toBe(false);
   });
   it("rejects wrong types: a string where an array is expected, a string time", () => {
     expect(RecipeContentInput.safeParse({ ...valid, ingredients: "2 eggs" }).success).toBe(false);
     expect(RecipeContentInput.safeParse({ ...valid, tags: "breakfast" }).success).toBe(false);
     expect(RecipeContentInput.safeParse({ ...valid, totalTimeMinutes: "20" }).success).toBe(false);
+    expect(RecipeContentInput.safeParse({ ...valid, servings: "4" }).success).toBe(false);
   });
   it("leaves business rules to the domain: empty name, no entries, 0 minutes and odd tags pass", () => {
-    const breaksRules = { name: "", ingredients: [], steps: [], totalTimeMinutes: 0, tags: ["Not A Tag!"] };
+    const breaksRules = { name: "", ingredients: [], steps: [], totalTimeMinutes: 0, servings: 2.5, tags: ["Not A Tag!"] };
     expect(RecipeContentInput.safeParse(breaksRules).success).toBe(true);
   });
   it("rejects unknown keys, so a misspelled or stored field isn't silently dropped", () => {
@@ -154,10 +157,10 @@ describe("api.md Shapes: PublicRecipe and EditorRecipe", () => {
   it("parses a valid public recipe", () => {
     expect(PublicRecipe.parse(publicRecipe)).toEqual(publicRecipe);
   });
-  it("PublicRecipe requires everything but prep and totalTimeMinutes", () => {
+  it("PublicRecipe requires everything but prep, totalTimeMinutes and servings", () => {
     expectRequired(PublicRecipe, publicRecipe, ["id", "name", "ingredients", "steps", "tags", "hasPhoto"]);
     // REC-20: left out when a recipe has none, so clients from before prep can still read the recipe.
-    expectOptional(PublicRecipe, publicRecipe, ["prep", "totalTimeMinutes"]);
+    expectOptional(PublicRecipe, publicRecipe, ["prep", "totalTimeMinutes", "servings"]);
   });
   it("parses a valid editor recipe", () => {
     expect(EditorRecipe.parse(editorRecipe)).toEqual(editorRecipe);
@@ -173,7 +176,7 @@ describe("api.md Shapes: PublicRecipe and EditorRecipe", () => {
       "cookedAt",
       "timesCooked",
     ]);
-    expectOptional(EditorRecipe, editorRecipe, ["toMake", "lastCookedAt", "totalTimeMinutes", "prep"]);
+    expectOptional(EditorRecipe, editorRecipe, ["toMake", "lastCookedAt", "totalTimeMinutes", "prep", "servings"]);
   });
   it("EditorRecipe parses a never-cooked recipe that isn't on the list", () => {
     const { toMake: _t, lastCookedAt: _l, ...rest } = editorRecipe;

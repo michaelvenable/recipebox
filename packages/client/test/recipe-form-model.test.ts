@@ -10,6 +10,7 @@ import {
   formatTotalTime,
   obviousErrors,
   photoProblem,
+  servingsCount,
   tagBeingTyped,
   tagItems,
   totalMinutes,
@@ -288,5 +289,59 @@ describe("REC-7 photo checks before uploading", () => {
     ["photo.gif", "image/gif"],
   ])("refuses %s", (name, type) => {
     expect(photoProblem(file(name, type))).toBe("Choose a JPEG, PNG or WebP photo.");
+  });
+});
+
+describe("REC-24 servings", () => {
+  const form = () => ({ ...formFrom(undefined), name: "Stew", ingredients: "Beef", steps: "Simmer." });
+
+  it.each([
+    ["4", 4],
+    [" 12 ", 12],
+    ["", undefined],
+    ["   ", undefined],
+    // Sent, so the server says why it is refused (REC-24 examples).
+    ["0", 0],
+    ["2.5", 2.5],
+    ["101", 101],
+    ["four", null],
+    ["-4", null],
+    ["4 people", null],
+    ["1e1", null],
+    ["0x4", null],
+  ])("reads %j as %j", (typed, count) => {
+    expect(servingsCount(typed)).toBe(count);
+  });
+
+  it("spec example: servings left empty sends none", () => {
+    const input = contentInput(form());
+    expect("servings" in input).toBe(false);
+  });
+
+  it("sends servings 4 as a number, in a valid RecipeContentInput", () => {
+    const input = contentInput({ ...form(), servings: "4" });
+    expect(input.servings).toBe(4);
+    expect(RecipeContentInput.parse(input)).toEqual(input);
+  });
+
+  it("starts an existing recipe's servings as typed text, and blank when it has none", () => {
+    expect(formFrom({ ...STEW, servings: 4 }).servings).toBe("4");
+    expect(formFrom(STEW).servings).toBe("");
+  });
+
+  it("counts a change to servings as a change", () => {
+    expect(contentSnapshot({ ...form(), servings: "4" })).not.toBe(contentSnapshot(form()));
+  });
+
+  it("refuses text that isn't a number in the browser, at the servings field", () => {
+    expect(obviousErrors({ ...form(), servings: "four" })).toEqual([
+      { code: "servings.format", field: "servings", message: "Enter the number of people, like 4." },
+    ]);
+    expect(obviousErrors({ ...form(), servings: "4" })).toEqual([]);
+  });
+
+  it("puts the server's servings error next to the servings field", () => {
+    const error = { code: "servings.outOfRange", field: "servings", message: "Servings must be between 1 and 100." };
+    expect(formErrors([error], form()).fields.get("servings")).toEqual(["Servings must be between 1 and 100."]);
   });
 });

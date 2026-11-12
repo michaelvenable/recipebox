@@ -8,6 +8,7 @@ export { RecipeContent, MAX_TAGS, type RecipeContentInput } from "./recipe-conte
 export { Recipe, TRASH_RETENTION_DAYS, type RecipeSnapshot } from "./recipe.js";
 export { RecipeId } from "./recipe-id.js";
 export { RecipeName, MAX_NAME_LENGTH } from "./recipe-name.js";
+export { Servings, MAX_SERVINGS, MIN_SERVINGS } from "./servings.js";
 export { Tag, MAX_TAG_LENGTH } from "./tag.js";
 export { TextEntry, MAX_ENTRY_LENGTH } from "./text-entry.js";
 export {

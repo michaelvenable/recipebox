@@ -4,6 +4,7 @@ import { Recipe } from "./recipe.js";
 import { RecipeId } from "./recipe-id.js";
 import { RecipeName } from "./recipe-name.js";
 import { fail, ok, type Result } from "./result.js";
+import { Servings } from "./servings.js";
 import { Tag } from "./tag.js";
 
 /** How long an import may take, from the upload, by the server's clock (IMP-11, X-12). Fixed by the spec. */
@@ -69,6 +70,8 @@ export interface ReadRecipe {
   prep: string[];
   steps: string[];
   totalTimeMinutes?: number;
+  /** Only when the page states how many people it serves (IMP-6, REC-24). */
+  servings?: number;
   tags: string[];
 }
 
@@ -211,6 +214,8 @@ export function importedRecipe(id: RecipeId, read: ReadRecipe, tagsInUse: readon
       prep: read.prep,
       steps: read.steps,
       totalTimeMinutes: read.totalTimeMinutes,
+      // IMP-6: servings read outside 1–100 are dropped rather than failing the import.
+      servings: read.servings !== undefined && Servings.create(read.servings).ok ? read.servings : undefined,
       tags: kept.map((t) => t.value),
     },
     at,
