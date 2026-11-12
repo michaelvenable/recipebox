@@ -9,7 +9,7 @@ interface TagChipsProps {
 }
 
 /**
- * A tag filter: every tag in use with its count, in the server's alphabetical order (REC-13). Used by the recipe list (REC-13)
+ * A tag filter: every tag in use, by name only, in the server's alphabetical order (REC-13). Used by the recipe list (REC-13)
  * and by "haven't made in a while" (COOK-9), each with its own picked tags.
  */
 export function TagChips({ tags, failed, retry, picked, toggle }: TagChipsProps) {
@@ -26,9 +26,9 @@ export function TagChips({ tags, failed, retry, picked, toggle }: TagChipsProps)
   if (tags === undefined || tags.length === 0) return null;
   return (
     <div className="tag-chips" role="group" aria-label="Filter by tag">
-      {tags.map(({ tag, count }) => (
+      {tags.map(({ tag }) => (
         <button key={tag} type="button" className="chip" aria-pressed={picked.includes(tag)} onClick={() => toggle(tag)}>
-          {tag} · {count}
+          {tag}
         </button>
       ))}
     </div>

@@ -39,7 +39,7 @@ Visitors get the public shapes. Editors calling the same endpoints get the edito
 
 - `GET /recipes?name=&tags=` — the recipe list with search and tag filter (REC-8, REC-9, REC-13). `tags` is comma-separated.
   Returns `RecipeSummary[]` (visitor) or `EditorRecipeSummary[]` (editor, adds `onToMakeList`).
-- `GET /tags` — tags in use with counts (REC-13). Returns `TagCount[]`.
+- `GET /tags` — tags in use with counts (REC-13). Returns `TagCount[]`. The app shows only the names; the counts are unused.
 - `GET /recipes/{id}` — one recipe (REC-4). Returns `PublicRecipe` or `EditorRecipe` (adds to-make status, cooking history and
   notes). 404 if it is in the trash.
 - `GET /recipes/{id}/photo` and `GET /recipes/{id}/thumbnail` — the images (REC-7). 404 if there is no photo. If the recipe is in

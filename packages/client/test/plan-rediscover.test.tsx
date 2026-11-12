@@ -784,9 +784,9 @@ describe("COOK-9 filter recommendations by tags", () => {
     return { ...fake, ...rendered };
   }
 
-  it("offers every tag in use, alphabetically, with its count, under the heading, none picked", async () => {
+  it("offers every tag in use, alphabetically, by name only, under the heading, none picked", async () => {
     await openFiltered();
-    expect(chips().map((c) => c.textContent)).toEqual(["breakfast · 3", "dinner · 2", "quick · 2", "vegetarian · 2"]);
+    expect(chips().map((c) => c.textContent)).toEqual(["breakfast", "dinner", "quick", "vegetarian"]);
     expect(pressed()).toEqual([]);
     const list = await screen.findByRole("list", { name: "Recommendations" });
     expect(names()).toEqual(["Blueberry Pancakes", "Fish Tacos", "Beef Stew", "Shakshuka", "Banana Muffins"]);
@@ -800,10 +800,10 @@ describe("COOK-9 filter recommendations by tags", () => {
     const { fetchMock, router } = await openFiltered();
     await screen.findByRole("list", { name: "Recommendations" });
 
-    await userEvent.click(chip("breakfast · 3"));
+    await userEvent.click(chip("breakfast"));
 
     await waitFor(() => expect(names()).toEqual(["Blueberry Pancakes", "Shakshuka", "Banana Muffins"]));
-    expect(pressed()).toEqual(["breakfast · 3"]);
+    expect(pressed()).toEqual(["breakfast"]);
     expect(requestedTags(fetchMock)).toEqual(["", "breakfast"]);
     expect(router.state.location.search).toBe("?tags=breakfast");
   });
@@ -812,12 +812,12 @@ describe("COOK-9 filter recommendations by tags", () => {
     const { fetchMock } = await openFiltered();
     await screen.findByRole("list", { name: "Recommendations" });
 
-    await userEvent.click(chip("breakfast · 3"));
+    await userEvent.click(chip("breakfast"));
     await waitFor(() => expect(names()).toHaveLength(3));
-    await userEvent.click(chip("vegetarian · 2"));
+    await userEvent.click(chip("vegetarian"));
 
     await waitFor(() => expect(names()).toEqual(["Shakshuka", "Banana Muffins"]));
-    expect(pressed()).toEqual(["breakfast · 3", "vegetarian · 2"]);
+    expect(pressed()).toEqual(["breakfast", "vegetarian"]);
     expect(requestedTags(fetchMock).at(-1)).toBe("breakfast,vegetarian");
   });
 
@@ -834,7 +834,7 @@ describe("COOK-9 filter recommendations by tags", () => {
           : undefined,
     });
     await screen.findByRole("list", { name: "Recommendations" });
-    await userEvent.click(chip("breakfast · 3"));
+    await userEvent.click(chip("breakfast"));
     await waitFor(() => expect(names()).toEqual(["Shakshuka", "Blueberry Pancakes", "Banana Muffins"]));
   });
 
@@ -842,15 +842,15 @@ describe("COOK-9 filter recommendations by tags", () => {
     const { router } = await openFiltered();
     await screen.findByRole("list", { name: "Recommendations" });
 
-    await userEvent.click(chip("breakfast · 3"));
+    await userEvent.click(chip("breakfast"));
     await waitFor(() => expect(names()).toHaveLength(3));
-    await userEvent.click(chip("quick · 2"));
+    await userEvent.click(chip("quick"));
 
     expect(await screen.findByText(/^No recipes tagged breakfast and quick/)).toHaveAttribute("role", "status");
     expect(screen.queryByRole("list", { name: "Recommendations" })).not.toBeInTheDocument();
     expect(screen.queryByText(/No recipes yet/)).not.toBeInTheDocument();
     // The chips stay, so a tag can be unpicked.
-    expect(pressed()).toEqual(["breakfast · 3", "quick · 2"]);
+    expect(pressed()).toEqual(["breakfast", "quick"]);
 
     await userEvent.click(screen.getByRole("button", { name: "Show all recipes" }));
     await screen.findByRole("list", { name: "Recommendations" });
@@ -862,9 +862,9 @@ describe("COOK-9 filter recommendations by tags", () => {
   it("unpicking every tag shows every recipe again", async () => {
     const { router, fetchMock } = await openFiltered({}, "/recommendations?tags=breakfast");
     await waitFor(() => expect(names()).toEqual(["Blueberry Pancakes", "Shakshuka", "Banana Muffins"]));
-    expect(pressed()).toEqual(["breakfast · 3"]);
+    expect(pressed()).toEqual(["breakfast"]);
 
-    await userEvent.click(chip("breakfast · 3"));
+    await userEvent.click(chip("breakfast"));
 
     await waitFor(() => expect(names()).toEqual(["Blueberry Pancakes", "Fish Tacos", "Beef Stew", "Shakshuka", "Banana Muffins"]));
     expect(pressed()).toEqual([]);
@@ -880,9 +880,9 @@ describe("COOK-9 filter recommendations by tags", () => {
     });
     await screen.findByRole("list", { name: "Recommendations" });
 
-    await userEvent.click(chip("breakfast · 3"));
+    await userEvent.click(chip("breakfast"));
 
-    expect(pressed()).toEqual(["breakfast · 3"]);
+    expect(pressed()).toEqual(["breakfast"]);
     expect(names()).toHaveLength(5);
     expect(screen.getByRole("list", { name: "Recommendations" })).toHaveAttribute("aria-busy", "true");
     expect(screen.queryByText("Loading recipes…")).not.toBeInTheDocument();
@@ -894,7 +894,7 @@ describe("COOK-9 filter recommendations by tags", () => {
     const { fetchMock } = mockServer({ recipes: TAGGED });
     const { router } = renderAt("/");
     await screen.findByRole("heading", { level: 1, name: "Catalog" });
-    await userEvent.click(await screen.findByRole("button", { name: "breakfast · 3" }));
+    await userEvent.click(await screen.findByRole("button", { name: "breakfast" }));
     await waitFor(() => expect(router.state.location.search).toBe("?tags=breakfast"));
 
     await act(() => router.navigate("/recommendations"));
@@ -904,13 +904,13 @@ describe("COOK-9 filter recommendations by tags", () => {
     expect(names()).toHaveLength(5);
     expect(requestedTags(fetchMock)).toEqual([""]);
 
-    await userEvent.click(chip("dinner · 2"));
+    await userEvent.click(chip("dinner"));
     await waitFor(() => expect(names()).toEqual(["Fish Tacos", "Beef Stew"]));
 
     // Back to the recipe list: still filtered by breakfast only, not by dinner.
     await act(() => router.navigate(-1));
     await screen.findByRole("heading", { level: 1, name: "Catalog" });
-    await waitFor(() => expect(pressed()).toEqual(["breakfast · 3"]));
+    await waitFor(() => expect(pressed()).toEqual(["breakfast"]));
     expect(router.state.location.search).toBe("?tags=breakfast");
   });
 

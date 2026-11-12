@@ -70,8 +70,8 @@ tag.
   near-duplicates like "dessert" and "desserts". Tags the recipe already has are not offered. Before anything is typed, all tags
   in use on other recipes are offered, the way an empty search shows every recipe.
 - **REC-13. Filter by tags.** On the recipe list, a user can pick one or more tags to filter by.
-  - The user picks from every tag currently in use, shown in alphabetical order (X-13) with the number of recipes that have each
-    one.
+  - The user picks from every tag currently in use, shown by name only in alphabetical order (X-13), without the number of
+    recipes that have it (owner decision, 2026-11-11).
   - With several tags picked, only recipes that have all of them are shown.
   - The tag filter and name search (REC-9) can be used together; a recipe must match both.
   - Results keep the REC-8 sort order. Clearing all picked tags shows the unfiltered list.

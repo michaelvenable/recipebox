@@ -24,8 +24,8 @@ ones that haven't been made in a while. Cooking history is private: only signed-
   still accepts them (COOK-4).
 - **COOK-9. Filter recommendations by tags.** On the "haven't made in a while" view (COOK-6), an editor can pick one or more
   tags to filter by, such as "breakfast", to look only at those recipes.
-  - The tags offered, their order and their counts are the same as on the recipe list (REC-13): every tag in use, in
-    alphabetical order (X-13), with the number of recipes that have it.
+  - The tags offered and their order are the same as on the recipe list (REC-13): every tag in use, by name only, in
+    alphabetical order (X-13).
   - With several tags picked, only recipes that have all of them are shown, still in the COOK-6 order. Clearing all picked tags
     shows every recipe again.
   - When no recipe has all the picked tags, the view says so ("No recipes tagged breakfast and quick").

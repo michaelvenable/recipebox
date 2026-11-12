@@ -311,12 +311,12 @@ describe("REC-9 search by name", () => {
 });
 
 describe("REC-13 filter by tags", () => {
-  it("offers every tag with its count, in the server's order, none picked", async () => {
+  it("offers every tag by name only, without a count, in the server's order, none picked", async () => {
     mockListApi();
     renderAt("/");
     const group = await screen.findByRole("group", { name: "Filter by tag" });
     const chips = within(group).getAllByRole("button");
-    expect(chips.map((c) => c.textContent)).toEqual(["dinner · 2", "noodles · 1", "quick · 1", "slow · 1"]);
+    expect(chips.map((c) => c.textContent)).toEqual(["dinner", "noodles", "quick", "slow"]);
     for (const c of chips) expect(c).toHaveAttribute("aria-pressed", "false");
   });
 
@@ -327,11 +327,11 @@ describe("REC-13 filter by tags", () => {
     const { router } = renderAt("/");
     await screen.findByText("Pad Thai");
 
-    await userEvent.click(await chip("dinner · 2"));
-    expect(await chip("dinner · 2")).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(await chip("dinner"));
+    expect(await chip("dinner")).toHaveAttribute("aria-pressed", "true");
     await waitFor(() => expect(recipeLinks()).toHaveLength(2));
 
-    await userEvent.click(await chip("quick · 1"));
+    await userEvent.click(await chip("quick"));
     await waitFor(() => expect(recipeLinks()).toHaveLength(1));
     expect(router.state.location.search).toBe("?tags=dinner,quick");
     expect(listQueries(fetchMock)).toEqual(["", "?tags=dinner", "?tags=dinner,quick"]);
@@ -351,8 +351,8 @@ describe("REC-13 filter by tags", () => {
     const { router } = renderAt("/?tags=dinner,quick");
     await screen.findByText("Pad Thai");
 
-    await userEvent.click(await chip("dinner · 2"));
-    await userEvent.click(await chip("quick · 1"));
+    await userEvent.click(await chip("dinner"));
+    await userEvent.click(await chip("quick"));
     expect(await screen.findByText("Beef Stew")).toBeInTheDocument();
     expect(router.state.location.search).toBe("");
     expect(listQueries(fetchMock)).toEqual(["?tags=dinner,quick", "?tags=quick", ""]);
@@ -363,8 +363,8 @@ describe("REC-13 filter by tags", () => {
     const fetchMock = mockListApi({ recipes: () => [BEEF_STEW] });
     renderAt("/?name=b&tags=dinner");
     await screen.findByText("Beef Stew");
-    expect(await chip("dinner · 2")).toHaveAttribute("aria-pressed", "true");
-    expect(await chip("quick · 1")).toHaveAttribute("aria-pressed", "false");
+    expect(await chip("dinner")).toHaveAttribute("aria-pressed", "true");
+    expect(await chip("quick")).toHaveAttribute("aria-pressed", "false");
     expect(searchField()).toHaveValue("b");
     expect(listQueries(fetchMock)).toEqual(["?name=b&tags=dinner"]);
     expect(within(screen.getByRole("main")).getByRole("status")).toHaveTextContent("1 recipe matches “b” with the tag dinner");
@@ -375,7 +375,7 @@ describe("REC-13 filter by tags", () => {
     const { router } = renderAt("/");
     await screen.findByText("Pad Thai");
     await userEvent.type(searchField(), "b");
-    await userEvent.click(await chip("dinner · 2"));
+    await userEvent.click(await chip("dinner"));
     expect(router.state.location.search).toBe("?name=b&tags=dinner");
     await waitFor(() => expect(listQueries(fetchMock)).toEqual(["", "?name=b&tags=dinner"]));
   });
@@ -386,7 +386,7 @@ describe("REC-13 filter by tags", () => {
     expect(await screen.findByText(/No recipes tagged noodles and slow/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Show all recipes" }));
     expect(await screen.findByText("Beef Stew")).toBeInTheDocument();
-    expect(await chip("noodles · 1")).toHaveAttribute("aria-pressed", "false");
+    expect(await chip("noodles")).toHaveAttribute("aria-pressed", "false");
   });
 
   it("says when the tags can't be loaded, and loads them on request", async () => {
@@ -395,7 +395,7 @@ describe("REC-13 filter by tags", () => {
     renderAt("/");
     expect(await screen.findByText(/Couldn't load the tags/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await chip("dinner · 2")).toBeInTheDocument();
+    expect(await chip("dinner")).toBeInTheDocument();
     expect(screen.getByText("Pad Thai")).toBeInTheDocument();
   });
 });
@@ -660,9 +660,9 @@ describe("REC-22 recently added", () => {
     await listShown();
     expect(rowNames()).toEqual(["Beef Stew"]);
 
-    await userEvent.click(await chip("dinner · 2"));
+    await userEvent.click(await chip("dinner"));
     await waitFor(() => expect(row()).not.toBeInTheDocument());
-    await userEvent.click(await chip("dinner · 2"));
+    await userEvent.click(await chip("dinner"));
     await waitFor(() => expect(rowNames()).toEqual(["Beef Stew"]));
   });
 

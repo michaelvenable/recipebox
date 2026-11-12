@@ -240,7 +240,7 @@ describe("REC-6, X-8 Delete on the recipe view", () => {
     const { fetchMock } = mockServer({ list: held, tags: held });
     const { router } = renderAt("/");
     await screen.findByRole("link", { name: /Pad Thai/ });
-    expect(screen.getByRole("button", { name: "noodles · 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "noodles" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("link", { name: /Pad Thai/ }));
     await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
     const tagLoads = gets(fetchMock, "/tags");
@@ -256,7 +256,7 @@ describe("REC-6, X-8 Delete on the recipe view", () => {
     // The tags were asked for again, and are still waiting for the answer.
     await waitFor(() => expect(gets(fetchMock, "/tags")).toBeGreaterThan(tagLoads));
     // REC-13: a tag on no other recipe leaves the filter; a shared one counts one fewer.
-    expect(screen.getByRole("button", { name: "dinner · 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dinner" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /noodles/ })).not.toBeInTheDocument();
   });
 

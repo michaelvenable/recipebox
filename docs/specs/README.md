@@ -27,7 +27,7 @@ been cooked in a while.
 ## Cross-cutting requirements
 
 - **X-1. Recipes are public; the rest is private.** Anyone with the app's address can, without signing in, view recipes and their
-  photos, search by name (REC-9), filter by tag with counts (REC-13) and see recently added recipes with their added dates
+  photos, search by name (REC-9), filter by tag (REC-13) and see recently added recipes with their added dates
   (REC-22). The "to make" list, cooking history and recipe notes (REC-25) are visible only
   to signed-in editors. That includes the "to make" indicator (PLAN-7), last-cooked date and count (COOK-5) and the "haven't made
   in a while" view (COOK-6). The trash (REC-14) is private too, including the photos of recipes in it, and so are imports in
