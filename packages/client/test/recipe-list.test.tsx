@@ -142,7 +142,7 @@ describe("REC-8 list", () => {
   });
 });
 
-describe("REC-26 time clock on cards", () => {
+describe("REC-26 time stopwatches on cards", () => {
   /** What a sighted user sees under the name: the meta line without the text kept for screen readers. */
   function visibleMeta(card: HTMLElement): string {
     const meta = card.querySelector(".recipe-card-meta")?.cloneNode(true) as HTMLElement | undefined;
@@ -150,36 +150,80 @@ describe("REC-26 time clock on cards", () => {
     return meta?.textContent?.trim() ?? "";
   }
 
-  it("shows the clock in place of the time text, keeping the tags", async () => {
+  /** Each stopwatch on a card: "full" or "partial". */
+  function stopwatchesOn(card: HTMLElement): string[] {
+    return [...card.querySelectorAll("svg.stopwatch")].map((svg) => (svg.querySelector("circle.stopwatch-fill") ? "full" : "partial"));
+  }
+
+  it("spec example: 2 h 30 min shows two full stopwatches and one half filled, in place of the time text, keeping the tags", async () => {
     mockListApi();
     renderAt("/");
     const beef = await screen.findByRole("link", { name: /Beef Stew/ });
-    const clock = beef.querySelector("svg.time-clock");
-    expect(clock).not.toBeNull();
+    expect(stopwatchesOn(beef)).toEqual(["full", "full", "partial"]);
+    expect(beef.querySelector("path.stopwatch-fill")).toHaveAttribute("d", "M12 14V6.5A7.5 7.5 0 0 1 12 21.5Z");
     expect(visibleMeta(beef)).toBe("dinner, slow");
-    // spec example: 2 h 30 min is full in the second shade with half in the third.
-    expect(clock?.querySelector("circle.time-clock-lap-2")).not.toBeNull();
-    expect(clock?.querySelector("path.time-clock-lap-3")).not.toBeNull();
   });
 
-  it("gives screen readers the time in words, not the picture", async () => {
+  it("gives full stopwatches the light marks and a partly filled one the dark marks", async () => {
     mockListApi();
     renderAt("/");
     const beef = await screen.findByRole("link", { name: /Beef Stew/ });
-    expect(beef.querySelector("svg.time-clock")).toHaveAttribute("aria-hidden", "true");
-    expect(beef.querySelector(".visually-hidden")).toHaveTextContent(/^2 h 30 min$/);
+    const [full, , partial] = [...beef.querySelectorAll("svg.stopwatch")];
+    expect(full?.querySelectorAll("line.stopwatch-mark-light")).toHaveLength(4);
+    expect(full?.querySelector("line.stopwatch-mark")).toBeNull();
+    expect(partial?.querySelectorAll("line.stopwatch-mark")).toHaveLength(4);
+    expect(partial?.querySelector("line.stopwatch-mark-light")).toBeNull();
+  });
+
+  it.each([
+    ["spec example: 15 min, one a quarter filled", 15, ["partial"]],
+    ["spec example: 1 h, one full", 60, ["full"]],
+    ["spec example: 1 h 15 min, one full and one a quarter filled", 75, ["full", "partial"]],
+    ["spec example: 4 h, four full", 240, ["full", "full", "full", "full"]],
+  ])("%s, with no ×N", async (_what, minutes, shown) => {
+    mockListApi({ recipes: () => [{ ...BEEF_STEW, totalTimeMinutes: minutes }] });
+    renderAt("/");
+    const beef = await screen.findByRole("link", { name: /Beef Stew/ });
+    expect(stopwatchesOn(beef)).toEqual(shown);
+    expect(beef.querySelector(".time-stopwatches-more")).toBeNull();
+    expect(visibleMeta(beef)).toBe("dinner, slow");
+  });
+
+  it.each([
+    ["spec example: 7 h 30 min", 450, "×8"],
+    ["4 h 1 min", 241, "×5"],
+    ["24 h", 1440, "×24"],
+  ])("%s shows one full stopwatch with %s beside it, keeping the tags", async (_what, minutes, more) => {
+    mockListApi({ recipes: () => [{ ...BEEF_STEW, totalTimeMinutes: minutes }] });
+    renderAt("/");
+    const beef = await screen.findByRole("link", { name: /Beef Stew/ });
+    expect(stopwatchesOn(beef)).toEqual(["full"]);
+    expect(visibleMeta(beef)).toBe(`${more} dinner, slow`);
+  });
+
+  it("gives screen readers the time in words, not the picture or the ×N", async () => {
+    mockListApi({ recipes: () => [{ ...BEEF_STEW, totalTimeMinutes: 450 }, PAD_THAI] });
+    renderAt("/");
+    const beef = await screen.findByRole("link", { name: /Beef Stew/ });
+    const pictures = beef.querySelector(".time-stopwatches");
+    expect(pictures).toHaveAttribute("aria-hidden", "true");
+    expect(pictures).toContainElement(beef.querySelector(".time-stopwatches-more") as HTMLElement);
+    beef.querySelectorAll("svg.stopwatch").forEach((svg) => expect(svg).toHaveAttribute("aria-hidden", "true"));
+    expect(beef.querySelector(".visually-hidden")).toHaveTextContent(/^7 h 30 min$/);
+    expect(beef).toHaveAccessibleName(/7 h 30 min dinner, slow$/);
+    expect(beef).not.toHaveAccessibleName(/×/);
     expect(screen.getByRole("link", { name: /Pad Thai.*30 min/ })).toBeInTheDocument();
     expect(screen.getAllByRole("img")).toEqual([screen.getByRole("img", { name: "Pad Thai photo" })]);
   });
 
-  it("spec example: no total time, no clock", async () => {
+  it("spec example: no total time, no stopwatch", async () => {
     mockListApi({ recipes: () => [TOAST, { ...TOAST, id: "0b6a3c2e-0000-4000-8000-000000000004", name: "Jam", tags: ["sweet"] }] });
     renderAt("/");
     const toast = await screen.findByRole("link", { name: "Toast" });
     const jam = screen.getByRole("link", { name: /Jam/ });
-    expect(toast.querySelector("svg.time-clock")).toBeNull();
+    expect(toast.querySelector(".time-stopwatches")).toBeNull();
     expect(toast.querySelector(".recipe-card-meta")).toBeNull();
-    expect(jam.querySelector("svg.time-clock")).toBeNull();
+    expect(jam.querySelector(".time-stopwatches")).toBeNull();
     expect(visibleMeta(jam)).toBe("sweet");
   });
 });

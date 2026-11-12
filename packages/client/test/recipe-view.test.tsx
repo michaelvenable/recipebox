@@ -754,29 +754,47 @@ describe("REC-24 servings on the view", () => {
   });
 });
 
-describe("REC-26 time clock on the view", () => {
-  it("shows the clock next to the time, which keeps its wording, for a visitor too", async () => {
+describe("REC-26 time stopwatches on the view", () => {
+  /** Each stopwatch next to the time: "full" or "partial". */
+  function stopwatchesIn(time: HTMLElement): string[] {
+    return [...time.querySelectorAll("svg.stopwatch")].map((svg) => (svg.querySelector("circle.stopwatch-fill") ? "full" : "partial"));
+  }
+
+  it("spec example: 1 h 15 min shows one full and one a quarter filled next to the time, which keeps its wording, for a visitor too", async () => {
     await openRecipe({ me: VISITOR, recipes: { [ID]: () => ({ ...PAD_THAI, totalTimeMinutes: 75 }) } });
     const time = screen.getByText("1 h 15 min total");
-    const clock = time.querySelector("svg.time-clock");
-    expect(clock).not.toBeNull();
-    // spec example: 1 h 15 min is full in the first shade with a quarter in the second.
-    expect(clock?.querySelector("circle.time-clock-lap-1")).not.toBeNull();
-    expect(clock?.querySelector("path.time-clock-lap-2")).not.toBeNull();
+    expect(stopwatchesIn(time)).toEqual(["full", "partial"]);
+    expect(time.querySelector("path.stopwatch-fill")).toHaveAttribute("d", "M12 14V6.5A7.5 7.5 0 0 1 19.5 14Z");
+    expect(time.querySelector("svg.stopwatch")).toHaveAttribute("width", "20");
+  });
+
+  it("spec example: 4 h shows four full stopwatches", async () => {
+    await openRecipe({ me: VISITOR, recipes: { [ID]: () => ({ ...PAD_THAI, totalTimeMinutes: 240 }) } });
+    expect(stopwatchesIn(screen.getByText("4 h total"))).toEqual(["full", "full", "full", "full"]);
+  });
+
+  it("spec example: 7 h 30 min shows a single full stopwatch next to the time, without the ×8", async () => {
+    await openRecipe({ me: VISITOR, recipes: { [ID]: () => ({ ...PAD_THAI, totalTimeMinutes: 450 }) } });
+    const time = screen.getByText("7 h 30 min total");
+    expect(stopwatchesIn(time)).toEqual(["full"]);
+    expect(time.querySelector(".time-stopwatches-more")).toBeNull();
+    expect(time).toHaveTextContent(/^7 h 30 min total$/);
   });
 
   it("keeps the picture from screen readers, which read the text beside it once", async () => {
     await openRecipe({ me: VISITOR, recipes: { [ID]: () => PAD_THAI } });
     const time = screen.getByText("30 min total");
-    expect(time.querySelector("svg.time-clock")).toHaveAttribute("aria-hidden", "true");
+    expect(stopwatchesIn(time)).toEqual(["partial"]);
+    expect(time.querySelector(".time-stopwatches")).toHaveAttribute("aria-hidden", "true");
+    expect(time.querySelector("svg.stopwatch")).toHaveAttribute("aria-hidden", "true");
     expect(time.querySelector(".visually-hidden")).toBeNull();
     expect(screen.getAllByText(/30 min/)).toEqual([time]);
   });
 
-  it("spec example: no total time, no clock", async () => {
+  it("spec example: no total time, no stopwatch", async () => {
     await openRecipe({ me: VISITOR, recipes: { [OTHER_ID]: () => TOAST } }, `/recipes/${OTHER_ID}`);
     expect(screen.getByRole("heading", { level: 1, name: "Toast" })).toBeInTheDocument();
-    expect(document.querySelector("svg.time-clock")).toBeNull();
+    expect(document.querySelector(".time-stopwatches")).toBeNull();
   });
 });
 

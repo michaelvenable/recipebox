@@ -137,13 +137,15 @@ tag.
     While it is in the trash they can't be added or deleted (REC-17).
   - The recipe list doesn't show notes, and search doesn't look in them. They are not part of the recipe's contents, so the
     create and edit form doesn't show them and editing the recipe leaves them unchanged.
-- **REC-26. Time clock.** Wherever a recipe's total time is shown, a small clock face shows it as a picture. One full turn is
-  one hour. The face fills clockwise from 12 o'clock, like a pie, by the share of the hour the time covers. Each hour after the
-  first fills a further lap on top of the last one, in a darker shade of the app's accent color: the second lap darker than the
-  first, the third darker still. From the fourth lap on, the darkest shade is used. A recipe without a total time shows no
-  clock. (Owner decisions, 2026-11-11.)
-  - Recipe view: the clock is next to the time, which keeps its current wording ("1 h 15 min").
-  - Recipe list cards: the clock takes the place of the time text. The tags stay as they are.
+- **REC-26. Time stopwatches.** Wherever a recipe's total time is shown, small stopwatches show it as a picture. Each stopwatch
+  stands for one hour and fills clockwise from 12 o'clock, like a pie, by the share of that hour the time covers: one full
+  stopwatch for each whole hour, then one partly filled stopwatch for the rest. All are in the app's accent color. A full
+  stopwatch has short quarter-hour marks in the color of an empty face, so they show against the fill; a partly filled one has
+  the usual marks in the color of its outline. A time over 4 hours shows a single
+  full stopwatch instead, with the number of started hours beside it on recipe cards ("×8"). A recipe without a total time shows
+  none. (Owner decisions, 2026-11-11.)
+  - Recipe view: the stopwatches are next to the time, which keeps its current wording ("1 h 15 min").
+  - Recipe list cards: the stopwatches take the place of the time text. The tags stay as they are.
   - Screen readers read the time in words, the same as the text ("1 h 15 min"), not the picture.
 
 ## Examples
@@ -191,12 +193,13 @@ tag.
 | A 51st note added to a recipe                                                | Rejected                                    |
 | "Pad Thai" with 2 notes deleted, then restored                               | Back with its 2 notes                       |
 | Recipe edited to add an ingredient                                           | Its notes are unchanged                     |
-| Total time 15 min                                                            | Clock a quarter filled, first shade         |
-| Total time 1 h                                                               | Clock full, first shade                     |
-| Total time 1 h 15 min                                                        | Full first shade; a quarter in the second   |
-| Total time 2 h 30 min                                                        | Full second shade; half in the third        |
-| Total time 6 h                                                               | Clock full, darkest shade                   |
-| No total time                                                                | No clock                                    |
+| Total time 15 min                                                            | One stopwatch, a quarter filled             |
+| Total time 1 h                                                               | One full stopwatch, short face-color marks  |
+| Total time 1 h 15 min                                                        | One full; one a quarter filled              |
+| Total time 2 h 30 min                                                        | Two full; one half filled                   |
+| Total time 4 h                                                               | Four full stopwatches                       |
+| Total time 7 h 30 min                                                        | One full; "×8" beside it on cards           |
+| No total time                                                                | No stopwatch                                |
 
 ## Out of scope
 

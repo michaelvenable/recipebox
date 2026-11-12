@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { type ListedRecipe, isOnToMakeList, thumbnailUrl } from "../api/recipes.js";
 import { formatTotalTime } from "./format.js";
 import { usePhotoVersion } from "./photo-version.js";
-import { TimeClock } from "./TimeClock.js";
+import { TimeStopwatches } from "./TimeStopwatches.js";
 
 /**
  * A recipe's thumbnail, or a neutral placeholder block when it has no photo (REC-8). Also falls back to the placeholder if the
@@ -39,7 +39,7 @@ export function ToMakeBadge() {
 
 /**
  * One recipe in the list, linking to it: thumbnail, name, total time and tags (REC-8), and for editors the to-make mark
- * (PLAN-7). The total time shows as the time clock in place of text, and screen readers hear it in words (REC-26). A row on
+ * (PLAN-7). The total time shows as stopwatches in place of text, and screen readers hear it in words (REC-26). A row on
  * phones, a card in the grid on wider screens (styles.css).
  */
 export function RecipeCard({ recipe, isEditor }: { recipe: ListedRecipe; isEditor: boolean }) {
@@ -58,7 +58,7 @@ export function RecipeCard({ recipe, isEditor }: { recipe: ListedRecipe; isEdito
             <span className="recipe-card-meta">
               {time !== undefined && (
                 <>
-                  <TimeClock minutes={time} size={16} />
+                  <TimeStopwatches minutes={time} size={16} showMore />
                   <span className="visually-hidden">{formatTotalTime(time)}</span>{" "}
                 </>
               )}
