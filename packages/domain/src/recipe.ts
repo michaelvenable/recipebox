@@ -32,7 +32,10 @@ export interface RecipeSnapshot {
   deletedAt?: string;
   /** ISO 8601 timestamp: the recipe's added time (REC-22). Documents stored before it was recorded have none. */
   createdAt?: string;
-  /** Newest first; omitted when there are none, so documents stored before REC-25 load unchanged. */
+  /**
+   * Newest first, the order notes have been stored in since REC-25 began; `Recipe.notes` lists them oldest first. Omitted when
+   * there are none, so documents stored before REC-25 load unchanged.
+   */
   notes?: RecipeNoteSnapshot[];
   schemaVersion: 1;
 }
@@ -61,7 +64,7 @@ export class Recipe {
     private deletedTime: Instant | undefined,
     /** Set once, by `create`; nothing changes it (REC-22). Undefined for recipes stored before it was recorded. */
     private readonly createdTime: Instant | undefined,
-    /** Newest first (REC-25). */
+    /** Newest first, as stored; `notes` lists them the other way round (REC-25). */
     private noteList: Note[],
   ) {}
 
@@ -271,7 +274,7 @@ export class Recipe {
     if (this.noteList.some((n) => n.id.equals(id))) throw new Error(`Note id ${id.value} is already used on this recipe`);
     const note = new Note(id, parsed.value, at);
     // Insert in order rather than assume `at` is the newest: the server's clock may step back. Ahead of notes with the same
-    // time, so the note just added is listed first.
+    // time, so that `notes`, which reverses this list, lists notes with the same time in the order they were added.
     const index = this.noteList.findIndex((n) => !at.isBefore(n.addedAt));
     this.noteList.splice(index === -1 ? this.noteList.length : index, 0, note);
     return ok(note);
@@ -291,9 +294,12 @@ export class Recipe {
     return ok(undefined);
   }
 
-  /** Newest first (REC-25). */
+  /**
+   * Oldest first (REC-25, owner decision 2026-11-11); notes with the same time in the order they were added. Kept and stored
+   * newest first, the order used before that decision, so documents already stored load and save unchanged.
+   */
   get notes(): readonly Note[] {
-    return Object.freeze([...this.noteList]);
+    return Object.freeze([...this.noteList].reverse());
   }
 
   // Persistence

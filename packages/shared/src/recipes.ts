@@ -106,7 +106,7 @@ export const EditorRecipe = PublicRecipe.extend({
   lastCookedAt: z.string().optional(),
   timesCooked: z.number(),
   /**
-   * Newest first (REC-25). Absent when the recipe has none, like `prep`, so clients from before notes, which parse this shape
+   * Oldest first (REC-25). Absent when the recipe has none, like `prep`, so clients from before notes, which parse this shape
    * strictly, can still read recipes without notes.
    */
   notes: z.array(RecipeNote).optional(),

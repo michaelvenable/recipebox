@@ -2,6 +2,7 @@
 // docs/specs/recipes.md. The rules themselves are tested in packages/domain; these tests show each endpoint applies them, and
 // that notes never reach a visitor (X-1).
 import { describe, expect, it } from "vitest";
+import { Recipe, type RecipeSnapshot } from "@recipebox/domain";
 import { EditorRecipe, EditorRecipeSummary, PublicRecipe, RecipeSummary } from "@recipebox/shared";
 import {
   AS_EDITOR,
@@ -111,19 +112,36 @@ describe("REC-25 add a note", () => {
   });
 });
 
-describe("REC-25 notes listed newest first", () => {
-  it("spec example: notes added Nov 2, then Nov 9, are listed Nov 9, then Nov 2", async () => {
+describe("REC-25 notes listed oldest first", () => {
+  it("spec example: notes added Nov 2, then Nov 9, are listed Nov 2, then Nov 9", async () => {
     const { app, repository, clock } = await recipeApp();
     const recipe = await seed(repository, content("Pad Thai"));
     clock.set("2026-11-02T18:00:00.000Z");
     await addNote(app, recipe.id.value, "first");
     clock.set("2026-11-09T18:00:00.000Z");
-    await addNote(app, recipe.id.value, "second");
+    const added = await addNote(app, recipe.id.value, "second");
 
-    expect((await editorView(app, recipe.id.value)).notes).toEqual([
-      { id: "11111111-0000-4000-8000-000000000002", text: "second", addedAt: "2026-11-09T18:00:00.000Z" },
+    const expected = [
       { id: FIRST_NOTE_ID, text: "first", addedAt: "2026-11-02T18:00:00.000Z" },
-    ]);
+      { id: "11111111-0000-4000-8000-000000000002", text: "second", addedAt: "2026-11-09T18:00:00.000Z" },
+    ];
+    expect(added.notes).toEqual(expected);
+    expect((await editorView(app, recipe.id.value)).notes).toEqual(expected);
+  });
+
+  it("lists the notes of a document stored newest first, as before the order changed, oldest first", async () => {
+    const { app, repository } = await recipeApp();
+    const seeded = await seed(repository, content("Pad Thai"));
+    const stored: RecipeSnapshot = {
+      ...seeded.toSnapshot(),
+      notes: [
+        { id: "dddddddd-0000-4000-8000-0000000000b2", text: "second", addedAt: "2026-11-09T18:00:00.000Z" },
+        { id: "dddddddd-0000-4000-8000-0000000000b1", text: "first", addedAt: "2026-11-02T18:00:00.000Z" },
+      ],
+    };
+    await repository.save(Recipe.fromSnapshot(stored));
+
+    expect((await editorView(app, seeded.id.value)).notes?.map((n) => n.text)).toEqual(["first", "second"]);
   });
 
   it("an editor's recipe without notes has no notes field, so older clients can still read it", async () => {
@@ -138,7 +156,7 @@ describe("REC-25 delete a note", () => {
   it("deletes the note at once and answers with the recipe", async () => {
     const { app, repository } = await recipeApp();
     const recipe = await seed(repository, content("Pad Thai"), { notes: notes(2) });
-    const [newest, oldest] = recipe.notes;
+    const [oldest, newest] = recipe.notes;
 
     const res = await change(app, "DELETE", `/recipes/${recipe.id.value}/notes/${newest?.id.value}`);
 

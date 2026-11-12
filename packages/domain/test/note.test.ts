@@ -81,29 +81,30 @@ describe("REC-25 notes are timed by the server", () => {
   });
 });
 
-describe("REC-25 notes listed newest first", () => {
-  it("spec example: notes added Nov 2, then Nov 9, are listed Nov 9, then Nov 2", () => {
+describe("REC-25 notes listed oldest first", () => {
+  it("spec example: notes added Nov 2, then Nov 9, are listed Nov 2, then Nov 9", () => {
     const r = recipe();
     valueOf(r.addNote(noteId(1), "first", at("2026-11-02T08:00:00Z")));
     valueOf(r.addNote(noteId(2), "second", at("2026-11-09T08:00:00Z")));
-    expect(r.notes.map((n) => n.addedAt.toIso())).toEqual(["2026-11-09T08:00:00.000Z", "2026-11-02T08:00:00.000Z"]);
-    expect(texts(r)).toEqual(["second", "first"]);
+    expect(r.notes.map((n) => n.addedAt.toIso())).toEqual(["2026-11-02T08:00:00.000Z", "2026-11-09T08:00:00.000Z"]);
+    expect(texts(r)).toEqual(["first", "second"]);
   });
 
-  it("keeps newest first if the server's clock steps back", () => {
+  it("keeps oldest first if the server's clock steps back", () => {
     const r = recipe();
     valueOf(r.addNote(noteId(1), "late", at("2026-11-09T08:00:00Z")));
     valueOf(r.addNote(noteId(2), "early", at("2026-11-02T08:00:00Z")));
-    expect(texts(r)).toEqual(["late", "early"]);
+    expect(texts(r)).toEqual(["early", "late"]);
   });
 
-  it("lists the note just added first when two have the same time", () => {
+  it("lists notes with the same time in the order they were added", () => {
     const r = recipe();
     valueOf(r.addNote(noteId(1), "first", at("2026-11-02T08:00:00Z")));
     valueOf(r.addNote(noteId(2), "second", at("2026-11-02T08:00:00Z")));
-    expect(texts(r)).toEqual(["second", "first"]);
+    valueOf(r.addNote(noteId(3), "third", at("2026-11-02T08:00:00Z")));
+    expect(texts(r)).toEqual(["first", "second", "third"]);
+    expect(texts(Recipe.fromSnapshot(r.toSnapshot()))).toEqual(["first", "second", "third"]);
   });
-
   it("a recipe without notes has none", () => {
     expect(recipe().notes).toEqual([]);
   });
@@ -143,7 +144,7 @@ describe("REC-25 delete a note", () => {
   it("removes only that note", () => {
     const r = withNotes(3);
     valueOf(r.deleteNote(noteId(2).value));
-    expect(texts(r)).toEqual(["note 3", "note 1"]);
+    expect(texts(r)).toEqual(["note 1", "note 3"]);
   });
 
   it("reads the id in either case", () => {
@@ -211,7 +212,7 @@ describe("REC-25 notes and the trash (REC-15, REC-17)", () => {
     r.delete(at("2026-11-10T09:00:00Z"));
     const stored = Recipe.fromSnapshot(r.toSnapshot());
     valueOf(stored.restore(at("2026-11-11T09:00:00Z")));
-    expect(texts(stored)).toEqual(["note 2", "note 1"]);
+    expect(texts(stored)).toEqual(["note 1", "note 2"]);
   });
 
   it("refuses adding a note while in the trash with recipe.inTrash, even an invalid one, and nothing changes", () => {
@@ -252,7 +253,21 @@ describe("REC-25 note ids", () => {
 });
 
 describe("REC-25 notes snapshot", () => {
-  it("stores notes newest first, and round-trips them", () => {
+  it("loads a document stored before notes were listed oldest first, and lists its notes oldest first", () => {
+    // Stored newest first, as every document with notes has been since REC-25 began (2026-11-11).
+    const stored: RecipeSnapshot = {
+      ...recipe().toSnapshot(),
+      notes: [
+        { id: noteId(2).value, text: "second", addedAt: "2026-11-09T08:00:00.000Z" },
+        { id: noteId(1).value, text: "first", addedAt: "2026-11-02T08:00:00.000Z" },
+      ],
+    };
+    const r = Recipe.fromSnapshot(stored);
+    expect(texts(r)).toEqual(["first", "second"]);
+    expect(r.toSnapshot()).toEqual(stored);
+  });
+
+  it("stores notes newest first, the order stored documents already have, and round-trips them", () => {
     const r = recipe();
     valueOf(r.addNote(noteId(1), "less salt", at("2026-11-02T08:00:00Z")));
     valueOf(r.addNote(noteId(2), "line one\nline two", at("2026-11-09T08:00:00Z")));

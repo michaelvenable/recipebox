@@ -134,7 +134,7 @@ Trash:
   `prep` and `servings` are left out when the recipe has none (REC-20, REC-24), so older clients, which refuse unknown fields,
   can still read the recipe.
 - `EditorRecipe`: `PublicRecipe` plus `toMake?` (`addedAt`), `cookedAt[]` (newest first), `lastCookedAt?`, `timesCooked`,
-  `notes[]?` (`RecipeNote`, newest first). `notes` is left out when there are none, like `prep`, so older clients can still
+  `notes[]?` (`RecipeNote`, oldest first). `notes` is left out when there are none, like `prep`, so older clients can still
   read recipes without notes.
 - `RecipeNote`: `id`, `text`, `addedAt` (REC-25). Not who added it, which isn't recorded.
 - `NoteRequest`: `{ text }`, the note as typed (REC-25).

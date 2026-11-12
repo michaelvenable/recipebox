@@ -803,7 +803,7 @@ describe("REC-25 notes on the recipe view", () => {
   const NOTE_2 = "11111111-0000-4000-8000-000000000002";
   const NOV_2 = at(2026, 10, 2, 19, 0);
   const NOV_9 = at(2026, 10, 9, 0, 30);
-  /** Notes as the server sends them: newest first. */
+  /** Notes as the server sends them: oldest first. */
   const LESS_SALT = { id: NOTE_2, text: "less salt", addedAt: NOV_9 };
   const MORE_BUTTER = { id: NOTE_1, text: "use more butter\nand more lime", addedAt: NOV_2 };
 
@@ -814,11 +814,11 @@ describe("REC-25 notes on the recipe view", () => {
       .map((li) => [li.querySelector(".note-text")?.textContent, li.querySelector("time")?.textContent].join(" | "));
   }
 
-  it("spec example: notes added Nov 2, then Nov 9, are listed Nov 9, then Nov 2, with text and local date", async () => {
-    await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI, { notes: [LESS_SALT, MORE_BUTTER] }) } });
+  it("spec example: notes added Nov 2, then Nov 9, are listed Nov 2, then Nov 9, with text and local date", async () => {
+    await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI, { notes: [MORE_BUTTER, LESS_SALT] }) } });
     expect(screen.getByRole("heading", { level: 2, name: "Notes" })).toBeInTheDocument();
     // Several lines are kept as they are.
-    expect(noteItems()).toEqual(["less salt | Nov 9, 2026", "use more butter\nand more lime | Nov 2, 2026"]);
+    expect(noteItems()).toEqual(["use more butter\nand more lime | Nov 2, 2026", "less salt | Nov 9, 2026"]);
     expect(screen.getByRole("textbox", { name: "New note" })).toBeInTheDocument();
   });
 
@@ -878,7 +878,7 @@ describe("REC-25 notes on the recipe view", () => {
   it("deletes a note at once, without asking to confirm, sending an empty body", async () => {
     const confirm = vi.spyOn(window, "confirm");
     const { fetchMock } = await openRecipe({
-      recipes: { [ID]: () => asEditor(PAD_THAI, { notes: [LESS_SALT, MORE_BUTTER] }) },
+      recipes: { [ID]: () => asEditor(PAD_THAI, { notes: [MORE_BUTTER, LESS_SALT] }) },
       change: () => asEditor(PAD_THAI, { notes: [MORE_BUTTER] }),
     });
 
@@ -896,7 +896,7 @@ describe("REC-25 notes on the recipe view", () => {
     let loads = 0;
     const { fetchMock } = await openRecipe({
       recipes: {
-        [ID]: () => (++loads === 1 ? asEditor(PAD_THAI, { notes: [LESS_SALT, MORE_BUTTER] }) : asEditor(PAD_THAI, { notes: [MORE_BUTTER] })),
+        [ID]: () => (++loads === 1 ? asEditor(PAD_THAI, { notes: [MORE_BUTTER, LESS_SALT] }) : asEditor(PAD_THAI, { notes: [MORE_BUTTER] })),
       },
       change: () =>
         jsonResponse(404, { errors: [{ code: "note.notFound", message: "This note doesn't exist. It may have been deleted already." }] }),

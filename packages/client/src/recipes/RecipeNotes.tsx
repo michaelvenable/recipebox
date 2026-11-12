@@ -6,7 +6,7 @@ import { useNoteChange } from "./note-changes.js";
 import { changeErrorMessage } from "./recipe-changes.js";
 
 /**
- * The recipe's notes (REC-25): newest first, as the server sends them, each with its text and the date it was added in the
+ * The recipe's notes (REC-25): oldest first, as the server sends them, each with its text and the date it was added in the
  * device's time zone (X-12), and a way to add one. Without notes, only the way to add one. Editors only: the server sends
  * visitors no notes at all (X-1). Text rules (trimming, 1 to 1,000 characters, at most 50) are the server's; its messages are
  * shown as they come.

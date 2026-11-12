@@ -70,7 +70,7 @@ export function toEditorRecipe(recipe: Recipe): EditorRecipe {
     cookedAt: recipe.cookedAt.map((at) => at.toIso()),
     lastCookedAt: recipe.lastCookedAt?.toIso(),
     timesCooked: recipe.timesCooked,
-    // Newest first, as the domain keeps them. Left out when there are none, like prep, so clients from before notes (strict
+    // Oldest first, as the domain lists them. Left out when there are none, like prep, so clients from before notes (strict
     // shapes) can still read recipes without any.
     notes:
       notes.length === 0

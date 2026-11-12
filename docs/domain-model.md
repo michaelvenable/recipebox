@@ -118,7 +118,7 @@ class Recipe {
   // Notes
   addNote(id: NoteId, text: string, at: Instant): Result<Note>; // REC-25
   deleteNote(id: string): Result<void>;                         // REC-25
-  get notes(): readonly Note[];  // newest first                // REC-25
+  get notes(): readonly Note[];  // oldest first                // REC-25
 
   // Persistence
   toSnapshot(): RecipeSnapshot;
@@ -153,8 +153,11 @@ notes are all still there (REC-15). Because the to-make status, history and note
 left pointing at a deleted recipe, and removing the document removes them with it (REC-16).
 
 Notes (REC-25) are private, like the history (X-1). Each `Note` is immutable: an id, its `NoteText` and `addedAt`, the
-server's time (X-12); who added it isn't recorded. `addNote` keeps them newest first, inserting by time rather than assuming
-the new one is the newest, as `markCooked` does; a note with the same time as another goes before it. It fails with
+server's time (X-12); who added it isn't recorded. `notes` lists them oldest first, and notes with the same time in the order
+they were added. Inside the recipe and in the snapshot they are kept the other way round, newest first, the order notes were
+stored in before the owner chose oldest first (2026-11-11), so documents already stored load and save unchanged and `notes`
+just reverses the list. `addNote` inserts by time rather than assuming the new one is the newest, as `markCooked` does; in the
+kept, newest-first list a note with the same time as another goes before it. It fails with
 `note.required` or `note.tooLong` (field `text`), or `notes.tooMany` at 50. Its id is made by the server, like a
 `RecipeId`; an id the recipe already has is a bug and throws. `deleteNote` takes the id as sent, so a malformed one is simply
 not found. Notes can't be edited. They aren't content: `revise`, `findRecipes` and the recipe list never look at them.
@@ -303,7 +306,7 @@ interface RecipeSnapshot {
   cookedAt: string[];             // ISO 8601 timestamps, newest first; duplicates allowed
   deletedAt?: string;             // ISO 8601 timestamp; present only while in the trash
   createdAt?: string;             // ISO 8601 timestamp, the added time (REC-22); documents from before REC-22 have none
-  notes?: { id: string; text: string; addedAt: string }[];  // REC-25, newest first; omitted when none, as before REC-25
+  notes?: { id: string; text: string; addedAt: string }[];  // REC-25, newest first (listed oldest first); omitted when none
   schemaVersion: 1;
 }
 ```

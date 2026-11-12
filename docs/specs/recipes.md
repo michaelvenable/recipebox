@@ -130,8 +130,8 @@ tag.
   recipe later. Notes are private: only editors see them (X-1). (Owner decisions, 2026-11-11.)
   - A note is free text of 1 to 1,000 characters after trimming whitespace, and may have several lines. A recipe has at most 50.
   - Each note records when it was added, by the server's clock (X-12). Who added it isn't recorded.
-  - The recipe view lists the recipe's notes, newest first, each with its text and the date it was added in the device's time
-    zone. A recipe without notes shows only the option to add one.
+  - The recipe view lists the recipe's notes, oldest first (owner decision, 2026-11-11), each with its text and the date it was
+    added in the device's time zone. A recipe without notes shows only the option to add one.
   - An editor can delete a note without being asked to confirm. Notes can't be edited: to change one, delete it and add another.
   - Notes stay with the recipe when it goes to the trash and when it is restored (REC-15), and are removed with it (REC-16).
     While it is in the trash they can't be added or deleted (REC-17).
@@ -188,7 +188,7 @@ tag.
 | Servings `4`                                                                 | Recipe view shows "Serves 4"                |
 | Note `"  use more butter "` added Nov 11                                     | Saved as "use more butter", dated Nov 11    |
 | Note of only spaces, or of 1,001 characters                                  | Rejected                                    |
-| Notes added Nov 2, then Nov 9                                                | Listed Nov 9, then Nov 2                    |
+| Notes added Nov 2, then Nov 9                                                | Listed Nov 2, then Nov 9                    |
 | A visitor opens a recipe that has notes                                      | No notes, and nothing saying there are any  |
 | A 51st note added to a recipe                                                | Rejected                                    |
 | "Pad Thai" with 2 notes deleted, then restored                               | Back with its 2 notes                       |

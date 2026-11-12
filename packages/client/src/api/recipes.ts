@@ -121,7 +121,7 @@ export function removeFromPlan(id: string): Promise<EditorRecipe> {
 
 /**
  * POST /recipes/{id}/notes (REC-25): the note as typed; trimming and the length rules are the server's, and so are the note's
- * id and added time (X-12). Answers with the recipe and its notes, newest first.
+ * id and added time (X-12). Answers with the recipe and its notes, oldest first.
  */
 export function addNote(id: string, text: string): Promise<EditorRecipe> {
   return apiChange("POST", `${recipePath(id)}/notes`, EditorRecipe, { text });
