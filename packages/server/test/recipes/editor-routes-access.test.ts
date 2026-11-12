@@ -19,18 +19,23 @@ import {
 const UNKNOWN_ID = "bbbbbbbb-0000-4000-8000-000000000000";
 
 /** A recipe on the to-make list with cooking history, plus one in the trash: every kind of private data there is. */
-async function appWithPrivateData(): Promise<Awaited<ReturnType<typeof recipeApp>> & { id: string; trashedId: string }> {
+async function appWithPrivateData(): Promise<
+  Awaited<ReturnType<typeof recipeApp>> & { id: string; trashedId: string; noteId: string }
+> {
   const setup = await recipeApp("2026-10-10T09:00:00.000Z");
   const recipe = await seed(setup.repository, content("Pad Thai", { tags: ["dinner"] }), {
     cookedAt: ["2026-08-01T18:00:00.000Z", "2026-09-01T18:00:00.000Z"],
     toMakeAt: "2026-09-20T08:00:00.000Z",
+    notes: [{ text: "use more butter", at: "2026-09-25T20:00:00.000Z" }],
   });
   await seed(setup.repository, content("Curry", { tags: ["spicy"] }));
   const trashed = await seed(setup.repository, content("Trashed Curry", { tags: ["secret"] }), {
     cookedAt: ["2026-07-01T18:00:00.000Z"],
     deletedAt: "2026-10-01T08:00:00.000Z",
   });
-  return { ...setup, id: recipe.id.value, trashedId: trashed.id.value };
+  const noteId = recipe.notes[0]?.id.value;
+  if (noteId === undefined) throw new Error("The seeded recipe has no note");
+  return { ...setup, id: recipe.id.value, trashedId: trashed.id.value, noteId };
 }
 
 /** Every editor-only read of this task, with the schema an editor's answer must match. */
@@ -45,13 +50,15 @@ function editorReads(id: string): [string, { parse(v: unknown): unknown }][] {
 }
 
 /** Every change endpoint of this task, against the recipe from appWithPrivateData, with a valid body. */
-function changeEndpoints(id: string): [string, "POST" | "DELETE", string, Record<string, unknown>][] {
+function changeEndpoints(id: string, noteId: string): [string, "POST" | "DELETE", string, Record<string, unknown>][] {
   return [
     ["attach a tag", "POST", `/recipes/${id}/tags`, { tag: "quick" }],
     ["remove a tag", "DELETE", `/recipes/${id}/tags`, { tag: "dinner" }],
     ["add to the list", "POST", `/recipes/${id}/add-to-plan`, {}],
     ["remove from the list", "POST", `/recipes/${id}/remove-from-plan`, {}],
     ["mark cooked", "POST", `/recipes/${id}/cookings`, {}],
+    ["add a note", "POST", `/recipes/${id}/notes`, { text: "less salt" }],
+    ["delete a note", "DELETE", `/recipes/${id}/notes/${noteId}`, {}],
   ];
 }
 
@@ -103,13 +110,13 @@ describe("X-1 recipes are public; the rest is private", () => {
   });
 
   it("marks every response of these endpoints private and not storable", async () => {
-    const { app, id } = await appWithPrivateData();
+    const { app, id, noteId } = await appWithPrivateData();
     for (const [url] of editorReads(id)) {
       for (const as of [AS_VISITOR, AS_EDITOR]) {
         expect((await get(app, url, as)).headers["cache-control"], url).toBe("private, no-store");
       }
     }
-    for (const [name, method, url, body] of changeEndpoints(id)) {
+    for (const [name, method, url, body] of changeEndpoints(id, noteId)) {
       for (const as of [AS_VISITOR, AS_EDITOR]) {
         expect((await change(app, method, url, body, as)).headers["cache-control"], name).toBe("private, no-store");
       }
@@ -123,9 +130,9 @@ describe("X-6 changes require sign-in", () => {
     ["a signed-in non-editor", AS_NON_EDITOR, 403, "auth.notEditor"],
   ] as const) {
     it(`refuses ${who} every change with ${status}, and changes nothing`, async () => {
-      const { app, repository, id } = await appWithPrivateData();
+      const { app, repository, id, noteId } = await appWithPrivateData();
       const before = await storedSnapshots(repository);
-      for (const [name, method, url, body] of changeEndpoints(id)) {
+      for (const [name, method, url, body] of changeEndpoints(id, noteId)) {
         const res = await change(app, method, url, body, as);
         expect(res.statusCode, name).toBe(status);
         expectErrors(res, status, [code]);
@@ -134,8 +141,8 @@ describe("X-6 changes require sign-in", () => {
     });
 
     it(`refuses ${who} before looking at the recipe: trashed and unknown ids get the same ${status}`, async () => {
-      const { app, id, trashedId } = await appWithPrivateData();
-      for (const [name, method, url, body] of changeEndpoints(id)) {
+      const { app, id, trashedId, noteId } = await appWithPrivateData();
+      for (const [name, method, url, body] of changeEndpoints(id, noteId)) {
         const live = await change(app, method, url, body, as);
         const trashed = await change(app, method, url.replace(id, trashedId), body, as);
         const unknown = await change(app, method, url.replace(id, UNKNOWN_ID), body, as);
@@ -149,8 +156,8 @@ describe("X-6 changes require sign-in", () => {
   }
 
   it("lets an editor make every change", async () => {
-    const { app, id } = await appWithPrivateData();
-    for (const [name, method, url, body] of changeEndpoints(id)) {
+    const { app, id, noteId } = await appWithPrivateData();
+    for (const [name, method, url, body] of changeEndpoints(id, noteId)) {
       const res = await change(app, method, url, body, AS_EDITOR);
       expect(res.statusCode, name).toBe(200);
       EditorRecipe.parse(res.json());
@@ -167,10 +174,12 @@ describe("X-12 every stored time comes from the server's clock", () => {
     ["add to the list", { addedAt: TIME }],
     ["remove from the list", { at: TIME }],
     ["mark cooked", { cookedAt: TIME }],
+    ["add a note", { addedAt: TIME }],
+    ["delete a note", { at: TIME }],
   ])("refuses a request to %s that carries a time, and changes nothing", async (name, payload) => {
-    const { app, repository, id } = await appWithPrivateData();
+    const { app, repository, id, noteId } = await appWithPrivateData();
     const before = await storedSnapshots(repository);
-    const [, method, url, valid] = changeEndpoints(id).find(([n]) => n === name) ?? [];
+    const [, method, url, valid] = changeEndpoints(id, noteId).find(([n]) => n === name) ?? [];
     if (method === undefined || url === undefined) throw new Error(`No endpoint ${name}`);
 
     const body = expectErrors(await change(app, method, url, { ...valid, ...payload }), 400, ["request.unknownField"]);

@@ -1972,3 +1972,46 @@ button.pill-button:disabled {
     animation: none;
   }
 }
+
+/* Notes on the recipe view (REC-25): a box to add one, then the notes, newest first, each with its date and Delete. */
+
+.note-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.notes {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.note {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.note-text {
+  margin: 0;
+  /* Notes may have several lines (REC-25). */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.note-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 0;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.note-delete {
+  color: var(--danger);
+}

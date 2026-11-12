@@ -22,8 +22,10 @@ export {
   EditorRecipe,
   EditorRecipeSummary,
   EmptyRequest,
+  NoteRequest,
   PublicRecipe,
   RecipeContentInput,
+  RecipeNote,
   RecipeSummary,
   TagRequest,
 } from "./recipes.js";

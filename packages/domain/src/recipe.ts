@@ -1,5 +1,6 @@
 import { domainError, type DomainError } from "./errors.js";
 import { Instant } from "./instant.js";
+import { MAX_NOTES, Note, NoteId, NoteText } from "./note.js";
 import { PhotoRef } from "./photo-ref.js";
 import { MAX_TAGS, RecipeContent, type RecipeContentInput } from "./recipe-content.js";
 import { RecipeId } from "./recipe-id.js";
@@ -31,11 +32,22 @@ export interface RecipeSnapshot {
   deletedAt?: string;
   /** ISO 8601 timestamp: the recipe's added time (REC-22). Documents stored before it was recorded have none. */
   createdAt?: string;
+  /** Newest first; omitted when there are none, so documents stored before REC-25 load unchanged. */
+  notes?: RecipeNoteSnapshot[];
   schemaVersion: 1;
 }
 
+/** One note in the stored document (REC-25). */
+export interface RecipeNoteSnapshot {
+  /** Lowercase UUID. */
+  id: string;
+  text: string;
+  /** ISO 8601 timestamp. */
+  addedAt: string;
+}
+
 /**
- * The aggregate root: one recipe with its photo, to-make status, cooking history and trash state, stored as one document.
+ * The aggregate root: one recipe with its photo, to-make status, cooking history, notes and trash state, stored as one document.
  * Every change goes through a method here. Every `Instant` passed in is the server's clock (X-12).
  */
 export class Recipe {
@@ -49,6 +61,8 @@ export class Recipe {
     private deletedTime: Instant | undefined,
     /** Set once, by `create`; nothing changes it (REC-22). Undefined for recipes stored before it was recorded. */
     private readonly createdTime: Instant | undefined,
+    /** Newest first (REC-25). */
+    private noteList: Note[],
   ) {}
 
   /**
@@ -58,7 +72,7 @@ export class Recipe {
   static create(id: RecipeId, content: RecipeContentInput, at: Instant): Result<Recipe> {
     const created = RecipeContent.create(content);
     if (!created.ok) return created;
-    return ok(new Recipe(id, created.value, undefined, undefined, [], undefined, at));
+    return ok(new Recipe(id, created.value, undefined, undefined, [], undefined, at, []));
   }
 
   get id(): RecipeId {
@@ -83,7 +97,7 @@ export class Recipe {
 
   // Content
 
-  /** Replaces all content, including tags; photo, to-make status and history are untouched (REC-5). */
+  /** Replaces all content, including tags; photo, to-make status, history and notes are untouched (REC-5, REC-25). */
   revise(content: RecipeContentInput): Result<void> {
     const refused = this.refuseIfInTrash();
     if (refused) return refused;
@@ -122,7 +136,7 @@ export class Recipe {
   }
 
   /**
-   * Takes the recipe out of the trash with content, photo, tags and history unchanged; it stays off the to-make list
+   * Takes the recipe out of the trash with content, photo, tags, history and notes unchanged; it stays off the to-make list
    * (REC-15, PLAN-6). Refused at or after `removalDueAt` (REC-16). Not deleted: no-op.
    */
   restore(at: Instant): Result<void> {
@@ -239,6 +253,49 @@ export class Recipe {
     return this.cookings.length;
   }
 
+  // Notes
+
+  /**
+   * Adds a note with the server's time (REC-25, X-12). `id` is made outside the domain, like a `RecipeId`. Fails if the text is
+   * blank or too long after trimming, or if the recipe already has 50 notes.
+   */
+  addNote(id: NoteId, text: string, at: Instant): Result<Note> {
+    const refused = this.refuseIfInTrash();
+    if (refused) return refused;
+    const parsed = NoteText.create(text);
+    if (!parsed.ok) return parsed;
+    if (this.noteList.length >= MAX_NOTES) {
+      return fail(domainError("notes.tooMany", `A recipe can have at most ${MAX_NOTES} notes.`));
+    }
+    // A fresh id that is already taken means the server's id source is broken: a bug, not user input.
+    if (this.noteList.some((n) => n.id.equals(id))) throw new Error(`Note id ${id.value} is already used on this recipe`);
+    const note = new Note(id, parsed.value, at);
+    // Insert in order rather than assume `at` is the newest: the server's clock may step back. Ahead of notes with the same
+    // time, so the note just added is listed first.
+    const index = this.noteList.findIndex((n) => !at.isBefore(n.addedAt));
+    this.noteList.splice(index === -1 ? this.noteList.length : index, 0, note);
+    return ok(note);
+  }
+
+  /**
+   * Deletes a note, at once (REC-25). `id` is the text from the request: one that isn't a note of this recipe, malformed or
+   * not, fails with `note.notFound`, for example when another device has already deleted it.
+   */
+  deleteNote(id: string): Result<void> {
+    const refused = this.refuseIfInTrash();
+    if (refused) return refused;
+    const parsed = NoteId.create(id);
+    const index = parsed.ok ? this.noteList.findIndex((n) => n.id.equals(parsed.value)) : -1;
+    if (index === -1) return fail(domainError("note.notFound", "This note doesn't exist. It may have been deleted already."));
+    this.noteList.splice(index, 1);
+    return ok(undefined);
+  }
+
+  /** Newest first (REC-25). */
+  get notes(): readonly Note[] {
+    return Object.freeze([...this.noteList]);
+  }
+
   // Persistence
 
   toSnapshot(): RecipeSnapshot {
@@ -261,6 +318,9 @@ export class Recipe {
     if (this.toMakeAddedAt !== undefined) snapshot.toMake = { addedAt: this.toMakeAddedAt.toIso() };
     if (this.deletedTime !== undefined) snapshot.deletedAt = this.deletedTime.toIso();
     if (this.createdTime !== undefined) snapshot.createdAt = this.createdTime.toIso();
+    if (this.noteList.length > 0) {
+      snapshot.notes = this.noteList.map((n) => ({ id: n.id.value, text: n.text.value, addedAt: n.addedAt.toIso() }));
+    }
     return snapshot;
   }
 
@@ -312,7 +372,14 @@ export class Recipe {
     }
     // Optional: documents stored before REC-22 have no added time, and none is made up for them.
     const createdAt = s.createdAt === undefined ? undefined : storedInstant(s, "createdAt", s.createdAt);
-    return new Recipe(id, content, photo, addedAt, cookedAt, deletedAt, createdAt);
+    // Optional: documents stored before REC-25 have no notes.
+    const notes = (s.notes ?? []).map((n, i) => storedNote(s, i, n));
+    if (notes.length > MAX_NOTES) throw invalidSnapshot(s, `more than ${MAX_NOTES} notes`);
+    if (notes.some((n, i) => i > 0 && notes[i - 1]!.addedAt.isBefore(n.addedAt))) {
+      throw invalidSnapshot(s, "notes are not newest first");
+    }
+    if (new Set(notes.map((n) => n.id.value)).size !== notes.length) throw invalidSnapshot(s, "two notes have the same id");
+    return new Recipe(id, content, photo, addedAt, cookedAt, deletedAt, createdAt, notes);
   }
 
   /** REC-17: every change except `restore` is refused while the recipe is in the trash, and nothing changes. */
@@ -356,6 +423,15 @@ function storedInstant(s: RecipeSnapshot, part: string, iso: string): Instant {
   const instant = orThrow(s, part, Instant.fromIso(iso));
   if (instant.toIso() !== iso) throw invalidSnapshot(s, `${part} is not in its canonical form`);
   return instant;
+}
+
+function storedNote(s: RecipeSnapshot, i: number, stored: RecipeNoteSnapshot): Note {
+  const part = `notes[${i}]`;
+  const id = orThrow(s, `${part}.id`, NoteId.create(stored.id));
+  const text = orThrow(s, `${part}.text`, NoteText.create(stored.text));
+  // As for content: stored text must already be in the form validation produces.
+  if (id.value !== stored.id || text.value !== stored.text) throw invalidSnapshot(s, `${part} is not in its validated form`);
+  return new Note(id, text, storedInstant(s, `${part}.addedAt`, stored.addedAt));
 }
 
 function describe(errors: readonly DomainError[]): string {

@@ -119,6 +119,19 @@ export function removeFromPlan(id: string): Promise<EditorRecipe> {
   return apiChange("POST", `${recipePath(id)}/remove-from-plan`, EditorRecipe);
 }
 
+/**
+ * POST /recipes/{id}/notes (REC-25): the note as typed; trimming and the length rules are the server's, and so are the note's
+ * id and added time (X-12). Answers with the recipe and its notes, newest first.
+ */
+export function addNote(id: string, text: string): Promise<EditorRecipe> {
+  return apiChange("POST", `${recipePath(id)}/notes`, EditorRecipe, { text });
+}
+
+/** DELETE /recipes/{id}/notes/{noteId} (REC-25). A note already deleted, such as from another device, is a 404 ApiError. */
+export function deleteNote(id: string, noteId: string): Promise<EditorRecipe> {
+  return apiChange("DELETE", `${recipePath(id)}/notes/${encodeURIComponent(noteId)}`, EditorRecipe);
+}
+
 /** GET /plan: the to-make list, oldest first (PLAN-3). Editors only (X-1). */
 export function fetchPlan(signal?: AbortSignal): Promise<ToMakeEntry[]> {
   return apiGet("/plan", ToMakeEntry.array(), signal);

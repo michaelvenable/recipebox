@@ -18,7 +18,7 @@ Rules cite spec IDs from `docs/specs/`. If a rule here has no spec ID, either th
 5. **All validation errors are reported at once.** REC-1 requires telling the user which fields are invalid, so content validation
    collects every error rather than stopping at the first.
 6. **One recipe = one aggregate = one Cosmos document.** Everything that must stay consistent together (content, photo, to-make
-   status, cooking history) lives inside `Recipe`, so saving a recipe is a single atomic write.
+   status, cooking history, notes) lives inside `Recipe`, so saving a recipe is a single atomic write.
 
 ## Building blocks
 
@@ -46,14 +46,16 @@ interface DomainError {
 | `Tag`        | Trimmed and lowercased; 1–30 characters. Equal tags have equal text.           | REC-11                     |
 | `Instant`    | A point in time (UTC). Passed in; the domain never reads the clock.            | X-12                       |
 | `ShareToken` | A link code: base64url, 22–64 characters (128+ bits). Made by the server.      | PLAN-9                     |
+| `NoteId`     | UUID, stored in lowercase; created outside the domain, like `RecipeId`.        | REC-25                     |
+| `NoteText`   | A note's text. Trimmed; 1–1,000 characters; may have several lines.            | REC-25                     |
 
 Notes:
 - `RecipeName.compare(a, b)` sorts ignoring case and accents. `RecipeName.matches(term)` finds the trimmed term anywhere in the
   name, ignoring case and accents; an empty term matches everything.
 - Character counts, sorting and matching all follow X-13: characters are counted as a person sees them (every emoji is one), and
   comparisons ignore case and accents using English rules. One shared helper implements this so every value object agrees:
-  - All stored text (names, ingredients, prep, steps, tags) is normalized to Unicode NFC, so text that looks the same is the same.
-    Two "café" tags typed on different keyboards are one tag.
+  - All stored text (names, ingredients, prep, steps, tags, notes) is normalized to Unicode NFC, so text that looks the same is
+    the same. Two "café" tags typed on different keyboards are one tag.
   - Search folds both the name and the term the same way sorting does: NFKD, accent marks removed, a small table for letters that
     don't decompose (ø→o, ł→l, đ→d, æ→ae, œ→oe, ß→ss), then lowercase. "smorrebrod" finds "Smørrebrød".
   - Tags that differ only in accents ("epice", "épicé") stay separate tags; only case is folded when a tag is stored.
@@ -113,6 +115,11 @@ class Recipe {
   get lastCookedAt(): Instant | undefined;                      // COOK-5
   get timesCooked(): number;                                    // COOK-5
 
+  // Notes
+  addNote(id: NoteId, text: string, at: Instant): Result<Note>; // REC-25
+  deleteNote(id: string): Result<void>;                         // REC-25
+  get notes(): readonly Note[];  // newest first                // REC-25
+
   // Persistence
   toSnapshot(): RecipeSnapshot;
   static fromSnapshot(s: RecipeSnapshot): Recipe;
@@ -129,7 +136,7 @@ Behavior rules:
 | `markCooked`                  | Removes the recipe from the to-make list.                                  | PLAN-5         |
 | `lastCookedAt`, `timesCooked` | Derived from `cookedAt`; never stored, so they cannot drift.               | COOK-5         |
 | `setPhoto`, `removePhoto`     | Return the previous `PhotoRef` so its blob can be deleted.                 | REC-7          |
-| `revise`                      | Replaces content, including tags. Never touches photo, plan or history.    | REC-5          |
+| `revise`                      | Replaces content and tags. Never touches photo, plan, history or notes.    | REC-5, REC-25  |
 | `attachTag`                   | Already attached: no-op, even at 20. Else fails if invalid or 20 attached. | REC-11         |
 | `removeTag`                   | If the tag isn't attached, or isn't a valid tag, does nothing.             | REC-10         |
 | `delete`                      | Clears to-make status. Already deleted: no-op.                             | REC-6, PLAN-6  |
@@ -137,11 +144,20 @@ Behavior rules:
 | `restore`                     | Fails with `trash.expired` if `at` is at or after `removalDueAt`.          | REC-16         |
 | `restore`                     | Not deleted: does nothing.                                                 | REC-15         |
 | `create`                      | `at` becomes `createdAt`, the added time. No method ever changes it.       | REC-22         |
+| `addNote`                     | Fails if the text is invalid or the recipe already has 50 notes.           | REC-25         |
+| `deleteNote`                  | Fails with `note.notFound` if the recipe has no note with that id.         | REC-25         |
 
 Deleting a recipe (REC-6) moves it to the trash by marking it deleted and recording when. It also takes the recipe off the to-make
-list (PLAN-6); nothing else inside it is cleared. `restore` clears the deleted mark, and the content, photo, tags and history are
-all still there (REC-15). Because the to-make status and history live inside the document, no other data can be left pointing at a
-deleted recipe.
+list (PLAN-6); nothing else inside it is cleared. `restore` clears the deleted mark, and the content, photo, tags, history and
+notes are all still there (REC-15). Because the to-make status, history and notes live inside the document, no other data can be
+left pointing at a deleted recipe, and removing the document removes them with it (REC-16).
+
+Notes (REC-25) are private, like the history (X-1). Each `Note` is immutable: an id, its `NoteText` and `addedAt`, the
+server's time (X-12); who added it isn't recorded. `addNote` keeps them newest first, inserting by time rather than assuming
+the new one is the newest, as `markCooked` does; a note with the same time as another goes before it. It fails with
+`note.required` or `note.tooLong` (field `text`), or `notes.tooMany` at 50. Its id is made by the server, like a
+`RecipeId`; an id the recipe already has is a bug and throws. `deleteNote` takes the id as sent, so a malformed one is simply
+not found. Notes can't be edited. They aren't content: `revise`, `findRecipes` and the recipe list never look at them.
 
 A recipe's added time (REC-22) is the `at` given to `create`: when it was created (REC-1), or when an import added it
 (IMP-10). It is stored as `createdAt`, not `addedAt`, which on the to-make list (PLAN-3) means something else. Editing,
@@ -287,6 +303,7 @@ interface RecipeSnapshot {
   cookedAt: string[];             // ISO 8601 timestamps, newest first; duplicates allowed
   deletedAt?: string;             // ISO 8601 timestamp; present only while in the trash
   createdAt?: string;             // ISO 8601 timestamp, the added time (REC-22); documents from before REC-22 have none
+  notes?: { id: string; text: string; addedAt: string }[];  // REC-25, newest first; omitted when none, as before REC-25
   schemaVersion: 1;
 }
 ```
@@ -358,6 +375,7 @@ packages/domain/
     photo-ref.ts
     tag.ts
     recipe-content.ts
+    note.ts           # NoteId, NoteText, Note (REC-25)
     recipe.ts
     finding.ts        # findRecipes, tagsInUse, suggestTags, trashContents
     rediscovery.ts

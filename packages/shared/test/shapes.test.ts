@@ -8,8 +8,10 @@ import {
   HealthResponse,
   ImportStatus,
   Me,
+  NoteRequest,
   PublicRecipe,
   RecipeContentInput,
+  RecipeNote,
   RecipeSummary,
   RediscoverEntry,
   SharedShoppingList,
@@ -50,6 +52,7 @@ const editorRecipe: EditorRecipe = {
   cookedAt: [T1, T2],
   lastCookedAt: T1,
   timesCooked: 2,
+  notes: [{ id: "00000000-0000-4000-8000-000000000001", text: "use more butter", addedAt: T1 }],
 };
 
 /** Removing any one of the keys must fail parsing. */
@@ -138,6 +141,31 @@ describe("api.md Shapes: TagRequest, the body of attaching or removing a tag", (
   });
 });
 
+describe("REC-25 api.md Shapes: NoteRequest and RecipeNote", () => {
+  it("NoteRequest parses { text }, keeping the text as typed, several lines included", () => {
+    expect(NoteRequest.parse({ text: "  use more butter\nless salt " })).toEqual({ text: "  use more butter\nless salt " });
+  });
+  it("NoteRequest requires text to be a string", () => {
+    expect(NoteRequest.safeParse({}).success).toBe(false);
+    expect(NoteRequest.safeParse({ text: 3 }).success).toBe(false);
+    expect(NoteRequest.safeParse("use more butter").success).toBe(false);
+  });
+  it("NoteRequest refuses a time or any other field (X-12)", () => {
+    expect(NoteRequest.safeParse({ text: "x", addedAt: T1 }).success).toBe(false);
+    expect(NoteRequest.safeParse({ text: "x", id: ID }).success).toBe(false);
+  });
+  it("RecipeNote requires id, text and addedAt, and nothing else", () => {
+    const note = { id: ID, text: "use more butter", addedAt: T1 };
+    expect(RecipeNote.parse(note)).toEqual(note);
+    expectRequired(RecipeNote, note, ["id", "text", "addedAt"]);
+    expect(RecipeNote.safeParse({ ...note, addedBy: "someone" }).success).toBe(false);
+  });
+  it("EditorRecipe rejects a note with an unknown field", () => {
+    const notes = [{ id: ID, text: "x", addedAt: T1, extra: 1 }];
+    expect(EditorRecipe.safeParse({ ...editorRecipe, notes }).success).toBe(false);
+  });
+});
+
 describe("api.md Shapes: RecipeSummary and EditorRecipeSummary", () => {
   it("parses a valid summary", () => {
     expect(RecipeSummary.parse(summary)).toEqual(summary);
@@ -176,7 +204,7 @@ describe("api.md Shapes: PublicRecipe and EditorRecipe", () => {
       "cookedAt",
       "timesCooked",
     ]);
-    expectOptional(EditorRecipe, editorRecipe, ["toMake", "lastCookedAt", "totalTimeMinutes", "prep", "servings"]);
+    expectOptional(EditorRecipe, editorRecipe, ["toMake", "lastCookedAt", "totalTimeMinutes", "prep", "servings", "notes"]);
   });
   it("EditorRecipe parses a never-cooked recipe that isn't on the list", () => {
     const { toMake: _t, lastCookedAt: _l, ...rest } = editorRecipe;
@@ -287,6 +315,7 @@ const PRIVATE_FIELDS: Record<string, unknown> = {
   timesCooked: 1,
   deletedAt: T1,
   onToMakeList: true,
+  notes: [{ id: ID, text: "use more butter", addedAt: T1 }],
 };
 
 describe("X-1 public shapes reject private fields", () => {

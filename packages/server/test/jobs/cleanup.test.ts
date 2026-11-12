@@ -7,7 +7,7 @@ import { InMemoryPhotoStore } from "../../src/photos/in-memory-photo-store.js";
 import { InMemoryRecipeRepository } from "../../src/recipes/in-memory-recipe-repository.js";
 import type { RecipeRepository, RecipeVersion } from "../../src/recipes/recipe-repository.js";
 import { instant } from "../app-helpers.js";
-import { content, recipeId, TestClock } from "../recipes/recipe-route-helpers.js";
+import { content, noteId, recipeId, TestClock } from "../recipes/recipe-route-helpers.js";
 
 /** Deleted at this time, a recipe's removal is due 30 days later, at DUE (REC-16). */
 const DELETED = "2026-09-01T09:00:00.000Z";
@@ -133,6 +133,22 @@ describe("REC-16 permanent removal", () => {
 
     expect(await recipes.get(created.value.id)).toBeUndefined();
     expect(summary).toEqual({ recipesRemoved: 1, imagesDeleted: 0, orphansDeleted: 0, failures: 0 });
+  });
+
+  it("REC-25: removes a due recipe together with its notes, which are part of its document", async () => {
+    const due = await recipeWithPhoto();
+    const id = noteId("11111111-0000-4000-8000-000000000001");
+    const note = due.addNote(id, "use more butter", instant("2026-08-20T19:00:00.000Z"));
+    if (!note.ok) throw new Error("could not add a note");
+    due.delete(instant(DELETED));
+    await recipes.save(due);
+    clock.set(DUE);
+
+    const summary = await cleanup();
+
+    expect(await recipes.get(due.id)).toBeUndefined();
+    expect(JSON.stringify((await recipes.list()).map((r) => r.toSnapshot()))).not.toContain("use more butter");
+    expect(summary.recipesRemoved).toBe(1);
   });
 
   it("doesn't remove a recipe restored after it was listed", async () => {

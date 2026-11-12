@@ -19,12 +19,12 @@ export function PrivacyPage() {
         </p>
       </section>
 
-      {/* X-1, PLAN-9. */}
+      {/* X-1, PLAN-9, REC-25. */}
       <section aria-labelledby="privacy-lists">
         <h2 id="privacy-lists">The household's lists</h2>
         <p>
-          The "to make" list, cooking history and trash can be seen only by the household's editors, and so can photos of
-          recipes in the trash. The one exception is a shopping list an editor sends: for 7 days, anyone with its link can see
+          The "to make" list, cooking history, notes on recipes and trash can be seen only by the household's editors, and so
+          can photos of recipes in the trash. The one exception is a shopping list an editor sends: for 7 days, anyone with its link can see
           the current shopping list, and nothing else.
         </p>
       </section>
@@ -80,12 +80,12 @@ export function PrivacyPage() {
         </p>
       </section>
 
-      {/* REC-7, REC-16; backups: docs/architecture.md, "Backups", and infra/main.bicep (7 days each). */}
+      {/* REC-7, REC-16, REC-25; backups: docs/architecture.md, "Backups", and infra/main.bicep (7 days each). */}
       <section aria-labelledby="privacy-deleting">
         <h2 id="privacy-deleting">Deleting</h2>
         <p>
-          A deleted recipe stays in the trash for 30 days. Within a day after that, it is removed for good, with its photo and
-          cooking history. Replacing or removing a photo deletes the old one. Backup copies are kept for 7 days, then they expire.
+          A deleted recipe stays in the trash for 30 days. Within a day after that, it is removed for good, with its photo,
+          cooking history and notes. Replacing or removing a photo deletes the old one. Backup copies are kept for 7 days, then they expire.
         </p>
       </section>
 

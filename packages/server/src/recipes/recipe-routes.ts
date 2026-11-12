@@ -1,6 +1,6 @@
 // The recipe endpoints (docs/api.md) other than photos (photos/photo-routes.ts): list, tags, view, create, edit, delete, trash
 // and restore; attaching and removing tags and tag suggestions; the "to make" list and its shopping list; cooking history and
-// the "haven't made in a while" view.
+// the "haven't made in a while" view; notes.
 //
 // Every change follows docs/architecture.md, "How a change is applied": requireEditor (X-6), read the stored recipe, call one
 // domain method with the request's input and the server's time (X-12), answer domain errors without saving, then save the
@@ -25,6 +25,7 @@ import {
   EmptyRequest,
   type ErrorItem,
   type ErrorResponse,
+  NoteRequest,
   type PublicRecipe,
   RecipeContentInput,
   type RecipeSummary,
@@ -36,7 +37,7 @@ import {
   type ToMakeEntry,
   type TrashEntry,
 } from "@recipebox/shared";
-import type { Clock, RecipeIdGenerator } from "../clock.js";
+import type { Clock, NoteIdGenerator, RecipeIdGenerator } from "../clock.js";
 import { requireEditor } from "../http/caller.js";
 import { parseBody } from "../http/request-body.js";
 import type { RecipeRepository } from "./recipe-repository.js";
@@ -58,10 +59,15 @@ export interface RecipeRouteDependencies {
   recipes: RecipeRepository;
   clock: Clock;
   newRecipeId: RecipeIdGenerator;
+  newNoteId: NoteIdGenerator;
 }
 
 interface IdParams {
   id: string;
+}
+
+interface NoteParams extends IdParams {
+  noteId: string;
 }
 
 interface ListQuery {
@@ -79,12 +85,13 @@ interface SuggestionQuery {
 }
 
 /**
- * Status for a refused change (docs/api.md, errors table): 409 when the recipe's state refuses it (REC-16, REC-17),
- * otherwise 400 for invalid input.
+ * Status for a refused change (docs/api.md, errors table): 409 when the recipe's state refuses it (REC-16, REC-17), 404 for a
+ * note the recipe doesn't have (REC-25), otherwise 400 for invalid input.
  */
 const STATE_ERRORS: Readonly<Record<string, number>> = {
   "recipe.inTrash": 409,
   "trash.expired": 409,
+  "note.notFound": 404,
 };
 
 export function statusFor(errors: readonly DomainError[]): number {
@@ -146,7 +153,10 @@ function pickedTags(text: string | undefined): string[] {
   return text.split(",").filter((tag) => tag !== "");
 }
 
-export function registerRecipeRoutes(app: FastifyInstance, { recipes, clock, newRecipeId }: RecipeRouteDependencies): void {
+export function registerRecipeRoutes(
+  app: FastifyInstance,
+  { recipes, clock, newRecipeId, newNoteId }: RecipeRouteDependencies,
+): void {
   /** The recipe for `id`, if it exists; trashed recipes included. */
   async function load(rawId: string): Promise<Recipe | undefined> {
     const id = recipeIdOf(rawId);
@@ -344,6 +354,28 @@ export function registerRecipeRoutes(app: FastifyInstance, { recipes, clock, new
     async (request, reply): Promise<EditorRecipe | FastifyReply> =>
       refuseUnlessEmpty(request.body, reply) ??
       applyChange(reply, request.params.id, (recipe) => recipe.markCooked(clock())),
+  );
+
+  // REC-25: the note's id and added time are the server's (X-12); the text is read by the domain (trimmed, 1-1,000
+  // characters, at most 50 notes). Refused with 409 recipe.inTrash while the recipe is in the trash (REC-17).
+  app.post<{ Params: IdParams }>(
+    "/recipes/:id/notes",
+    { preHandler: requireEditor },
+    async (request, reply): Promise<EditorRecipe | FastifyReply> => {
+      const input = parseBody(NoteRequest, request.body);
+      if (!input.ok) return reply.code(400).send({ errors: input.errors } satisfies ErrorResponse);
+      return applyChange(reply, request.params.id, (recipe) => recipe.addNote(newNoteId(), input.value.text, clock()));
+    },
+  );
+
+  // REC-25: deleted at once, without confirmation (that is the app's part). A note the recipe doesn't have, such as one another
+  // device already deleted, gets 404 note.notFound; a recipe in the trash gets 409 recipe.inTrash first (REC-17).
+  app.delete<{ Params: NoteParams }>(
+    "/recipes/:id/notes/:noteId",
+    { preHandler: requireEditor },
+    async (request, reply): Promise<EditorRecipe | FastifyReply> =>
+      refuseUnlessEmpty(request.body, reply) ??
+      applyChange(reply, request.params.id, (recipe) => recipe.deleteNote(request.params.noteId)),
   );
 
   // COOK-6, COOK-9: editor-only (X-1); the order and the tag filter are the domain's. `tags` is read as on GET /recipes.

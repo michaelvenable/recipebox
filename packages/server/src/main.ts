@@ -1,5 +1,5 @@
 import { buildApp } from "./app.js";
-import { randomImportId, randomRecipeId, randomShareToken, systemClock } from "./clock.js";
+import { randomImportId, randomNoteId, randomRecipeId, randomShareToken, systemClock } from "./clock.js";
 import { loadConfig } from "./config.js";
 import { CosmosImportRepository } from "./imports/cosmos-import-repository.js";
 import { createImportQueueClient, StorageImportQueue } from "./imports/storage-import-queue.js";
@@ -31,6 +31,7 @@ const app = await buildApp({
   photos: new BlobPhotoStore(photoContainer),
   clock: systemClock,
   newRecipeId: randomRecipeId,
+  newNoteId: randomNoteId,
   newShareToken: randomShareToken,
   newImportId: randomImportId,
   logger: true,

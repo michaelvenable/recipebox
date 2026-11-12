@@ -42,8 +42,10 @@ describe("X-15 privacy page", () => {
     const text = (await privacyPage()).textContent ?? "";
     // X-1: recipes and photos are public.
     expect(text).toMatch(/Recipes and their photos are public/);
-    // X-1, PLAN-9: the private lists, and the shopping list link exception.
-    expect(text).toMatch(/"to make" list, cooking history and trash can be seen only by the household's editors/);
+    // X-1, PLAN-9, REC-25: the private lists, and the shopping list link exception.
+    expect(text).toMatch(/"to make" list, cooking history, notes on recipes and trash can be seen only by the household's\s+editors/);
+    // REC-16, REC-25: removed for good with the recipe.
+    expect(text).toMatch(/removed for good, with its photo,\s+cooking history and notes/);
     expect(text).toMatch(/shopping list an editor sends: for 7 days, anyone with its link can see/);
     // X-7: Microsoft or Google; only the provider and permanent account ID; no name or email.
     expect(text).toMatch(/Microsoft or Google account/);

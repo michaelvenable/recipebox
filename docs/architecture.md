@@ -80,11 +80,11 @@ can still overwrite each other; that is accepted (X-5, withdrawn).
 
 ## Public and private data
 
-X-1 makes recipes public and the to-make list, cooking history and trash private. The API enforces this with two response shapes
-in `packages/shared`:
+X-1 makes recipes public and the to-make list, cooking history, notes and trash private. The API enforces this with two response
+shapes in `packages/shared`:
 
 - `PublicRecipe`: content, tags and photo link only.
-- `EditorRecipe`: everything in `PublicRecipe`, plus to-make status and cooking history.
+- `EditorRecipe`: everything in `PublicRecipe`, plus to-make status, cooking history and notes (REC-25).
 
 Rules:
 - Visitors only ever receive `PublicRecipe`. A recipe in the trash is "not found" for visitors, and so is its photo.

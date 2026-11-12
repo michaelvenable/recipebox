@@ -1,6 +1,6 @@
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { expect } from "vitest";
-import { Instant, Recipe, RecipeId, type RecipeContentInput } from "@recipebox/domain";
+import { Instant, NoteId, Recipe, RecipeId, type RecipeContentInput } from "@recipebox/domain";
 import { EditorRecipe, ErrorResponse } from "@recipebox/shared";
 import { InMemoryRecipeRepository } from "../../src/recipes/in-memory-recipe-repository.js";
 import { EDITOR, NON_EDITOR, appWith, instant } from "../app-helpers.js";
@@ -11,7 +11,16 @@ export const AS_NON_EDITOR = { "x-dev-identity": NON_EDITOR };
 export const AS_VISITOR = {};
 
 /** Fields only editors may see (docs/api.md, "Shapes"; X-1). */
-export const PRIVATE_FIELDS = ["toMake", "cookedAt", "lastCookedAt", "timesCooked", "deletedAt", "removalDueAt", "onToMakeList"];
+export const PRIVATE_FIELDS = [
+  "toMake",
+  "cookedAt",
+  "lastCookedAt",
+  "timesCooked",
+  "deletedAt",
+  "removalDueAt",
+  "onToMakeList",
+  "notes",
+];
 
 /** The server's clock as tests control it (X-12). */
 export class TestClock {
@@ -34,6 +43,18 @@ export function sequentialIds(): () => RecipeId {
   return () => recipeId(`00000000-0000-4000-8000-${String(++n).padStart(12, "0")}`);
 }
 
+/** Note ids 11111111-0000-4000-8000-000000000001, …002, … in order of creation (REC-25). */
+export function sequentialNoteIds(): () => NoteId {
+  let n = 0;
+  return () => noteId(`11111111-0000-4000-8000-${String(++n).padStart(12, "0")}`);
+}
+
+export function noteId(text: string): NoteId {
+  const id = NoteId.create(text);
+  if (!id.ok) throw new Error(`Not a note id: ${text}`);
+  return id.value;
+}
+
 export function recipeId(text: string): RecipeId {
   const id = RecipeId.create(text);
   if (!id.ok) throw new Error(`Not a recipe id: ${text}`);
@@ -49,7 +70,12 @@ export interface RecipeTestApp {
 export async function recipeApp(now = "2026-10-01T09:00:00.000Z"): Promise<RecipeTestApp> {
   const repository = new InMemoryRecipeRepository();
   const clock = new TestClock(now);
-  const app = await appWith({}, false, { recipes: repository, clock: clock.now, newRecipeId: sequentialIds() });
+  const app = await appWith({}, false, {
+    recipes: repository,
+    clock: clock.now,
+    newRecipeId: sequentialIds(),
+    newNoteId: sequentialNoteIds(),
+  });
   return { app, repository, clock };
 }
 
@@ -58,16 +84,24 @@ export function content(name: string, extra: Partial<RecipeContentInput> = {}): 
 }
 
 let seeded = 0;
+let seededNotes = 0;
 
 /**
- * Stores a recipe directly in the repository, with history and list state that endpoints of later tasks (cookings, to-make)
- * would otherwise set. Times are applied in order: cooked, added to the list, deleted. `createdAt` is its added time
- * (REC-22), SEEDED_AT unless given; `null` stores it as a recipe from before added times were recorded, which has none.
+ * Stores a recipe directly in the repository, with history, list state and notes that endpoints of later tasks (cookings,
+ * to-make, notes) would otherwise set. Times are applied in order: cooked, added to the list, notes added, deleted. `createdAt`
+ * is its added time (REC-22), SEEDED_AT unless given; `null` stores it as a recipe from before added times were recorded, which
+ * has none.
  */
 export async function seed(
   repository: InMemoryRecipeRepository,
   input: RecipeContentInput,
-  state: { createdAt?: string | null; cookedAt?: string[]; toMakeAt?: string; deletedAt?: string } = {},
+  state: {
+    createdAt?: string | null;
+    cookedAt?: string[];
+    toMakeAt?: string;
+    notes?: { text: string; at: string }[];
+    deletedAt?: string;
+  } = {},
 ): Promise<Recipe> {
   const id = recipeId(`aaaaaaaa-0000-4000-8000-${String(++seeded).padStart(12, "0")}`);
   const created = Recipe.create(id, input, instant(state.createdAt ?? SEEDED_AT));
@@ -75,6 +109,10 @@ export async function seed(
   const recipe = state.createdAt === null ? withoutAddedTime(created.value) : created.value;
   for (const at of state.cookedAt ?? []) expectOk(recipe.markCooked(instant(at)));
   if (state.toMakeAt !== undefined) expectOk(recipe.addToMakeList(instant(state.toMakeAt)));
+  for (const note of state.notes ?? []) {
+    const id = noteId(`dddddddd-0000-4000-8000-${String(++seededNotes).padStart(12, "0")}`);
+    expectOk(recipe.addNote(id, note.text, instant(note.at)));
+  }
   if (state.deletedAt !== undefined) recipe.delete(instant(state.deletedAt));
   await repository.save(recipe);
   return recipe;

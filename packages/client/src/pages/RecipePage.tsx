@@ -9,6 +9,7 @@ import { useViewer } from "../auth/sign-in.js";
 import { useNotices } from "../layout/notices.js";
 import { formatTotalTime } from "../recipes/format.js";
 import { RecipeActions } from "../recipes/RecipeActions.js";
+import { RecipeNotes } from "../recipes/RecipeNotes.js";
 import { ToMakeBadge } from "../recipes/RecipeCard.js";
 import { type RecipeChange, changeErrorMessage, useRecipeChange } from "../recipes/recipe-changes.js";
 import { RecipeTags } from "../recipes/RecipeTags.js";
@@ -145,6 +146,9 @@ function RecipeContent({ recipe }: { recipe: ViewedRecipe }) {
           <NumberedSection id="prep" title="Prep" noun="Prep" entries={recipe.prep} ticks={prepTicks} setTicks={setPrepTicks} />
         )}
         <NumberedSection id="steps" title="Steps" noun="Step" entries={recipe.steps} ticks={stepTicks} setTicks={setStepTicks} />
+
+        {/* REC-25: editors only; the server sends visitors no notes (X-1). */}
+        {editorRecipe !== undefined && <RecipeNotes recipe={editorRecipe} />}
 
         {editorRecipe !== undefined && <BottomActions recipe={editorRecipe} busy={change.busy} />}
       </div>

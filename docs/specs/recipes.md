@@ -83,11 +83,12 @@ tag.
   thumbnail, the date it was deleted and how many days remain before it is permanently removed. An empty trash shows a short
   message saying so. The trash is private, like the "to make" list (X-1).
 - **REC-15. Restore.** An editor can restore a recipe from the trash at any time during its 30 days there. It returns with its
-  content, photo, tags and cooking history unchanged. It is not on the "to make" list, because deleting took it off (PLAN-6).
+  content, photo, tags, cooking history and notes unchanged. It is not on the "to make" list, because deleting took it off
+  (PLAN-6).
 - **REC-16. Permanent removal.** Once a recipe has been in the trash for 30 days, it can no longer be restored, even if it hasn't
-  been removed yet. It is permanently removed, together with its photo and cooking history, within one day after that. The 30 days
-  are measured by the server's clock, never by a time the app sends. Backups are not covered: copies of the recipe and its photo
-  in backups can remain until those backups expire, at most 7 days later (docs/architecture.md, "Backups").
+  been removed yet. It is permanently removed, together with its photo, cooking history and notes, within one day after that.
+  The 30 days are measured by the server's clock, never by a time the app sends. Backups are not covered: copies of the recipe
+  and its photo in backups can remain until those backups expire, at most 7 days later (docs/architecture.md, "Backups").
 - **REC-17. Trashed recipes can't be changed.** Any change to a recipe in the trash, other than restoring it, is refused and
   nothing changes. The editor is told the recipe is in the trash. (This can happen when another device still shows the recipe
   after it was deleted.) The exception is deleting it again: that changes nothing and shows no error.
@@ -125,6 +126,17 @@ tag.
   edit form and left empty if not known. The recipe view shows it next to the total time, as "Serves 4"; a recipe without it shows
   nothing there. The recipe list doesn't show it. Amounts are never scaled to a different number of servings (out of scope, see
   docs/specs/README.md). (Owner decision, 2026-11-11.)
+- **REC-25. Notes.** An editor can add notes to a recipe, such as feedback after cooking it ("use more butter"), to fold into the
+  recipe later. Notes are private: only editors see them (X-1). (Owner decisions, 2026-11-11.)
+  - A note is free text of 1 to 1,000 characters after trimming whitespace, and may have several lines. A recipe has at most 50.
+  - Each note records when it was added, by the server's clock (X-12). Who added it isn't recorded.
+  - The recipe view lists the recipe's notes, newest first, each with its text and the date it was added in the device's time
+    zone. A recipe without notes shows only the option to add one.
+  - An editor can delete a note without being asked to confirm. Notes can't be edited: to change one, delete it and add another.
+  - Notes stay with the recipe when it goes to the trash and when it is restored (REC-15), and are removed with it (REC-16).
+    While it is in the trash they can't be added or deleted (REC-17).
+  - The recipe list doesn't show notes, and search doesn't look in them. They are not part of the recipe's contents, so the
+    create and edit form doesn't show them and editing the recipe leaves them unchanged.
 
 ## Examples
 
@@ -164,6 +176,13 @@ tag.
 | Servings `0`, `2.5` or `101`                                                 | Rejected                                    |
 | Servings left empty                                                          | Saved with no servings; nothing shown       |
 | Servings `4`                                                                 | Recipe view shows "Serves 4"                |
+| Note `"  use more butter "` added Nov 11                                     | Saved as "use more butter", dated Nov 11    |
+| Note of only spaces, or of 1,001 characters                                  | Rejected                                    |
+| Notes added Nov 2, then Nov 9                                                | Listed Nov 9, then Nov 2                    |
+| A visitor opens a recipe that has notes                                      | No notes, and nothing saying there are any  |
+| A 51st note added to a recipe                                                | Rejected                                    |
+| "Pad Thai" with 2 notes deleted, then restored                               | Back with its 2 notes                       |
+| Recipe edited to add an ingredient                                           | Its notes are unchanged                     |
 
 ## Out of scope
 

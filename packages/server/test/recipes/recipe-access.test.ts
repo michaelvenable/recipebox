@@ -26,17 +26,19 @@ import {
 /** The added time of the recipe that isn't in the trash: public (REC-22). */
 const ADDED = "2026-06-15T10:00:00.000Z";
 
-/** A recipe on the to-make list with cooking history, plus one in the trash: every kind of private data there is. */
+/** A recipe on the to-make list with cooking history and notes, plus one in the trash: every kind of private data there is. */
 async function appWithPrivateData(): Promise<Awaited<ReturnType<typeof recipeApp>> & { id: string; trashedId: string }> {
   const setup = await recipeApp("2026-10-10T09:00:00.000Z");
   const recipe = await seed(setup.repository, content("Pad Thai", { tags: ["dinner"] }), {
     createdAt: ADDED,
     cookedAt: ["2026-08-01T18:00:00.000Z", "2026-09-01T18:00:00.000Z"],
     toMakeAt: "2026-09-20T08:00:00.000Z",
+    notes: [{ text: "use more butter", at: "2026-09-25T20:00:00.000Z" }],
   });
   const trashed = await seed(setup.repository, content("Trashed Curry", { tags: ["secret"] }), {
     createdAt: "2026-06-20T10:00:00.000Z",
     cookedAt: ["2026-07-01T18:00:00.000Z"],
+    notes: [{ text: "too spicy", at: "2026-07-01T20:00:00.000Z" }],
     deletedAt: "2026-10-01T08:00:00.000Z",
   });
   return { ...setup, id: recipe.id.value, trashedId: trashed.id.value };
@@ -55,6 +57,8 @@ function publicEndpoints(id: string): [string, { safeParse(v: unknown): { succes
 
 function expectNoPrivateFields(body: string): void {
   for (const field of PRIVATE_FIELDS) expect(body).not.toContain(`"${field}"`);
+  // REC-25: nor any note's text.
+  for (const note of ["use more butter", "too spicy"]) expect(body).not.toContain(note);
   // The one public time is a listed recipe's added time (REC-22). Every other time here is private: history, to-make and
   // trash dates, and the added time of the recipe in the trash.
   const times = body.match(/\d{4}-\d{2}-\d{2}T[^"]*/g) ?? [];
@@ -112,6 +116,7 @@ describe("X-1 recipes are public; the rest is private", () => {
       cookedAt: ["2026-09-01T18:00:00.000Z", "2026-08-01T18:00:00.000Z"],
       lastCookedAt: "2026-09-01T18:00:00.000Z",
       timesCooked: 2,
+      notes: [{ id: expect.any(String), text: "use more butter", addedAt: "2026-09-25T20:00:00.000Z" }],
     });
 
     expect(TagCount.array().parse((await get(app, "/tags", AS_EDITOR)).json())).toEqual([{ tag: "dinner", count: 1 }]);

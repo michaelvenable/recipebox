@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { Instant } from "@recipebox/domain";
 import { type AppDependencies, buildApp } from "../src/app.js";
-import { randomImportId, randomRecipeId, randomShareToken } from "../src/clock.js";
+import { randomImportId, randomNoteId, randomRecipeId, randomShareToken } from "../src/clock.js";
 import { type Config, loadConfig } from "../src/config.js";
 import { InMemoryImportQueue } from "../src/imports/in-memory-import-queue.js";
 import { InMemoryImportRepository } from "../src/imports/in-memory-import-repository.js";
@@ -55,6 +55,7 @@ export async function appWith(
       | "photos"
       | "clock"
       | "newRecipeId"
+      | "newNoteId"
       | "newShareToken"
       | "newImportId"
       | "photoProcessing"
@@ -71,6 +72,7 @@ export async function appWith(
     photos: deps.photos ?? new InMemoryPhotoStore(),
     clock: deps.clock ?? (() => instant(TEST_TIME)),
     newRecipeId: deps.newRecipeId ?? randomRecipeId,
+    newNoteId: deps.newNoteId ?? randomNoteId,
     newShareToken: deps.newShareToken ?? randomShareToken,
     newImportId: deps.newImportId ?? randomImportId,
     ...(deps.photoProcessing === undefined ? {} : { photoProcessing: deps.photoProcessing }),

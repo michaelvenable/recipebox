@@ -43,5 +43,5 @@ ones that haven't been made in a while. Cooking history is private: only signed-
 ## Out of scope
 
 - Recording a cooking for an earlier date (backdating), or changing or deleting an entry.
-- Recording who cooked, ratings, or notes per cooking.
+- Recording who cooked, ratings, or notes per cooking. (Notes on a recipe, not tied to a cooking, are REC-25.)
 - Statistics or charts beyond last-cooked date and count.

@@ -41,6 +41,15 @@ export const TagRequest = z.strictObject({
 });
 export type TagRequest = z.infer<typeof TagRequest>;
 
+/**
+ * Body of POST /recipes/{id}/notes (REC-25): the note as typed; trimming and the length rule are the domain's. No time: the
+ * server records its own (X-12).
+ */
+export const NoteRequest = z.strictObject({
+  text: z.string(),
+});
+export type NoteRequest = z.infer<typeof NoteRequest>;
+
 /** A recipe in the list, as a visitor sees it (X-1). */
 export const RecipeSummary = z.strictObject({
   id: z.string(),
@@ -81,12 +90,25 @@ export const PublicRecipe = z.strictObject({
 });
 export type PublicRecipe = z.infer<typeof PublicRecipe>;
 
-/** One recipe, as an editor sees it: adds to-make status and cooking history (X-1). */
+/** A note on a recipe (REC-25), editor-only like the rest of EditorRecipe's additions (X-1). */
+export const RecipeNote = z.strictObject({
+  id: z.string(),
+  text: z.string(),
+  addedAt: z.string(),
+});
+export type RecipeNote = z.infer<typeof RecipeNote>;
+
+/** One recipe, as an editor sees it: adds to-make status, cooking history and notes (X-1). */
 export const EditorRecipe = PublicRecipe.extend({
   toMake: z.strictObject({ addedAt: z.string() }).optional(),
   /** Newest first. */
   cookedAt: z.array(z.string()),
   lastCookedAt: z.string().optional(),
   timesCooked: z.number(),
+  /**
+   * Newest first (REC-25). Absent when the recipe has none, like `prep`, so clients from before notes, which parse this shape
+   * strictly, can still read recipes without notes.
+   */
+  notes: z.array(RecipeNote).optional(),
 });
 export type EditorRecipe = z.infer<typeof EditorRecipe>;

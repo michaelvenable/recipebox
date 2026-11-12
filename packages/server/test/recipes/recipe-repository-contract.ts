@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
-import { Instant, PhotoRef, Recipe, RecipeId, type RecipeContentInput, type Result } from "@recipebox/domain";
+import { Instant, NoteId, PhotoRef, Recipe, RecipeId, type RecipeContentInput, type Result } from "@recipebox/domain";
 import type { RecipeRepository } from "../../src/recipes/recipe-repository.js";
 
 /**
@@ -103,6 +103,19 @@ export function recipeRepositoryContract(name: string, createRepository: () => P
 
         const loaded = (await repository.get(recipe.id))?.toSnapshot();
         expect(loaded).not.toHaveProperty("photo");
+        expect(loaded).toStrictEqual(recipe.toSnapshot());
+      });
+
+      it("no notes after the last note is deleted (REC-25)", async () => {
+        const recipe = newRecipe("Pancakes");
+        const note = valueOf(recipe.addNote(newNoteId(), "less sugar", at("2026-10-03T08:00:00Z")));
+        await repository.save(recipe);
+        valueOf(recipe.deleteNote(note.id.value));
+
+        await repository.save(recipe);
+
+        const loaded = (await repository.get(recipe.id))?.toSnapshot();
+        expect(loaded).not.toHaveProperty("notes");
         expect(loaded).toStrictEqual(recipe.toSnapshot());
       });
     });
@@ -267,7 +280,14 @@ function fullRecipe(): Recipe {
   valueOf(recipe.markCooked(at("2026-09-01T12:00:00Z")));
   valueOf(recipe.markCooked(at("2026-10-01T12:30:00.123Z")));
   valueOf(recipe.addToMakeList(at("2026-10-05T07:00:00Z")));
+  // REC-25: several lines, and characters beyond ASCII.
+  valueOf(recipe.addNote(newNoteId(), "Mere smør 🧈\nLess salt", at("2026-10-06T19:00:00.500Z")));
+  valueOf(recipe.addNote(newNoteId(), "Try caraway", at("2026-10-07T19:00:00Z")));
   return recipe;
+}
+
+function newNoteId(): NoteId {
+  return valueOf(NoteId.create(randomUUID()));
 }
 
 function at(iso: string): Instant {

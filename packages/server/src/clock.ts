@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { ImportId, Instant, RecipeId, ShareToken } from "@recipebox/domain";
+import { ImportId, Instant, NoteId, RecipeId, ShareToken } from "@recipebox/domain";
 
 /**
  * The server's clock (X-12): the only source of every stored time. Passed into the app so tests can set the time; the domain
@@ -18,6 +18,15 @@ export const systemClock: Clock = () => {
 
 export const randomRecipeId: RecipeIdGenerator = () => {
   const id = RecipeId.create(randomUUID());
+  if (!id.ok) throw new Error("crypto.randomUUID returned something that is not a UUID");
+  return id.value;
+};
+
+/** Creates the id of a new note on a recipe (REC-25). Passed into the app so tests can control ids. */
+export type NoteIdGenerator = () => NoteId;
+
+export const randomNoteId: NoteIdGenerator = () => {
+  const id = NoteId.create(randomUUID());
   if (!id.ok) throw new Error("crypto.randomUUID returned something that is not a UUID");
   return id.value;
 };

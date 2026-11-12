@@ -40,8 +40,8 @@ Visitors get the public shapes. Editors calling the same endpoints get the edito
 - `GET /recipes?name=&tags=` — the recipe list with search and tag filter (REC-8, REC-9, REC-13). `tags` is comma-separated.
   Returns `RecipeSummary[]` (visitor) or `EditorRecipeSummary[]` (editor, adds `onToMakeList`).
 - `GET /tags` — tags in use with counts (REC-13). Returns `TagCount[]`.
-- `GET /recipes/{id}` — one recipe (REC-4). Returns `PublicRecipe` or `EditorRecipe` (adds to-make status and cooking history).
-  404 if it is in the trash.
+- `GET /recipes/{id}` — one recipe (REC-4). Returns `PublicRecipe` or `EditorRecipe` (adds to-make status, cooking history and
+  notes). 404 if it is in the trash.
 - `GET /recipes/{id}/photo` and `GET /recipes/{id}/thumbnail` — the images (REC-7). 404 if there is no photo. If the recipe is in
   the trash: 404 for visitors and non-editors, but editors get the images, so the trash can show thumbnails (REC-14, X-1).
 - `GET /me` — the Account page (X-11). Returns `Me`: whether signed in, provider, account ID, and whether an editor.
@@ -92,6 +92,15 @@ Cooking history:
 - `GET /recommendations?tags=` — "Haven't made in a while" (COOK-6), filtered by tags (COOK-9). `tags` is read as on
   `GET /recipes`: comma-separated, only recipes with every one, still in the COOK-6 order. Returns `RediscoverEntry[]`.
 
+Notes:
+- `POST /recipes/{id}/notes` — add a note (REC-25). Body `NoteRequest`, the text as typed; the server makes the note's id and
+  takes the added time from its clock (X-12). Returns `EditorRecipe`. Errors (400): `note.required`, `note.tooLong` (field
+  `text`), `notes.tooMany` when the recipe already has 50.
+- `DELETE /recipes/{id}/notes/{noteId}` — delete a note at once (REC-25). Body `EmptyRequest`. Returns `EditorRecipe`. A note
+  the recipe doesn't have, such as one already deleted from another device, or a malformed note id: 404 `note.notFound`.
+- Notes can't be edited, and no other endpoint changes them: `PUT /recipes/{id}/content` leaves them as they are (REC-25).
+  While the recipe is in the trash both answer 409 `recipe.inTrash` (REC-17), whatever the body or note id.
+
 Import from a photo:
 - `POST /imports` — start an import of one recipe from 1 to 4 photos (IMP-1 to IMP-4). Body: the photos as
   `multipart/form-data` with `X-Requested-By`, one file part per photo, in the order added; field names don't matter. Before
@@ -124,7 +133,11 @@ Trash:
 - `PublicRecipe`: `id`, `name`, `ingredients[]`, `prep[]?`, `steps[]`, `totalTimeMinutes?`, `servings?`, `tags[]`, `hasPhoto`.
   `prep` and `servings` are left out when the recipe has none (REC-20, REC-24), so older clients, which refuse unknown fields,
   can still read the recipe.
-- `EditorRecipe`: `PublicRecipe` plus `toMake?` (`addedAt`), `cookedAt[]` (newest first), `lastCookedAt?`, `timesCooked`.
+- `EditorRecipe`: `PublicRecipe` plus `toMake?` (`addedAt`), `cookedAt[]` (newest first), `lastCookedAt?`, `timesCooked`,
+  `notes[]?` (`RecipeNote`, newest first). `notes` is left out when there are none, like `prep`, so older clients can still
+  read recipes without notes.
+- `RecipeNote`: `id`, `text`, `addedAt` (REC-25). Not who added it, which isn't recorded.
+- `NoteRequest`: `{ text }`, the note as typed (REC-25).
 - `TagCount`: `tag`, `count`. `Tag`: a string.
 - `ShoppingItem`: `text` (the ingredient as entered), `recipeId`, `recipeName`.
 - `ShoppingListLink`: `token`, `path` (`/list/{token}`, the client's page for it), `expiresAt`.
@@ -137,7 +150,8 @@ Trash:
   time, failure reason or photo; the reason is only in the server log (IMP-11).
 - `Me`: `signedIn`, `provider?` (`aad` or `google`), `accountId?`, `isEditor`.
 - `ErrorResponse`: `errors[]` of `{ code, field?, message }`.
-- `EmptyRequest`: `{}`, the body of a change that needs no input (delete, restore, add to the list, mark cooked).
+- `EmptyRequest`: `{}`, the body of a change that needs no input (delete, restore, add to the list, mark cooked, delete a
+  note).
 
-Public shapes never include `toMake`, `cookedAt`, `lastCookedAt`, `timesCooked`, `deletedAt` or `onToMakeList` (X-1). Tests check
-this for every public endpoint. The only time in a public recipe shape is a listed recipe's `createdAt` (REC-22).
+Public shapes never include `toMake`, `cookedAt`, `lastCookedAt`, `timesCooked`, `notes`, `deletedAt` or `onToMakeList` (X-1).
+Tests check this for every public endpoint. The only time in a public recipe shape is a listed recipe's `createdAt` (REC-22).

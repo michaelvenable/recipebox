@@ -119,7 +119,7 @@ function prep(n: number): HTMLElement {
   return screen.getByRole("button", { name: `Prep ${n} done` });
 }
 
-const EDITOR_CONTROLS = ["I cooked this today", "I want to cook this", "Edit", "+ Tag", "History", "Remove", "Remove tag dinner"];
+const EDITOR_CONTROLS = ["I cooked this today", "I want to cook this", "Edit", "+ Tag", "History", "Remove", "Remove tag dinner", "Add note"];
 
 function editorControlsShown(): string[] {
   return EDITOR_CONTROLS.filter(
@@ -226,7 +226,7 @@ describe("X-1, X-8 visitors and editors", () => {
 
   it("shows editors the actions, history and Edit link, but no way to change the tags (REC-10)", async () => {
     await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI, cooked(at(2026, 7, 2))) } });
-    expect(editorControlsShown()).toEqual(["I cooked this today", "I want to cook this", "Edit", "History"]);
+    expect(editorControlsShown()).toEqual(["I cooked this today", "I want to cook this", "Edit", "History", "Add note"]);
     expect(screen.getByRole("link", { name: "Edit" })).toHaveAttribute("href", `/recipes/${ID}/edit`);
   });
 
@@ -754,5 +754,128 @@ describe("REC-24 servings on the view", () => {
   it("spec example: a recipe without servings shows nothing there", async () => {
     await openRecipe({ me: VISITOR, recipes: { [ID]: () => PAD_THAI } });
     expect(screen.queryByText(/^Serves/)).toBeNull();
+  });
+});
+
+describe("REC-25 notes on the recipe view", () => {
+  const NOTE_1 = "11111111-0000-4000-8000-000000000001";
+  const NOTE_2 = "11111111-0000-4000-8000-000000000002";
+  const NOV_2 = at(2026, 10, 2, 19, 0);
+  const NOV_9 = at(2026, 10, 9, 0, 30);
+  /** Notes as the server sends them: newest first. */
+  const LESS_SALT = { id: NOTE_2, text: "less salt", addedAt: NOV_9 };
+  const MORE_BUTTER = { id: NOTE_1, text: "use more butter\nand more lime", addedAt: NOV_2 };
+
+  function noteItems(): string[] {
+    const list = screen.getByRole("list", { name: "Notes" });
+    return within(list)
+      .getAllByRole("listitem")
+      .map((li) => [li.querySelector(".note-text")?.textContent, li.querySelector("time")?.textContent].join(" | "));
+  }
+
+  it("spec example: notes added Nov 2, then Nov 9, are listed Nov 9, then Nov 2, with text and local date", async () => {
+    await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI, { notes: [LESS_SALT, MORE_BUTTER] }) } });
+    expect(screen.getByRole("heading", { level: 2, name: "Notes" })).toBeInTheDocument();
+    // Several lines are kept as they are.
+    expect(noteItems()).toEqual(["less salt | Nov 9, 2026", "use more butter\nand more lime | Nov 2, 2026"]);
+    expect(screen.getByRole("textbox", { name: "New note" })).toBeInTheDocument();
+  });
+
+  it("shows a recipe without notes only the option to add one", async () => {
+    await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI) } });
+    expect(screen.getByRole("textbox", { name: "New note" })).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Add note" })).toBeEnabled();
+    expect(screen.queryByRole("list", { name: "Notes" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Delete note/ })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["visitors", VISITOR],
+    ["signed-in non-editors", NON_EDITOR],
+  ])("spec example: shows %s no notes, and nothing saying there are any (X-1)", async (_who, me) => {
+    await openRecipe({ me, recipes: { [ID]: () => PAD_THAI } });
+    expect(screen.queryByRole("heading", { name: "Notes" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "New note" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/note/i)).not.toBeInTheDocument();
+  });
+
+  it("shows no notes once the app knows the person is a visitor, even if a cached recipe has them", async () => {
+    await openRecipe({ me: VISITOR, recipes: { [ID]: () => asEditor(PAD_THAI, { notes: [LESS_SALT] }) } });
+    await screen.findByRole("link", { name: "Sign in" });
+    expect(screen.queryByText("less salt")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Notes" })).not.toBeInTheDocument();
+  });
+
+  it("adds a note as typed, without a time (X-12), shows the saved note and empties the box", async () => {
+    const saved = asEditor(PAD_THAI, { notes: [{ id: NOTE_1, text: "use more butter", addedAt: at(2026, 10, 11, 19, 30) }] });
+    const { fetchMock } = await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI) }, change: () => saved });
+
+    await userEvent.type(screen.getByRole("textbox", { name: "New note" }), "  use more butter ");
+    await userEvent.click(screen.getByRole("button", { name: "Add note" }));
+
+    await screen.findByRole("list", { name: "Notes" });
+    expect(noteItems()).toEqual(["use more butter | Nov 11, 2026"]);
+    expect(screen.getByRole("textbox", { name: "New note" })).toHaveValue("");
+    expect(changes(fetchMock)).toEqual([
+      { method: "POST", path: `/recipes/${ID}/notes`, body: JSON.stringify({ text: "  use more butter " }), contentType: "application/json" },
+    ]);
+  });
+
+  it("shows the server's message for a rejected note, keeping the text to fix", async () => {
+    await openRecipe({
+      recipes: { [ID]: () => asEditor(PAD_THAI) },
+      change: () =>
+        jsonResponse(400, { errors: [{ code: "note.tooLong", field: "text", message: "A note must be at most 1000 characters." }] }),
+    });
+    await userEvent.type(screen.getByRole("textbox", { name: "New note" }), "too long");
+    await userEvent.click(screen.getByRole("button", { name: "Add note" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("A note must be at most 1000 characters.");
+    expect(screen.getByRole("textbox", { name: "New note" })).toHaveValue("too long");
+  });
+
+  it("deletes a note at once, without asking to confirm, sending an empty body", async () => {
+    const confirm = vi.spyOn(window, "confirm");
+    const { fetchMock } = await openRecipe({
+      recipes: { [ID]: () => asEditor(PAD_THAI, { notes: [LESS_SALT, MORE_BUTTER] }) },
+      change: () => asEditor(PAD_THAI, { notes: [MORE_BUTTER] }),
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete note from Nov 9, 2026" }));
+
+    await waitFor(() => expect(screen.queryByText("less salt")).not.toBeInTheDocument());
+    expect(confirm).not.toHaveBeenCalled();
+    expect(changes(fetchMock)).toEqual([
+      { method: "DELETE", path: `/recipes/${ID}/notes/${NOTE_2}`, body: "{}", contentType: "application/json" },
+    ]);
+    confirm.mockRestore();
+  });
+
+  it("says when the note was already deleted, and reloads the recipe so it goes", async () => {
+    let loads = 0;
+    const { fetchMock } = await openRecipe({
+      recipes: {
+        [ID]: () => (++loads === 1 ? asEditor(PAD_THAI, { notes: [LESS_SALT, MORE_BUTTER] }) : asEditor(PAD_THAI, { notes: [MORE_BUTTER] })),
+      },
+      change: () =>
+        jsonResponse(404, { errors: [{ code: "note.notFound", message: "This note doesn't exist. It may have been deleted already." }] }),
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete note from Nov 9, 2026" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("This note doesn't exist.");
+    await waitFor(() => expect(screen.queryByText("less salt")).not.toBeInTheDocument());
+    expect(requests(fetchMock).filter((r) => r.path === `/recipes/${ID}`).length).toBeGreaterThan(1);
+  });
+
+  it("says the recipe is in the trash when adding a note is refused (REC-17)", async () => {
+    await openRecipe({
+      recipes: { [ID]: () => asEditor(PAD_THAI) },
+      change: () =>
+        jsonResponse(409, { errors: [{ code: "recipe.inTrash", message: "This recipe is in the trash. Restore it before changing it." }] }),
+    });
+    await userEvent.type(screen.getByRole("textbox", { name: "New note" }), "less salt");
+    await userEvent.click(screen.getByRole("button", { name: "Add note" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("This recipe is in the trash.");
   });
 });

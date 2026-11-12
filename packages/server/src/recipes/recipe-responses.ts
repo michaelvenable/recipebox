@@ -60,15 +60,22 @@ export function toPublicRecipe(recipe: Recipe): PublicRecipe {
   };
 }
 
-/** One recipe, as an editor sees it: adds to-make status and cooking history (X-1). */
+/** One recipe, as an editor sees it: adds to-make status, cooking history and notes (X-1, REC-25). */
 export function toEditorRecipe(recipe: Recipe): EditorRecipe {
   const addedAt = recipe.addedToMakeListAt;
+  const notes = recipe.notes;
   return {
     ...toPublicRecipe(recipe),
     toMake: addedAt === undefined ? undefined : { addedAt: addedAt.toIso() },
     cookedAt: recipe.cookedAt.map((at) => at.toIso()),
     lastCookedAt: recipe.lastCookedAt?.toIso(),
     timesCooked: recipe.timesCooked,
+    // Newest first, as the domain keeps them. Left out when there are none, like prep, so clients from before notes (strict
+    // shapes) can still read recipes without any.
+    notes:
+      notes.length === 0
+        ? undefined
+        : notes.map((n) => ({ id: n.id.value, text: n.text.value, addedAt: n.addedAt.toIso() })),
   };
 }
 

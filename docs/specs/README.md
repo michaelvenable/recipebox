@@ -28,7 +28,7 @@ been cooked in a while.
 
 - **X-1. Recipes are public; the rest is private.** Anyone with the app's address can, without signing in, view recipes and their
   photos, search by name (REC-9), filter by tag with counts (REC-13) and see recently added recipes with their added dates
-  (REC-22). The "to make" list and cooking history are visible only
+  (REC-22). The "to make" list, cooking history and recipe notes (REC-25) are visible only
   to signed-in editors. That includes the "to make" indicator (PLAN-7), last-cooked date and count (COOK-5) and the "haven't made
   in a while" view (COOK-6). The trash (REC-14) is private too, including the photos of recipes in it, and so are imports in
   progress (IMP-5). The server never sends this data to a visitor; hiding it in the app is not enough on its own. The one
@@ -73,7 +73,8 @@ been cooked in a while.
 - **X-15. Privacy page.** Anyone, signed in or not, can open a Privacy page at `/privacy`. In plain words, it says what the app
   stores and who can see it:
   - recipes and their photos, which are public (X-1);
-  - the "to make" list, cooking history and trash, which only editors can see, apart from shopping list links (PLAN-9);
+  - the "to make" list, cooking history, recipe notes (REC-25) and trash, which only editors can see, apart from shopping list
+    links (PLAN-9);
   - sign-in through Microsoft or Google, and that the app keeps only the provider and permanent account ID from it, not a name
     or email address (X-7);
   - that a photo uploaded to import a recipe (IMP-1) is sent to an AI service in the app's own Microsoft Azure account to read the

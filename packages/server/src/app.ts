@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import type { HealthResponse, Me } from "@recipebox/shared";
-import type { Clock, ImportIdGenerator, RecipeIdGenerator, ShareTokenGenerator } from "./clock.js";
+import type { Clock, ImportIdGenerator, NoteIdGenerator, RecipeIdGenerator, ShareTokenGenerator } from "./clock.js";
 import type { Config } from "./config.js";
 import { registerCaller } from "./http/caller.js";
 import { registerJsonOnlyChanges } from "./http/content-type.js";
@@ -36,6 +36,8 @@ export interface AppDependencies {
   clock: Clock;
   /** Creates the id for a new recipe (REC-1). */
   newRecipeId: RecipeIdGenerator;
+  /** Creates the id of a new note on a recipe (REC-25). */
+  newNoteId: NoteIdGenerator;
   /** Creates the random code of a new shopping list link (PLAN-9). */
   newShareToken: ShareTokenGenerator;
   /** Creates the id of a new import (IMP-1). */
@@ -61,6 +63,7 @@ export async function buildApp({
   photos,
   clock,
   newRecipeId,
+  newNoteId,
   newShareToken,
   newImportId,
   photoProcessing = {},
@@ -96,7 +99,7 @@ export async function buildApp({
   registerSignedInRoute(app, config.clientOrigin);
 
   // Each in its own scope, so their hooks (and the photo routes' multipart parser) apply only to them.
-  await app.register(async (scope) => registerRecipeRoutes(scope, { recipes, clock, newRecipeId }));
+  await app.register(async (scope) => registerRecipeRoutes(scope, { recipes, clock, newRecipeId, newNoteId }));
   await app.register(async (scope) => registerSharedListRoutes(scope, { recipes, sharedLists, clock, newShareToken }));
   await app.register(async (scope) => registerPhotoRoutes(scope, { recipes, photos, photoProcessing }));
   await app.register(async (scope) =>
