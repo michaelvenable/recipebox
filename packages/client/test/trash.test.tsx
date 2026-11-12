@@ -439,7 +439,7 @@ describe("REC-6 the Undo message", () => {
     const tags = within(screen.getByRole("list", { name: "Tags" }));
     expect(tags.getByText("dinner")).toBeInTheDocument();
     expect(tags.getByText("noodles")).toBeInTheDocument();
-    expect(screen.getByText(/cooked once/)).toBeInTheDocument();
+    expect(screen.getByText(/^Last cooked /)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "I want to cook this" })).toBeInTheDocument();
     expect(screen.queryByText("Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
     // Opening it closes the message.
@@ -630,7 +630,7 @@ describe("REC-15 restore from the trash", () => {
     expect(open).toHaveFocus();
     await userEvent.click(open);
     expect(await screen.findByRole("heading", { level: 1, name: "Pad Thai" })).toBeInTheDocument();
-    expect(screen.getByText(/cooked once/)).toBeInTheDocument();
+    expect(screen.getByText(/^Last cooked /)).toBeInTheDocument();
   });
 
   it("shows the empty trash after restoring the last entry", async () => {

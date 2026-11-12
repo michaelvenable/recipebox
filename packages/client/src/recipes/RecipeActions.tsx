@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EditorRecipe } from "@recipebox/shared";
-import { formatDate, formatRecentDay, isOnLocalDay } from "./dates.js";
+import { formatRecentDay, isOnLocalDay } from "./dates.js";
 import { focusIsUnclaimed } from "./focus.js";
 import { useLocalDay } from "./use-local-day.js";
 
@@ -20,7 +20,7 @@ type FocusTarget = "cook" | "addToPlan" | "removeFromPlan";
 
 /**
  * The editor's actions on a recipe (X-8): "I cooked this today" (COOK-1, COOK-8), the to-make list (PLAN-1, PLAN-4) and the
- * cooking history (COOK-5). Editors only; the server sends none of this to visitors (X-1).
+ * last-cooked date (COOK-5). Editors only; the server sends none of this to visitors (X-1).
  */
 export function RecipeActions({ recipe, busy, error, markCooked, addToPlan, removeFromPlan }: RecipeActionsProps) {
   // Whether it was cooked today is decided on the device, in its time zone, and rechecked when the day changes (X-12, COOK-8).
@@ -93,34 +93,8 @@ export function RecipeActions({ recipe, busy, error, markCooked, addToPlan, remo
   );
 }
 
-function timesCooked(count: number): string {
-  return count === 1 ? "cooked once" : `cooked ${count} times`;
-}
-
-/** "Last cooked Aug 2 · cooked 6 times · History", with History showing every entry, newest first (COOK-5). No deleting. */
+/** "Last cooked Aug 2" or "Never cooked". Every cooking is recorded, but the app shows neither the count nor the entries (COOK-5). */
 function CookingHistory({ recipe, today }: { recipe: EditorRecipe; today: string }) {
-  const [open, setOpen] = useState(false);
-  const listId = useId();
-
   if (recipe.lastCookedAt === undefined) return <p className="cook-summary">Never cooked</p>;
-  return (
-    <>
-      <p className="cook-summary">
-        Last cooked {formatRecentDay(recipe.lastCookedAt, today)} · {timesCooked(recipe.timesCooked)} ·{" "}
-        <button type="button" className="link-button history-toggle" aria-expanded={open} aria-controls={listId} onClick={() => setOpen(!open)}>
-          History
-        </button>
-      </p>
-      {open && (
-        // The server's order: newest first.
-        <ol id={listId} className="cook-history" aria-label="Cooking history">
-          {recipe.cookedAt.map((at, index) => (
-            <li key={`${at}-${index}`}>
-              <time dateTime={at}>{formatDate(at)}</time>
-            </li>
-          ))}
-        </ol>
-      )}
-    </>
-  );
+  return <p className="cook-summary">Last cooked {formatRecentDay(recipe.lastCookedAt, today)}</p>;
 }

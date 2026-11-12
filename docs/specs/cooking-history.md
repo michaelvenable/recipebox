@@ -12,9 +12,9 @@ ones that haven't been made in a while. Cooking history is private: only signed-
 - **COOK-2.** (withdrawn) "Today" no longer comes from the device; cooking times come from the server (X-12).
 - **COOK-3.** (withdrawn) Future dates can't occur, because the server records the time.
 - **COOK-4.** (withdrawn) Duplicate entries are allowed. Marking a recipe cooked twice records two entries.
-- **COOK-5. History on the recipe.** A recipe shows the date it was last cooked ("Never cooked" if none) and how many times it has
-  been cooked. An editor can see the full list of entries, newest first, each shown as a date in the device's time zone. Entries
-  can't be deleted or changed.
+- **COOK-5. History on the recipe.** A recipe shows the date it was last cooked ("Never cooked" if none). Every cooking is still
+  recorded (COOK-1), but the app shows neither how many times a recipe has been cooked nor the list of entries (owner decision,
+  2026-11-11). Entries can't be deleted or changed.
 - **COOK-6. "Haven't made in a while" view.** In the app, this view is called "Recommendations". An editor can see all recipes
   ordered by when they were last cooked, least recent first, each showing the last-cooked date and how long ago that was ("3
   months ago"). Recipes never cooked appear before all others, sorted by name.

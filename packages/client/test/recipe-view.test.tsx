@@ -225,9 +225,9 @@ describe("X-1, X-8 visitors and editors", () => {
     expect(step(1)).toBeEnabled();
   });
 
-  it("shows editors the actions, history and Edit link, but no way to change the tags (REC-10)", async () => {
+  it("shows editors the actions, last-cooked date and Edit link, but no way to change the tags (REC-10)", async () => {
     await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI, cooked(at(2026, 7, 2))) } });
-    expect(editorControlsShown()).toEqual(["I cooked this today", "I want to cook this", "Edit", "History", "Add note"]);
+    expect(editorControlsShown()).toEqual(["I cooked this today", "I want to cook this", "Edit", "Add note"]);
     expect(screen.getByRole("link", { name: "Edit" })).toHaveAttribute("href", `/recipes/${ID}/edit`);
   });
 
@@ -452,7 +452,7 @@ describe("COOK-1, COOK-8 cooked today", () => {
     expect(changes(fetchMock)).toEqual([
       { method: "POST", path: `/recipes/${ID}/cookings`, body: "{}", contentType: "application/json" },
     ]);
-    expect(screen.getByText(/Last cooked today · cooked once/)).toBeInTheDocument();
+    expect(screen.getByText("Last cooked today")).toBeInTheDocument();
   });
 
   it("styles I cooked this today like I want to cook this, not as the primary action", async () => {
@@ -473,7 +473,7 @@ describe("COOK-1, COOK-8 cooked today", () => {
     setClock(new Date(2026, 10, 5, 0, 1));
     await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI, cooked(at(2026, 10, 4, 23, 59))) } });
     expect(screen.getByRole("button", { name: "I cooked this today" })).toBeEnabled();
-    expect(screen.getByText(/Last cooked Nov 4 · cooked once/)).toBeInTheDocument();
+    expect(screen.getByText("Last cooked Nov 4")).toBeInTheDocument();
   });
 
   it("offers the button again at local midnight while the recipe stays open", async () => {
@@ -591,7 +591,7 @@ describe("PLAN-1, PLAN-4, PLAN-7 the to-make list from the recipe", () => {
     expect(screen.getByRole("button", { name: "I want to cook this" })).toHaveFocus();
     expect(screen.queryByText("On your plan ✓")).not.toBeInTheDocument();
     expect(screen.queryByText("Plan", { selector: ".to-make-badge" })).not.toBeInTheDocument();
-    expect(screen.getByText(/Last cooked Aug 2 · cooked once/)).toBeInTheDocument();
+    expect(screen.getByText("Last cooked Aug 2")).toBeInTheDocument();
     expect(changes(fetchMock)).toEqual([
       { method: "POST", path: `/recipes/${ID}/remove-from-plan`, body: "{}", contentType: "application/json" },
     ]);
@@ -642,30 +642,25 @@ describe("COOK-5 history on the recipe", () => {
     expect(screen.queryByRole("button", { name: "History" })).not.toBeInTheDocument();
   });
 
-  it("shows the last-cooked date and count, and the full list newest first as local dates, without delete", async () => {
+  it("shows only the last-cooked date as a local date, not the count or the list of entries", async () => {
     setClock(NOV_4_6PM);
-    // Just after and just before local midnight: in any time zone but UTC, one of these is on another day in UTC.
+    // Three entries, newest first: only the newest is shown, as a date in the device's time zone.
     const entries = [at(2026, 7, 2, 0, 30), at(2026, 6, 14, 23, 30), at(2025, 11, 31, 19, 0)];
     await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI, cooked(...entries)) } });
-    expect(screen.getByText(/Last cooked Aug 2 · cooked 3 times/)).toBeInTheDocument();
+    const summary = screen.getByText("Last cooked Aug 2");
+    expect(summary.textContent).toBe("Last cooked Aug 2");
+    const actions = screen.getByRole("region", { name: "Cooking" });
+    expect(within(actions).queryByText(/times|once/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "History" })).not.toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Cooking history" })).not.toBeInTheDocument();
-
-    const toggle = screen.getByRole("button", { name: "History" });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await userEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    const list = screen.getByRole("list", { name: "Cooking history" });
-    expect(within(list).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Aug 2, 2026", "Jul 14, 2026", "Dec 31, 2025"]);
-    expect(within(list).queryAllByRole("button")).toEqual([]);
-
-    await userEvent.click(toggle);
-    expect(screen.queryByRole("list", { name: "Cooking history" })).not.toBeInTheDocument();
+    expect(within(actions).queryByText("Jul 14, 2026")).not.toBeInTheDocument();
+    expect(within(actions).queryAllByRole("list")).toEqual([]);
   });
 
   it("gives the year of a last cooking in an earlier year", async () => {
     setClock(NOV_4_6PM);
     await openRecipe({ recipes: { [ID]: () => asEditor(PAD_THAI, cooked(at(2025, 11, 31, 19, 0))) } });
-    expect(screen.getByText(/Last cooked Dec 31, 2025 · cooked once/)).toBeInTheDocument();
+    expect(screen.getByText("Last cooked Dec 31, 2025")).toBeInTheDocument();
   });
 });
 

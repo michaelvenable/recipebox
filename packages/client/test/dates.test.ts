@@ -42,7 +42,7 @@ describe("COOK-8 the device's local day", () => {
   });
 });
 
-describe("COOK-5 history dates", () => {
+describe("REC-25 note dates", () => {
   it("shows a stored time as a date in the device's time zone", () => {
     expect(formatDate("2026-08-02T03:30:00Z")).toBe("Aug 1, 2026");
   });

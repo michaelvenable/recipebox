@@ -29,7 +29,7 @@ been cooked in a while.
 - **X-1. Recipes are public; the rest is private.** Anyone with the app's address can, without signing in, view recipes and their
   photos, search by name (REC-9), filter by tag (REC-13) and see recently added recipes with their added dates
   (REC-22). The "to make" list, cooking history and recipe notes (REC-25) are visible only
-  to signed-in editors. That includes the "to make" indicator (PLAN-7), last-cooked date and count (COOK-5) and the "haven't made
+  to signed-in editors. That includes the "to make" indicator (PLAN-7), last-cooked date (COOK-5) and the "haven't made
   in a while" view (COOK-6). The trash (REC-14) is private too, including the photos of recipes in it, and so are imports in
   progress (IMP-5). The server never sends this data to a visitor; hiding it in the app is not enough on its own. The one
   exception is a shopping list an editor sends (PLAN-9): for 7 days, anyone with its link can see the current shopping list, and

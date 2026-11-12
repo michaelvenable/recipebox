@@ -905,17 +905,6 @@ code {
   color: var(--muted);
 }
 
-.history-toggle {
-  font-weight: 700;
-}
-
-.cook-history {
-  margin: 0;
-  padding: 0 0 0 20px;
-  font-size: 15px;
-  color: var(--muted);
-}
-
 .section-header {
   display: flex;
   align-items: center;
